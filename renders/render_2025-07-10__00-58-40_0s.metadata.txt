@@ -1,0 +1,2 @@
+time elapsed: 404 ms/0.404 s/0.00673333 m
+width: 256 height: 256  
