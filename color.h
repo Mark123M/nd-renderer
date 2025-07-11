@@ -8,13 +8,23 @@ struct color {
     float r = 0.f;
     float g = 0.f;
     float b = 0.f;
+
+    color(float r0, float g0, float b0): r{r0}, g{g0}, b{b0} {}
+    color operator+(const color& other) {
+        return { r + other.r, g + other.g, b + other.b };
+    }
 };
 
+inline color operator*(float k, color c) {
+    return { k * c.r, k * c.g, k * c.b };
+}
+
 inline float apply_gamma(float f) {
-    if (f > 0) {
+    /* if (f > 0) {
         return std::sqrt(f);
     }
-    return 0;
+    return 0; */
+    return f;
 }
 
 inline void write_color(std::ofstream& file, const color& col) {

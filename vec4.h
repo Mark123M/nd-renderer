@@ -116,7 +116,7 @@ inline vec4 operator*(float k, const vec4& v) { return { k * v.x, k * v.y, k * v
 inline vec4 operator*(const vec4& v, float k) { return k * v; }
 
 inline std::ostream& operator<<(std::ostream& out, const vec4& v) {
-	out << v.x << " " << v.y << " " << v.z;
+	out << v.x << " " << v.y << " " << v.z << " " << v.w;
 	return out;
 }
 
