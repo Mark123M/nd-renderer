@@ -9,6 +9,8 @@ class vec4;
 inline vec4 operator*(float k, const vec4& v);
 inline float dot(const vec4& a, const vec4& b);
 
+using point4 = vec4;
+
 class vec4 {
 public:
 	float x, y, z, w;
@@ -108,8 +110,6 @@ public:
 		return std::fabs(x) < t && std::fabs(y) < t && std::fabs(z) < t;
 	}
 };
-
-using point3 = vec4;
 
 inline vec4 operator*(float k, const vec4& v) { return { k * v.x, k * v.y, k * v.z, k * v.w }; }
 
