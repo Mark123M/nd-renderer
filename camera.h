@@ -6,6 +6,8 @@
 #include <sstream>
 #include "ray.h"
 #include <vector>
+#include <cassert>
+#include "util.h"
 
 inline std::tm localtime_xp(std::time_t timer) {
     std::tm bt{};
@@ -34,6 +36,7 @@ class camera {
     vec4 pixel_y;
     point4 camera_center;
     point4 pixel00_center;
+    std::vector<nsphere>& scene;
 
     void initialize() {
         image_height = std::max(1.f, image_width / aspect_ratio);
@@ -51,17 +54,85 @@ class camera {
         pixel00_center = viewport_top_left + 0.5 * (pixel_x + pixel_y);
     }
 
-    color ray_color(const ray& r) {
+    float scene_sdf(const point4& p, nsphere** target_ptr) {
+        float sdf = MAX_DIST + 5;
+        
+        for (nsphere& obj : scene) {
+            float obj_sdf = obj.sdf(p);
+
+            if (obj_sdf < sdf) {
+                sdf = obj_sdf;
+                *target_ptr = &obj; // assign object pointer
+            }
+        }
+
+        assert(sdf >= -TOL); // only reflections
+        return sdf;
+    }
+
+    float scene_sdf(const point4& p) {
+        float sdf = MAX_DIST;
+
+        for (nsphere& obj : scene) {
+            float obj_sdf = obj.sdf(p);
+
+            if (obj_sdf < sdf) {
+                sdf = obj_sdf;
+            }
+        }
+
+        assert(sdf >= -TOL); // only reflections
+        return sdf;
+    }
+
+    vec4 get_normal(const vec4& p) {
+        float sdf_diff_x = scene_sdf(p + delta_x) - scene_sdf(p - delta_x);
+        float sdf_diff_y = scene_sdf(p + delta_y) - scene_sdf(p - delta_y);
+        float sdf_diff_z = scene_sdf(p + delta_z) - scene_sdf(p - delta_z);
+        float sdf_diff_w = scene_sdf(p + delta_w) - scene_sdf(p - delta_w);
+
+        return normalize(vec4(sdf_diff_x, sdf_diff_y, sdf_diff_z, sdf_diff_w));
+    }
+
+    void ray_march(ray& r, nsphere** target_ptr) {
+        //float a = 0.5f * (r.dir.y + 1.f);
+        //return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+        do {
+            float dist = scene_sdf(r.pos, target_ptr);
+
+            if (dist <= TOL) {
+                return;
+            } else if (dist > MAX_DIST) {
+                *target_ptr = nullptr; // no object hit
+                return;
+            } else {
+                r.march(dist);
+            }
+        } while (true);
+    }
+
+    color ray_color(ray& r) {
+        nsphere* target = nullptr;
+        ray_march(r, &target);
+
+        if (target != nullptr) {
+            vec4 normal = get_normal(r.pos);
+            return 0.5 * color(normal.x + 1, normal.y + 1, normal.z + 1);
+        }
+
         vec4 unit_direction = normalize(r.dir);
         float a = 0.5f * (unit_direction.y + 1.f);
         return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
     }
+
 public:
     float aspect_ratio = 1.f;
     int image_width = 100;
     float focal_length = 1.f;
 
-    void render(const std::vector<nsphere>& scene) {
+    camera(float aspect_ratio0, int image_width0, float focal_length0, std::vector<nsphere>& scene0) : aspect_ratio{ aspect_ratio0 }, image_width{ image_width0 }, focal_length{ focal_length0 }, scene{ scene0 } {}
+
+    void render() {
         initialize();
 
         std::ofstream file{ "renders/render_" + time_stamp() + ".ppm", std::ios::app };
@@ -73,7 +144,7 @@ public:
             std::clog << "\rScanlines remaining: " << (image_height - j) << "     " << std::flush;
             for (int i = 0; i < image_width; i++) {
                 point4 pixel_center = pixel00_center + (i * pixel_x) + (j * pixel_y);
-                vec4 direction = pixel_center - camera_center;
+                vec4 direction = normalize(pixel_center - camera_center);
                 ray r(camera_center, direction);
 
                 color color = ray_color(r);

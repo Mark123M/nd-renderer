@@ -28,8 +28,8 @@ inline float apply_gamma(float f) {
 }
 
 inline void write_color(std::ofstream& file, const color& col) {
-    // Red from left to right
-    // Green from top to bottom
+    assert(col.r >= 0.f && col.g >= 0.f && col.b >= 0.f);
+
     int ir = (int)(std::min(1.f, apply_gamma(col.r)) * 255.999f);
     int ig = (int)(std::min(1.f, apply_gamma(col.g)) * 255.999f);
     int ib = (int)(std::min(1.f, apply_gamma(col.b)) * 255.999f);
