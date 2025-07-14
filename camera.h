@@ -8,6 +8,7 @@
 #include <vector>
 #include <cassert>
 #include "util.h"
+#include "direction_light.h"
 
 inline std::tm localtime_xp(std::time_t timer) {
     std::tm bt{};
@@ -37,6 +38,7 @@ class camera {
     point4 camera_center;
     point4 pixel00_center;
     std::vector<nsphere>& scene;
+    std::vector<direction_light>& lights;
 
     void initialize() {
         image_height = std::max(1.f, image_width / aspect_ratio);
@@ -115,22 +117,41 @@ class camera {
         nsphere* target = nullptr;
         ray_march(r, &target);
 
-        if (target != nullptr) {
-            vec4 normal = get_normal(r.pos);
+        if (target == nullptr) {
+            vec4 unit_direction = normalize(r.dir);
+            float a = 0.5f * (unit_direction.y + 1.f);
+            return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+        }
+
+        vec4 normal = get_normal(r.pos);
+
+        if (render_normals) {
             return 0.5 * color(normal.x + 1, normal.y + 1, normal.z + 1);
         }
 
-        vec4 unit_direction = normalize(r.dir);
-        float a = 0.5f * (unit_direction.y + 1.f);
-        return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+        color total_lighting(0.f, 0.f, 0.f);
+
+        for (direction_light& light : lights) {
+            float diffuse = std::max(0.f, dot(normal, light.dir));
+            point4 shadow_ray_origin = r.pos + normal * 0.01; // slight offset
+            ray shadow_ray(shadow_ray_origin, light.dir);
+            nsphere* shadow_target = nullptr;
+            ray_march(shadow_ray, &shadow_target);
+
+            bool visibility = shadow_target == nullptr; // check of occlusion
+            total_lighting += (diffuse * visibility + AMBIENT) * light.col;
+        }
+
+        return target->albedo * total_lighting;
     }
 
 public:
     float aspect_ratio = 1.f;
     int image_width = 100;
     float focal_length = 1.f;
+    bool render_normals = false;
 
-    camera(float aspect_ratio0, int image_width0, float focal_length0, std::vector<nsphere>& scene0) : aspect_ratio{ aspect_ratio0 }, image_width{ image_width0 }, focal_length{ focal_length0 }, scene{ scene0 } {}
+    camera(std::vector<nsphere>& scene0, std::vector<direction_light>& lights0): scene{ scene0 }, lights{ lights0 } {}
 
     void render() {
         initialize();

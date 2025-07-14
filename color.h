@@ -10,8 +10,21 @@ struct color {
     float b = 0.f;
 
     color(float r0, float g0, float b0): r{r0}, g{g0}, b{b0} {}
+
     color operator+(const color& other) {
         return { r + other.r, g + other.g, b + other.b };
+    }
+
+    color& operator+=(const color& other) {
+        r += other.r;
+        g += other.g;
+        b += other.b;
+
+        return *this;
+    }
+
+    color operator*(const color& other) {
+        return { r * other.r, g * other.g, b * other.b };
     }
 };
 

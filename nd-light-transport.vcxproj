@@ -131,6 +131,7 @@
     <Text Include="CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="direction_light.h" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="nsphere.h" />
   </ItemGroup>

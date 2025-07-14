@@ -24,6 +24,9 @@
     <ClCompile Include="nsphere.h">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="direction_light.h">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vec4.h">
