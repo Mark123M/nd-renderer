@@ -3,18 +3,16 @@
 
 #include "vec4.h"
 #include "color.h"
+#include "shape.h"
 
-
-struct nsphere {
+struct nsphere : public shape {
 	point4 center;
 	float radius;
-	color albedo;
-	int n;
 
-	nsphere(const point4& center, float radius, int n = 4) : center{ center }, radius{ radius }, albedo{ 1.f, 1.f, 1.f }, n { n } {}
-	nsphere(const point4& center, float radius, const color& albedo0, int n = 4) : center{ center }, radius{ radius }, albedo{ albedo0 }, n{ n } {}
+	nsphere(const point4& center, float radius, int n = 4) : shape{ n }, center { center }, radius{ radius } {}
+	nsphere(const point4& center, float radius, const color& albedo0, int n = 4) : shape{ albedo0, n }, center { center }, radius{ radius } {}
 
-	float sdf(const point4& p) {
+	float sdf(const point4& p) const {
 		return (center - p).length() - radius;
 	}
 };

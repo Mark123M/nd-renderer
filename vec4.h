@@ -143,6 +143,10 @@ inline float max_comp(const vec4& v) {
 	return std::max(v.x, std::max(v.y, std::max(v.z, v.w)));
 }
 
+inline vec4 max(const vec4& v, float k) {
+	return { std::max(v.x, k), std::max(v.y, k), std::max(v.z, k), std::max(v.w, k) };
+}
+
 inline vec4 abs(const vec4& v) {
 	return { std::abs(v.x), std::abs(v.y), std::abs(v.z), std::abs(v.w) };
 }
