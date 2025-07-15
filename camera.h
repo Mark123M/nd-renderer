@@ -52,7 +52,7 @@ class camera {
         pixel_x = viewport_x / image_width;
         pixel_y = viewport_y / image_height;
 
-        point4 viewport_top_left = camera_center - vec4(0.f, 0.f, 0.f, focal_length) - viewport_x / 2 - viewport_y / 2;
+        point4 viewport_top_left = camera_center - vec4(0.f, 0.f, focal_length, 0.f) - viewport_x / 2 - viewport_y / 2;
         pixel00_center = viewport_top_left + 0.5 * (pixel_x + pixel_y);
     }
 

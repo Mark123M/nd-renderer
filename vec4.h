@@ -139,4 +139,12 @@ inline float dot(const vec4& a, const vec4& b) {
 	return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
 }
 
+inline float max_comp(const vec4& v) {
+	return std::max(v.x, std::max(v.y, std::max(v.z, v.w)));
+}
+
+inline vec4 abs(const vec4& v) {
+	return { std::abs(v.x), std::abs(v.y), std::abs(v.z), std::abs(v.w) };
+}
+
 #endif
