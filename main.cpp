@@ -10,7 +10,7 @@
 
 void scene1() {
     std::vector<shape*> scene;
-    nsphere* sphere1 = new nsphere(point4(0.f, 0.f, -1.f, 0.f), 0.5f, color(1.f, 0.647f, 0.f), 4);
+    nsphere* sphere1 = new nsphere(point4(0.f, 0.f, -1.f, 0.4f), 0.5f, color(1.f, 0.647f, 0.f), 4);
     nsphere* sphere2 = new nsphere(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
     scene.push_back(sphere1);
     scene.push_back(sphere2);
@@ -22,7 +22,7 @@ void scene1() {
     camera cam{ scene, lights };
     cam.aspect_ratio = 16.f / 9.f;
     cam.image_width = 400;
-    cam.render_normals = true;
+    //cam.render_normals = true;
     cam.render();
 
     for (shape* shape_ptr: scene) {
@@ -54,7 +54,7 @@ void scene2() {
 }
 
 int main() {
-    scene1();
-    //scene2();
+    //scene1();
+    scene2();
 	return 0;
 }

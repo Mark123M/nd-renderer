@@ -45,7 +45,7 @@ class camera {
 
         float viewport_height = 2.f;
         float viewport_width = viewport_height * ((float)image_width / image_height);
-        camera_center = point4(0.f, 0.f, 0.f, 0.f);
+        camera_center = point4(0.f, 0.f, 1.f, 0.f);
 
         vec4 viewport_x = vec4(viewport_width, 0.f, 0.f, 0.f);
         vec4 viewport_y = vec4(0.f, -viewport_height, 0.f, 0.f);
@@ -73,7 +73,7 @@ class camera {
     }
 
     float scene_sdf(const point4& p) {
-        float sdf = MAX_DIST;
+        float sdf = MAX_DIST + 5;
 
         for (shape* obj : scene) {
             float obj_sdf = obj->sdf(p);
@@ -142,7 +142,9 @@ class camera {
             total_lighting += (diffuse * visibility + AMBIENT) * light.col;
         }
 
-        return target->albedo * total_lighting;
+        color final_col = target->albedo * total_lighting;
+
+        return final_col;
     }
 
 public:

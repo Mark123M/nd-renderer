@@ -10,7 +10,7 @@ struct ncube : public shape {
 	point4 corner;
 
 	ncube(const point4& corner, int n = 4) : shape{n}, corner{ corner } {}
-	ncube(const point4& corner, const color& albedo0, int n = 4) : shape{ albedo, n }, corner{ corner } {}
+	ncube(const point4& corner, const color& albedo0, int n = 4) : shape{ albedo0, n }, corner{ corner } {}
 
 	float sdf(const point4& p) const override {
 		vec4 q = abs(p) - corner;
