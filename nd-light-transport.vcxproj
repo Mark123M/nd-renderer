@@ -139,6 +139,7 @@
   <ItemGroup>
     <ClInclude Include="camera.h" />
     <ClInclude Include="color.h" />
+    <ClInclude Include="mat4.h" />
     <ClInclude Include="ray.h" />
     <ClInclude Include="shape.h" />
     <ClInclude Include="util.h" />

@@ -7,6 +7,7 @@
 #include "ncube.h"
 #include "camera.h"
 #include "direction_light.h"
+#include "mat4.h"
 
 void scene1() {
     std::vector<shape*> scene;
@@ -53,8 +54,33 @@ void scene2() {
     }
 }
 
+void math_test() {
+    mat4 m1 {
+        -0.0971147f,  -0.30548878f, -0.63968163f, -0.69860772f,
+        0.80357565f, -0.51840114f,  0.26369012f, -0.12646725f,
+        0.58114334f,  0.58723162f, -0.5408912f,   0.15769641f,
+        -0.08430502f, -0.54138331f, -0.47823806f,  0.68635641f
+    };
+
+    mat4 m2 = m1.transpose();
+    mat4 m3 = matmul(m1, m2);
+    std::cout << m3;
+
+    mat4 m4{
+        3, 4, 0, 2,
+        3, 10, 7, 8,
+        -5, 0, 1, 0,
+        7, 4, -1, 2
+    };
+    vec4 v{ 6, 2, -4, 7 };
+    std::cout << m4.vecmul(v) << std::endl;
+
+    std::cout << m2;
+}
+
 int main() {
-    //scene1();
-    scene2();
+    // scene1();
+    // scene2();
+    math_test();
 	return 0;
 }
