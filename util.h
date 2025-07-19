@@ -1,7 +1,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-constexpr float TOL = 1e-3f;
+constexpr float TOL = 5e-3f;
 constexpr float EPSILON = 1e-3f;
 constexpr float MAX_DIST = 100.f;
 constexpr float AMBIENT = 0.3f;

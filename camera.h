@@ -45,7 +45,7 @@ class camera {
 
         float viewport_height = 2.f;
         float viewport_width = viewport_height * ((float)image_width / image_height);
-        camera_center = point4(0.f, 0.f, 1.f, 0.f);
+        camera_center = point4(0.f, 0.f, 1.f, 0.1f);
 
         vec4 viewport_x = vec4(viewport_width, 0.f, 0.f, 0.f);
         vec4 viewport_y = vec4(0.f, -viewport_height, 0.f, 0.f);
@@ -152,6 +152,9 @@ public:
     int image_width = 100;
     float focal_length = 1.f;
     bool render_normals = false;
+
+    point4 lookfrom = point4(0.f, 0.f, 0.f, 0.f);
+    point4 lookat = point4(0.f, 0.f, -1.f, 0.f);
 
     camera(std::vector<shape*>& scene0, std::vector<direction_light>& lights0): scene{ scene0 }, lights{ lights0 } {}
 

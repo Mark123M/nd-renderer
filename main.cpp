@@ -39,7 +39,7 @@ void scene2() {
     scene.push_back(sphere2);
 
     std::vector<direction_light> lights;
-    direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.f)), color(1.0f, 1.0f, 0.9f));
+    direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
     lights.push_back(light1);
 
     camera cam{ scene, lights };
