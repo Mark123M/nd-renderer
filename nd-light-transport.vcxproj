@@ -142,6 +142,7 @@
     <ClInclude Include="mat4.h" />
     <ClInclude Include="ray.h" />
     <ClInclude Include="shape.h" />
+    <ClInclude Include="transform.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="vec4.h" />
   </ItemGroup>

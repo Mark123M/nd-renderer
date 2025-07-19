@@ -45,7 +45,7 @@ class camera {
 
         float viewport_height = 2.f;
         float viewport_width = viewport_height * ((float)image_width / image_height);
-        camera_center = point4(0.f, 0.f, 1.f, 0.1f);
+        camera_center = point4(0.f, 0.f, 1.f, 0.f);
 
         vec4 viewport_x = vec4(viewport_width, 0.f, 0.f, 0.f);
         vec4 viewport_y = vec4(0.f, -viewport_height, 0.f, 0.f);
