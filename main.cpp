@@ -35,14 +35,15 @@ void scene2() {
     std::vector<shape*> scene;
     //nsphere* sphere1 = new nsphere(point4(0.f, 0.f, -1.f, 0.4f), 0.5f, color(1.f, 0.647f, 0.f), 4);
 
-    vec4 vx(-0.0971147f, -0.30548878f, -0.63968163f, -0.69860772f);
+    /*vec4 vx(-0.0971147f, -0.30548878f, -0.63968163f, -0.69860772f);
     vec4 vy(0.80357565f, -0.51840114f, 0.26369012f, -0.12646725f);
     vec4 vz(0.58114334f, 0.58723162f, -0.5408912f, 0.15769641f);
-    vec4 vw(-0.08430502f, -0.54138331f, -0.47823806f, 0.68635641f);
+    vec4 vw(-0.08430502f, -0.54138331f, -0.47823806f, 0.68635641f); */
 
     ncube* cube1 = new ncube(point4(0.25f, 0.25f, 0.25f, 0.25f), color(1.f, 0.647f, 0.f));
-    cube1->transform.set_basis(vx, vy, vz, vw);
-
+    cube1->transform.rotate_xz(deg2rad(30.f));
+    cube1->transform.rotate_yw(deg2rad(50.f));
+    //cube1->transform.set_translation({ 0.2f, 0.2f, 0.f, 0.f });
 
     nsphere* sphere2 = new nsphere(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
     scene.push_back(cube1);
