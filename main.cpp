@@ -139,131 +139,6 @@ void rotation_test() {
     cam.render();
 }
 
-void skeleton() {
-    std::vector<shape*> scene;
-
-    // Assuming side_length = 0.5, so half_side = 0.25
-    float hs = 0.25f; // half_side
-
-    // Vertex Index (Binary representation of (WZYX) -> Coordinate signs)
-    // Example: 0000 -> (-hs, -hs, -hs, -hs)
-    //          1111 -> (+hs, +hs, +hs, +hs)
-
-    // Vertices (as point4 or similar 4-component vector structure)
-    point4 vertices[16] = {
-        // ---- W= -hs Plane (analogous to 3D cube's 'bottom' face) ----
-        // Z = -hs
-        point4(-hs, -hs, -hs, -hs), // 0
-        point4(hs, -hs, -hs, -hs), // 1
-        point4(-hs,  hs, -hs, -hs), // 2
-        point4(hs,  hs, -hs, -hs), // 3
-        // Z = +hs
-        point4(-hs, -hs,  hs, -hs), // 4
-        point4(hs, -hs,  hs, -hs), // 5
-        point4(-hs,  hs,  hs, -hs), // 6
-        point4(hs,  hs,  hs, -hs), // 7
-
-        // ---- W= +hs Plane (analogous to 3D cube's 'top' face) ----
-        // Z = -hs
-        point4(-hs, -hs, -hs,  hs), // 8
-        point4(hs, -hs, -hs,  hs), // 9
-        point4(-hs,  hs, -hs,  hs), // 10
-        point4(hs,  hs, -hs,  hs), // 11
-        // Z = +hs
-        point4(-hs, -hs,  hs,  hs), // 12
-        point4(hs, -hs,  hs,  hs), // 13
-        point4(-hs,  hs,  hs,  hs), // 14
-        point4(hs,  hs,  hs,  hs)  // 15
-    };
-
-    // Edges (pairs of vertex indices)
-    int edges[32][2] = {
-        // --- Edges within the W=-hs cube (indices 0-7) ---
-        {0, 1}, // X-axis
-        {0, 2}, // Y-axis
-        {0, 4}, // Z-axis
-
-        {1, 3},
-        {1, 5},
-
-        {2, 3},
-        {2, 6},
-
-        {3, 7},
-
-        {4, 5},
-        {4, 6},
-
-        {5, 7},
-
-        {6, 7},
-
-        // --- Edges within the W=+hs cube (indices 8-15) ---
-        {8, 9}, // X-axis
-        {8, 10}, // Y-axis
-        {8, 12}, // Z-axis
-
-        {9, 11},
-        {9, 13},
-
-        {10, 11},
-        {10, 14},
-
-        {11, 15},
-
-        {12, 13},
-        {12, 14},
-
-        {13, 15},
-
-        {14, 15},
-
-        // --- Edges connecting the W=-hs cube to the W=+hs cube (W-axis edges) ---
-        {0, 8},
-        {1, 9},
-        {2, 10},
-        {3, 11},
-        {4, 12},
-        {5, 13},
-        {6, 14},
-        {7, 15}
-    };
-
-    color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    float cylinder_radius = 0.02f; // Or whatever radius you choose
-
-    for (int i = 0; i < 32; ++i) {
-        int idx1 = edges[i][0];
-        int idx2 = edges[i][1];
-
-        scene.push_back(new cylinder(vertices[idx1], vertices[idx2], edge_color, cylinder_radius));
-    }
-
-    // USE UNIQUE PTRS
-   /* std::unique_ptr<cylinder> c1 = std::make_unique<cylinder>(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), color(1.f, 0.647f, 0.f));
-    std::unique_ptr<nsphere> sphere2 = std::make_unique<nsphere>(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
-    std::unique_ptr<nsphere> point = std::make_unique<nsphere>(point4(-1.f, 0.f, 0.f, 0.f), 0.03f, color(1.f, 0.f, 0.f), 4);
-    c1->transform.rotate_xy_around_point(deg2rad(30.f), point4(-1.f, 0.f, 0.f, 0.f));
-
-    scene.push_back(c1.get());
-    scene.push_back(sphere2.get());
-    scene.push_back(point.get()); */
-
-    std::vector<direction_light> lights;
-    direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
-    lights.push_back(light1);
-
-    camera cam{ scene, lights };
-    cam.aspect_ratio = 16.f / 9.f;
-    cam.image_width = 400;
-    //cam.render_normals = true;
-    cam.render();
-
-    for (shape* shape_ptr : scene) {
-        delete shape_ptr;
-    }
-}
-
 void tesseract() {
     std::vector<shape*> scene;
 
@@ -359,7 +234,12 @@ void tesseract() {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
-        scene.push_back(new cylinder(vertices[idx1], vertices[idx2], edge_color));
+        cylinder* c = new cylinder(vertices[idx1], vertices[idx2], edge_color);
+        c->transform.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
+        c->transform.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        // rotate on 0.5f, 0.5f, 0.5f, 0.5f
+
+        scene.push_back(c);
     }
 
     std::vector<direction_light> lights;
@@ -382,8 +262,7 @@ int main() {
     // scene2();
     // math_test();
     // scene3();
-    //rotation_test();
-    //skeleton();
+    // rotation_test();
 
     tesseract();
 	return 0;
