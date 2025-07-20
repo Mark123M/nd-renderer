@@ -237,6 +237,10 @@ void tesseract() {
         cylinder* c = new cylinder(vertices[idx1], vertices[idx2], edge_color);
         c->transform.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
         c->transform.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        //c->transform.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        c->transform.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        //cube1->transform.rotate_yz(deg2rad(50.f));
+        //cube1->transform.rotate_zw(deg2rad(45.f));
         // rotate on 0.5f, 0.5f, 0.5f, 0.5f
 
         scene.push_back(c);

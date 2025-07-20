@@ -73,13 +73,36 @@ struct transform {
 		rotate(angle, 2, 3);
 	}
 
-	void rotate_xy_around_point(float angle, const point4& p) {
-		mat4 AR = matmul(linear, rotate_mat(angle, 0, 1));
+	void rotate_around_point(float angle, const point4& p, int a, int b) {
+		mat4 AR = matmul(linear, rotate_mat(angle, a, b));
 		vec4 b_ = linear.vecmul(p) - AR.vecmul(p) + translation;
 		linear = AR;
 		inv_linear = linear.transpose();
 		translation = b_;
-		// set_translation(p - );
+	}
+
+	void rotate_xy_around_point(float angle, const point4& p) {
+		rotate_around_point(angle, p, 0, 1);
+	}
+
+	void rotate_xz_around_point(float angle, const point4& p) {
+		rotate_around_point(angle, p, 0, 2);
+	}
+
+	void rotate_xw_around_point(float angle, const point4& p) {
+		rotate_around_point(angle, p, 0, 3);
+	}
+
+	void rotate_yz_around_point(float angle, const point4& p) {
+		rotate_around_point(angle, p, 1, 2);
+	}
+
+	void rotate_yw_around_point(float angle, const point4& p) {
+		rotate_around_point(angle, p, 1, 3);
+	}
+
+	void rotate_zw_around_point(float angle, const point4& p) {
+		rotate_around_point(angle, p, 2, 3);
 	}
 
 	vec4 local_to_world(const vec4& v) const {
@@ -104,28 +127,32 @@ struct transform {
 		return R;
 	}
 
+	inline static vec4 rotate_vec(const vec4& v, float angle, int a, int b) {
+		return rotate_mat(angle, a, b).vecmul(v);
+	}
+
 	inline static vec4 rotate_xy_vec(const vec4& v, float angle) {
-		return rotate_mat(angle, 0, 1).vecmul(v);
+		return rotate_vec(v, angle, 0, 1);
 	}
 
 	inline static vec4 rotate_xz_vec(const vec4& v, float angle) {
-		return rotate_mat(angle, 0, 2).vecmul(v);
+		return rotate_vec(v, angle, 0, 2);
 	}
 
 	inline static vec4 rotate_xw_vec(const vec4& v, float angle) {
-		return rotate_mat(angle, 0, 3).vecmul(v);
+		return rotate_vec(v, angle, 0, 3);
 	}
 
 	inline static vec4 rotate_yz_vec(const vec4& v, float angle) {
-		return rotate_mat(angle, 1, 2).vecmul(v);
+		return rotate_vec(v, angle, 1, 2);
 	}
 
 	inline static vec4 rotate_yw_vec(const vec4& v, float angle) {
-		return rotate_mat(angle, 1, 3).vecmul(v);
+		return rotate_vec(v, angle, 1, 3);
 	}
 
 	inline static vec4 rotate_zw_vec(const vec4& v, float angle) {
-		return rotate_mat(angle, 2, 3).vecmul(v);
+		return rotate_vec(v, angle, 2, 3);
 	}
 };
 
