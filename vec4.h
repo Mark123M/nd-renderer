@@ -158,4 +158,8 @@ inline vec4 abs(const vec4& v) {
 	return { std::abs(v.x), std::abs(v.y), std::abs(v.z), std::abs(v.w) };
 }
 
+inline float length(const vec4& v) {
+	return v.length();
+}
+
 #endif
