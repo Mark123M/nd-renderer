@@ -71,7 +71,7 @@ void scene2() {
 void scene3() {
     std::vector<shape*> scene;
 
-    cylinder* c1 = new cylinder(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), color(1.f, 0.647f, 0.f));
+    cylinder* c1 = new cylinder(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), false, color(1.f, 0.647f, 0.f));
     nsphere* sphere2 = new nsphere(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
 
     scene.push_back(c1);
@@ -119,7 +119,7 @@ void math_test() {
 void rotation_test() {
     std::vector<shape*> scene;
     // USE UNIQUE PTRS
-    std::unique_ptr<cylinder> c1 = std::make_unique<cylinder>(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), color(1.f, 0.647f, 0.f));
+    std::unique_ptr<cylinder> c1 = std::make_unique<cylinder>(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), false, color(1.f, 0.647f, 0.f));
     std::unique_ptr<nsphere> sphere2 = std::make_unique<nsphere>(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
     std::unique_ptr<nsphere> point = std::make_unique<nsphere>(point4(-1.f, 0.f, 0.f, 0.f), 0.03f, color(1.f, 0.f, 0.f), 4);
     c1->transform.rotate_xy_around_point(deg2rad(30.f), point4(-1.f, 0.f, 0.f, 0.f));
@@ -234,11 +234,13 @@ void tesseract() {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
-        cylinder* c = new cylinder(vertices[idx1], vertices[idx2], edge_color);
+        cylinder* c = new cylinder(vertices[idx1], vertices[idx2], true, edge_color);
         c->transform.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
         c->transform.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        //c->transform.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        c->transform.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        c->transform.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        c->a = c->transform.local_to_world(c->a);
+        c->b = c->transform.local_to_world(c->b);
+        //c->transform.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         //cube1->transform.rotate_yz(deg2rad(50.f));
         //cube1->transform.rotate_zw(deg2rad(45.f));
         // rotate on 0.5f, 0.5f, 0.5f, 0.5f

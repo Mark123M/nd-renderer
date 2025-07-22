@@ -8,17 +8,30 @@
 struct cylinder : public shape {
 	point4 a;
 	point4 b;
+	bool should_project;
 	float radius;
 
-	cylinder(const point4& start, const point4& end, float radius = 0.02f, int n = 4):
-		shape{ n }, a{ start }, b{ end }, radius{ radius } {}
-	cylinder(const point4& start, const point4& end, const color& albedo, float radius = 0.02f, int n = 4):
-		shape{ albedo, n }, a{ start }, b{ end }, radius{ radius } {}
+	cylinder(const point4& start, const point4& end, bool should_project, float radius = 0.02f, int n = 4):
+		shape{ n }, a{ start }, b{ end }, should_project{ should_project }, radius {radius} {}
+	cylinder(const point4& start, const point4& end, bool should_project, const color& albedo, float radius = 0.02f, int n = 4):
+		shape{ albedo, n }, a{ start }, b{ end }, should_project{ should_project }, radius {radius} {}
 
 	float sdf(const point4& p) const override {
-		point4 pp = transform.world_to_local(p);
-		vec4  ba = b - a;
-		vec4  pa = pp - a;
+		//point4 pp = transform.world_to_local(p);
+
+		point4 aa = a;
+		point4 bb = b;
+
+		// projection should happen after affine transforms
+		if (should_project) {
+			aa = aa / (1.f + aa.w);
+			bb = bb / (1.f + bb.w);
+			aa.w = 0;
+			bb.w = 0;
+		}
+
+		vec4  ba = bb - aa;
+		vec4  pa = p - aa;
 
 		float baba = dot(ba, ba);
 		float paba = dot(pa, ba);
