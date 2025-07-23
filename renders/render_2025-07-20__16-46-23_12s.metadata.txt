@@ -1,0 +1,2 @@
+time elapsed: 12468 ms/12.468 s/0.2078 m
+width: 400 height: 225  

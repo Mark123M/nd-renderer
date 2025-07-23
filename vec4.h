@@ -11,11 +11,10 @@ inline float dot(const vec4& a, const vec4& b);
 
 using point4 = vec4;
 
-class vec4 {
-public:
+struct vec4 {
 	float x, y, z, w;
 
-	vec4() : x{ 0 }, y{ 0 }, z{ 0 }, w{ 0 } {}
+	vec4() : x{ 0.f }, y{ 0.f }, z{ 0.f }, w{ 0.f } {}
 
 	vec4(float x0, float y0, float z0, float w0) : x{ x0 }, y{ y0 }, z{ z0 }, w{ w0 } {}
 
@@ -74,27 +73,35 @@ public:
 	}
 
 	float get(int idx) const {
-		if (idx == 0) {
+		switch (idx) {
+		case 0:
 			return x;
-		} else if (idx == 1) {
+		case 1:
 			return y;
-		} else if (idx == 2) {
+		case 2:
 			return z;
+		case 3:
+			return w;
 		}
 
-		return w;
+		return 0.f;
 	}
 
 	void set(int idx, float val) {
-		if (idx == 0) {
+		switch (idx) {
+		case 0:
 			x = val;
-		} else if (idx == 1) {
+			break;
+		case 1:
 			y = val;
-		} else if (idx == 2) {
+			break;
+		case 2:
 			z = val;
+			break;
+		case 3:
+			w = val;
+			break;
 		}
-
-		w = val;
 	}
 
 	float length() const {
@@ -143,8 +150,16 @@ inline float max_comp(const vec4& v) {
 	return std::max(v.x, std::max(v.y, std::max(v.z, v.w)));
 }
 
+inline vec4 max(const vec4& v, float k) {
+	return { std::max(v.x, k), std::max(v.y, k), std::max(v.z, k), std::max(v.w, k) };
+}
+
 inline vec4 abs(const vec4& v) {
 	return { std::abs(v.x), std::abs(v.y), std::abs(v.z), std::abs(v.w) };
+}
+
+inline float length(const vec4& v) {
+	return v.length();
 }
 
 #endif

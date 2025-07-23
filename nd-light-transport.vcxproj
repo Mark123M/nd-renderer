@@ -133,12 +133,18 @@
   <ItemGroup>
     <ClCompile Include="direction_light.h" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ncube.h" />
     <ClCompile Include="nsphere.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.h" />
     <ClInclude Include="color.h" />
+    <ClInclude Include="cylinder.h" />
+    <ClInclude Include="group.h" />
+    <ClInclude Include="mat4.h" />
     <ClInclude Include="ray.h" />
+    <ClInclude Include="shape.h" />
+    <ClInclude Include="transform.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="vec4.h" />
   </ItemGroup>

@@ -1,7 +1,7 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#include "nsphere.h"
+#include "shape.h"
 #include "color.h"
 #include <sstream>
 #include "ray.h"
@@ -37,7 +37,7 @@ class camera {
     vec4 pixel_y;
     point4 camera_center;
     point4 pixel00_center;
-    std::vector<nsphere>& scene;
+    std::vector<shape*>& scene;
     std::vector<direction_light>& lights;
 
     void initialize() {
@@ -45,7 +45,7 @@ class camera {
 
         float viewport_height = 2.f;
         float viewport_width = viewport_height * ((float)image_width / image_height);
-        camera_center = point4(0.f, 0.f, 0.f, 0.f);
+        camera_center = point4(0.f, 0.f, 1.f, 0.f);
 
         vec4 viewport_x = vec4(viewport_width, 0.f, 0.f, 0.f);
         vec4 viewport_y = vec4(0.f, -viewport_height, 0.f, 0.f);
@@ -56,15 +56,15 @@ class camera {
         pixel00_center = viewport_top_left + 0.5 * (pixel_x + pixel_y);
     }
 
-    float scene_sdf(const point4& p, nsphere** target_ptr) {
+    float scene_sdf(const point4& p, shape** target_ptr) {
         float sdf = MAX_DIST + 5;
         
-        for (nsphere& obj : scene) {
-            float obj_sdf = obj.sdf(p);
+        for (shape* obj : scene) {
+            float obj_sdf = obj->sdf(p);
 
             if (obj_sdf < sdf) {
                 sdf = obj_sdf;
-                *target_ptr = &obj; // assign object pointer
+                *target_ptr = obj; // assign object pointer
             }
         }
 
@@ -73,10 +73,10 @@ class camera {
     }
 
     float scene_sdf(const point4& p) {
-        float sdf = MAX_DIST;
+        float sdf = MAX_DIST + 5;
 
-        for (nsphere& obj : scene) {
-            float obj_sdf = obj.sdf(p);
+        for (shape* obj : scene) {
+            float obj_sdf = obj->sdf(p);
 
             if (obj_sdf < sdf) {
                 sdf = obj_sdf;
@@ -96,7 +96,7 @@ class camera {
         return normalize(vec4(sdf_diff_x, sdf_diff_y, sdf_diff_z, sdf_diff_w));
     }
 
-    void ray_march(ray& r, nsphere** target_ptr) {
+    void ray_march(ray& r, shape** target_ptr) {
         //float a = 0.5f * (r.dir.y + 1.f);
         //return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
         do {
@@ -114,7 +114,7 @@ class camera {
     }
 
     color ray_color(ray& r) {
-        nsphere* target = nullptr;
+        shape* target = nullptr;
         ray_march(r, &target);
 
         if (target == nullptr) {
@@ -135,14 +135,16 @@ class camera {
             float diffuse = std::max(0.f, dot(normal, light.dir));
             point4 shadow_ray_origin = r.pos + normal * 0.01; // slight offset
             ray shadow_ray(shadow_ray_origin, light.dir);
-            nsphere* shadow_target = nullptr;
+            shape* shadow_target = nullptr;
             ray_march(shadow_ray, &shadow_target);
 
             bool visibility = shadow_target == nullptr; // check of occlusion
             total_lighting += (diffuse * visibility + AMBIENT) * light.col;
         }
 
-        return target->albedo * total_lighting;
+        color final_col = target->albedo * total_lighting;
+
+        return final_col;
     }
 
 public:
@@ -151,7 +153,10 @@ public:
     float focal_length = 1.f;
     bool render_normals = false;
 
-    camera(std::vector<nsphere>& scene0, std::vector<direction_light>& lights0): scene{ scene0 }, lights{ lights0 } {}
+    point4 lookfrom = point4(0.f, 0.f, 0.f, 0.f);
+    point4 lookat = point4(0.f, 0.f, -1.f, 0.f);
+
+    camera(std::vector<shape*>& scene0, std::vector<direction_light>& lights0): scene{ scene0 }, lights{ lights0 } {}
 
     void render() {
         initialize();
