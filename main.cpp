@@ -14,10 +14,10 @@
 
 void scene1() {
     std::vector<shape*> scene;
-    nsphere* sphere1 = new nsphere(point4(0.f, 0.f, -1.f, 0.4f), 0.5f, color(1.f, 0.647f, 0.f), 4);
-    nsphere* sphere2 = new nsphere(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
-    scene.push_back(sphere1);
-    scene.push_back(sphere2);
+    std::unique_ptr<nsphere> sphere1 = std::make_unique<nsphere>(point4(0.f, 0.f, -1.f, 0.4f), 0.5f, color(1.f, 0.647f, 0.f), 4);
+    std::unique_ptr<nsphere> sphere2 = std::make_unique<nsphere>(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
+    scene.push_back(sphere1.get());
+    scene.push_back(sphere2.get());
 
     std::vector<direction_light> lights;
     direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.f)), color(1.0f, 1.0f, 0.9f));
@@ -43,15 +43,15 @@ void scene2() {
     vec4 vz(0.58114334f, 0.58723162f, -0.5408912f, 0.15769641f);
     vec4 vw(-0.08430502f, -0.54138331f, -0.47823806f, 0.68635641f); */
 
-    ncube* cube1 = new ncube(point4(0.25f, 0.25f, 0.25f, 0.25f), color(1.f, 0.647f, 0.f));
+    std::unique_ptr<ncube> cube1 = std::make_unique<ncube>(point4(0.25f, 0.25f, 0.25f, 0.25f), color(1.f, 0.647f, 0.f));
     cube1->transform.rotate_xy(deg2rad(30.f));
     cube1->transform.rotate_yz(deg2rad(50.f));
     cube1->transform.rotate_zw(deg2rad(45.f));
     //cube1->transform.set_translation({ 0.2f, 0.2f, 0.f, 0.f });
 
-    nsphere* sphere2 = new nsphere(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
-    scene.push_back(cube1);
-    scene.push_back(sphere2);
+    std::unique_ptr<nsphere> sphere2 = std::make_unique<nsphere>(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
+    scene.push_back(cube1.get());
+    scene.push_back(sphere2.get());
 
     std::vector<direction_light> lights;
     direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
@@ -71,11 +71,11 @@ void scene2() {
 void scene3() {
     std::vector<shape*> scene;
 
-    cylinder* c1 = new cylinder(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), false, color(1.f, 0.647f, 0.f));
-    nsphere* sphere2 = new nsphere(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
+    std::unique_ptr<cylinder> c1 = std::make_unique<cylinder>(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), false, color(1.f, 0.647f, 0.f));
+    std::unique_ptr<nsphere> sphere2 = std::make_unique<nsphere>(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
 
-    scene.push_back(c1);
-    scene.push_back(sphere2);
+    scene.push_back(c1.get());
+    scene.push_back(sphere2.get());
 
     std::vector<direction_light> lights;
     direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
@@ -229,23 +229,25 @@ void tesseract() {
     };
 
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
+    std::vector<std::unique_ptr<cylinder>> cylinders;
 
     for (int i = 0; i < 32; ++i) {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
-        cylinder* c = new cylinder(vertices[idx1], vertices[idx2], true, edge_color);
+        std::unique_ptr<cylinder> c = std::make_unique<cylinder>(vertices[idx1], vertices[idx2], true, edge_color);
         c->transform.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
         c->transform.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         c->transform.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         c->a = c->transform.local_to_world(c->a);
         c->b = c->transform.local_to_world(c->b);
+        cylinders.push_back(std::move(c));
         //c->transform.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         //cube1->transform.rotate_yz(deg2rad(50.f));
         //cube1->transform.rotate_zw(deg2rad(45.f));
         // rotate on 0.5f, 0.5f, 0.5f, 0.5f
 
-        scene.push_back(c);
+        scene.push_back(cylinders.back().get());
     }
 
     std::vector<direction_light> lights;
@@ -257,10 +259,6 @@ void tesseract() {
     cam.image_width = 400;
     //cam.render_normals = true;
     cam.render();
-
-    for (shape* shape_ptr : scene) {
-        delete shape_ptr;
-    }
 }
 
 int main() {
