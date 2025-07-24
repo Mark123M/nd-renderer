@@ -33,16 +33,16 @@ struct cylinder : public shape {
 		vec4  ba = bb - aa;
 		vec4  pa = p - aa;
 
-		float baba = dot(ba, ba);
-		float paba = dot(pa, ba);
-		float x = length(pa * baba - ba * paba) - radius * baba;
-		float y = abs(paba - baba * 0.5) - baba * 0.5;
+		float baba = vec4::dot(ba, ba);
+		float paba = vec4::dot(pa, ba);
+		float x = vec4::length(pa * baba - ba * paba) - radius * baba;
+		float y = std::abs(paba - baba * 0.5) - baba * 0.5;
 		float x2 = x * x;
 		float y2 = y * y * baba;
 		float d = (std::max(x, y) < 0.0) ? -std::min(x2, y2) : (((x > 0.0) ? x2 : 0.0) + ((y > 0.0) ? y2 : 0.0));
 		float sign_d = (d > 0) - (d < 0);
 
-		return sign_d * sqrt(abs(d)) / baba;
+		return sign_d * std::sqrt(std::abs(d)) / baba;
 	}
 };
 

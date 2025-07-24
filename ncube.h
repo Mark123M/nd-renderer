@@ -12,10 +12,10 @@ struct ncube : public shape {
 	ncube(const point4& corner, const color& albedo0, int n = 4) : shape{ albedo0, n }, corner{ corner } {}
 
 	float sdf(const point4& p) const override {
-		point4 pp = transform.world_to_local(p); //multiply_matrix_vec4(example_matrix, p);
+		point4 pp = basis.world_to_local(p); //multiply_matrix_vec4(example_matrix, p);
 		
-		vec4 q = abs(pp) - corner;
-		float d = max(q, 0).length() + std::min(max_comp(q), 0.f);
+		vec4 q = vec4::abs(pp) - corner;
+		float d = vec4::max(q, 0).length() + std::min(vec4::max_comp(q), 0.f);
 		return d;
 	}
 };

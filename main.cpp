@@ -20,7 +20,7 @@ void scene1() {
     scene.push_back(sphere2.get());
 
     std::vector<direction_light> lights;
-    direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.f)), color(1.0f, 1.0f, 0.9f));
+    direction_light light1(vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.f)), color(1.0f, 1.0f, 0.9f));
     lights.push_back(light1);
 
     camera cam{ scene, lights };
@@ -44,17 +44,17 @@ void scene2() {
     vec4 vw(-0.08430502f, -0.54138331f, -0.47823806f, 0.68635641f); */
 
     std::unique_ptr<ncube> cube1 = std::make_unique<ncube>(point4(0.25f, 0.25f, 0.25f, 0.25f), color(1.f, 0.647f, 0.f));
-    cube1->transform.rotate_xy(deg2rad(30.f));
-    cube1->transform.rotate_yz(deg2rad(50.f));
-    cube1->transform.rotate_zw(deg2rad(45.f));
-    //cube1->transform.set_translation({ 0.2f, 0.2f, 0.f, 0.f });
+    cube1->basis.rotate_xy(deg2rad(30.f));
+    cube1->basis.rotate_yz(deg2rad(50.f));
+    cube1->basis.rotate_zw(deg2rad(45.f));
+    //cube1->basis.set_translation({ 0.2f, 0.2f, 0.f, 0.f });
 
     std::unique_ptr<nsphere> sphere2 = std::make_unique<nsphere>(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
     scene.push_back(cube1.get());
     scene.push_back(sphere2.get());
 
     std::vector<direction_light> lights;
-    direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
+    direction_light light1(vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
     lights.push_back(light1);
 
     camera cam{ scene, lights };
@@ -78,7 +78,7 @@ void scene3() {
     scene.push_back(sphere2.get());
 
     std::vector<direction_light> lights;
-    direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
+    direction_light light1(vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
     lights.push_back(light1);
 
     camera cam{ scene, lights };
@@ -122,14 +122,14 @@ void rotation_test() {
     std::unique_ptr<cylinder> c1 = std::make_unique<cylinder>(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), false, color(1.f, 0.647f, 0.f));
     std::unique_ptr<nsphere> sphere2 = std::make_unique<nsphere>(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
     std::unique_ptr<nsphere> point = std::make_unique<nsphere>(point4(-1.f, 0.f, 0.f, 0.f), 0.03f, color(1.f, 0.f, 0.f), 4);
-    c1->transform.rotate_xy_around_point(deg2rad(30.f), point4(-1.f, 0.f, 0.f, 0.f));
+    c1->basis.rotate_xy_around_point(deg2rad(30.f), point4(-1.f, 0.f, 0.f, 0.f));
 
     scene.push_back(c1.get());
     scene.push_back(sphere2.get());
     scene.push_back(point.get());
 
     std::vector<direction_light> lights;
-    direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
+    direction_light light1(vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
     lights.push_back(light1);
 
     camera cam{ scene, lights };
@@ -236,22 +236,22 @@ void tesseract() {
         int idx2 = edges[i][1];
 
         std::unique_ptr<cylinder> c = std::make_unique<cylinder>(vertices[idx1], vertices[idx2], true, edge_color);
-        c->transform.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
-        c->transform.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        c->transform.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        c->a = c->transform.local_to_world(c->a);
-        c->b = c->transform.local_to_world(c->b);
+        c->basis.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
+        c->basis.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        c->basis.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        c->a = c->basis.local_to_world(c->a);
+        c->b = c->basis.local_to_world(c->b);
         cylinders.push_back(std::move(c));
-        //c->transform.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        //cube1->transform.rotate_yz(deg2rad(50.f));
-        //cube1->transform.rotate_zw(deg2rad(45.f));
+        //c->basis.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        //cube1->basis.rotate_yz(deg2rad(50.f));
+        //cube1->basis.rotate_zw(deg2rad(45.f));
         // rotate on 0.5f, 0.5f, 0.5f, 0.5f
 
         scene.push_back(cylinders.back().get());
     }
 
     std::vector<direction_light> lights;
-    direction_light light1(normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
+    direction_light light1(vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
     lights.push_back(light1);
 
     camera cam{ scene, lights };
