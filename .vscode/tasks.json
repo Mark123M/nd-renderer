@@ -10,15 +10,11 @@
                 "${workspaceFolder}",
                 "-B",
                 "${workspaceFolder}/build",
-                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
                 "-G",
                 "Ninja"
             ],
-            "problemMatcher": [],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
+            "problemMatcher": []
         },
         {
             "label": "cmake-build",
@@ -27,8 +23,8 @@
             "args": [
                 "--build",
                 "${workspaceFolder}/build",
-                "--config",
-                "RelWithDebInfo",
+                //"--config",
+                //"RelWithDebInfo",
                 "-j"
             ],
             "problemMatcher": [
@@ -44,7 +40,64 @@
                 "cmake-build"
             ],
             "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true // Keep this as the default build task
+            }
+        },
+        {
+            "label": "cmake-configure-release",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-S",
+                "${workspaceFolder}",
+                "-B",
+                "${workspaceFolder}/build/release", // Dedicated build directory for Release
+                "-DCMAKE_BUILD_TYPE=Release",       // Set build type to Release
+                "-G",
+                "Ninja"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "cmake-build-release",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build/release", // Build from the Release directory
+                "-j"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "dependsOn": ["cmake-configure-release"]
+        },
+        {
+            "label": "build-release", // A convenient label to build the Release configuration
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "cmake-configure-release",
+                "cmake-build-release"
+            ],
+            "problemMatcher": [],
             "group": "build"
+        },
+        // --- NEW: Task for Full ASan/LSan Run (No Debugger) ---
+        {
+            "label": "run-asan-full", // A descriptive label for this task
+            "type": "shell",
+            // The command to execute, including ASAN_OPTIONS and LSAN_OPTIONS
+            "command": "ASAN_OPTIONS=\"detect_leaks=1\" LSAN_OPTIONS=\"verbosity=1:log_threads=1\" \"${workspaceFolder}/build/nd-raytracer\"",
+           // "cwd": "${workspaceFolder}", // Run from the project root
+            "problemMatcher": [],
+            "group": "test", // You can classify it as a "test" task, or "none"
+            "presentation": {
+                "reveal": "always", // Always show the terminal for this task
+                "panel": "new"     // Open a new terminal panel each time
+            },
+            "dependsOn": "build" // Ensure the RelWithDebInfo build is up-to-date before running
         }
     ]
 }
