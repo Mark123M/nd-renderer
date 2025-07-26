@@ -8,7 +8,7 @@
 struct shape {
 	color albedo;
 	int n;
-	transform transform;
+	transform basis;
 
 	shape(int n) : albedo{ 1.f, 1.f, 1.f }, n { n } {}
 	shape(const color& albedo, int n) : albedo{albedo}, n{n} {}

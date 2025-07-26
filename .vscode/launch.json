@@ -1,0 +1,48 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++ Debug (ASan RelWithDebInfo)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/nd-raytracer",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build",
+            "miDebuggerPath": "/usr/bin/gdb"
+        },
+        // --- NEW: Release Run Configuration ---
+        {
+            "name": "C++ Run (Release Optimized)", // Clear name for this config
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/release/nd-raytracer", // Points to the Release build executable
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [], // No ASAN_OPTIONS for Release
+            "externalConsole": false,
+            "MIMode": "gdb", // Still use gdb for basic run/attach capabilities if needed
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build-release", // Triggers the new Release build task
+            "miDebuggerPath": "/usr/bin/gdb"
+        }
+    ]
+}

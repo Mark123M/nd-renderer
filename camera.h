@@ -9,6 +9,8 @@
 #include <cassert>
 #include "util.h"
 #include "direction_light.h"
+#include <ctime>
+#include <mutex>
 
 inline std::tm localtime_xp(std::time_t timer) {
     std::tm bt{};
@@ -30,6 +32,7 @@ inline std::string time_stamp(const std::string& fmt = "%F__%H-%M-%S") {
     char buf[64];
     return { buf, std::strftime(buf, sizeof(buf), fmt.c_str(), &bt) };
 }
+
 
 class camera {
     int image_height;
@@ -93,7 +96,7 @@ class camera {
         float sdf_diff_z = scene_sdf(p + delta_z) - scene_sdf(p - delta_z);
         float sdf_diff_w = scene_sdf(p + delta_w) - scene_sdf(p - delta_w);
 
-        return normalize(vec4(sdf_diff_x, sdf_diff_y, sdf_diff_z, sdf_diff_w));
+        return vec4::normalize(vec4(sdf_diff_x, sdf_diff_y, sdf_diff_z, sdf_diff_w));
     }
 
     void ray_march(ray& r, shape** target_ptr) {
@@ -118,7 +121,7 @@ class camera {
         ray_march(r, &target);
 
         if (target == nullptr) {
-            vec4 unit_direction = normalize(r.dir);
+            vec4 unit_direction = vec4::normalize(r.dir);
             float a = 0.5f * (unit_direction.y + 1.f);
             return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
         }
@@ -132,7 +135,7 @@ class camera {
         color total_lighting(0.f, 0.f, 0.f);
 
         for (direction_light& light : lights) {
-            float diffuse = std::max(0.f, dot(normal, light.dir));
+            float diffuse = std::max(0.f, vec4::dot(normal, light.dir));
             point4 shadow_ray_origin = r.pos + normal * 0.01; // slight offset
             ray shadow_ray(shadow_ray_origin, light.dir);
             shape* shadow_target = nullptr;
@@ -170,7 +173,7 @@ public:
             std::clog << "\rScanlines remaining: " << (image_height - j) << "     " << std::flush;
             for (int i = 0; i < image_width; i++) {
                 point4 pixel_center = pixel00_center + (i * pixel_x) + (j * pixel_y);
-                vec4 direction = normalize(pixel_center - camera_center);
+                vec4 direction = vec4::normalize(pixel_center - camera_center);
                 ray r(camera_center, direction);
 
                 color color = ray_color(r);
@@ -178,7 +181,7 @@ public:
             }
         }
 
-        int duration = clock() - t0;
+        int duration = (clock() - t0) / 1000;
         std::clog << "\rDone " << duration << "ms                                                    \n";
 
         std::stringstream ss;
