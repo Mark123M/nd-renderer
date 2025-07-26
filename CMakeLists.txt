@@ -28,10 +28,10 @@ set ( IMGUI_SOURCES
 
 # EXAMPLE: Using GLFW for windowing and OpenGL 3 for rendering.
 list(APPEND IMGUI_SOURCES
-    #"${IMGUI_DIR}/backends/imgui_impl_glfw.h"
-    #"${IMGUI_DIR}/backends/imgui_impl_glfw.cpp"
-    #"${IMGUI_DIR}/backends/imgui_impl_opengl3.h"
-    #"${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp"
+    "${IMGUI_DIR}/backends/imgui_impl_glfw.h"
+    "${IMGUI_DIR}/backends/imgui_impl_glfw.cpp"
+    "${IMGUI_DIR}/backends/imgui_impl_opengl3.h"
+    "${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp"
     #"${IMGUI_DIR}/backends/imgui_impl_vulkan.h"
     #"${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp"
     "${IMGUI_DIR}/misc/cpp/imgui_stdlib.h"
@@ -82,11 +82,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # As this is a public compile feature anything that links to 
 # particles will also build with -std=c++11
 target_compile_features(nd-raytracer PUBLIC cxx_std_20)
- 
+
 target_include_directories(nd-raytracer PUBLIC
     "${IMGUI_DIR}"
     "${IMGUI_DIR}/backends"
 )
+
+find_package(glfw3 3.4 REQUIRED)
+target_link_libraries(nd-raytracer glfw)
+
+find_package(OpenGL REQUIRED)
+target_link_libraries(nd-raytracer OpenGL::GL)
 
 # We need to explicitly state that we need all CUDA files in the 
 # particle library to be built with -dc as the member functions 

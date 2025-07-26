@@ -43,3 +43,5 @@
 .vs
 build
 *Debug
+
+glfw-3.4/
