@@ -17,7 +17,7 @@ int g_image_width, g_image_height;
 int g_row_update_rate = 50; // number of rows to update per tick
 int g_cur_row = 0;
 
-inline std::tm localtime_xp(std::time_t timer) {
+static inline std::tm localtime_xp(std::time_t timer) {
     std::tm bt{};
 #if defined(__unix__)
     localtime_r(&timer, &bt);
@@ -32,7 +32,7 @@ inline std::tm localtime_xp(std::time_t timer) {
 }
 
 // "YYYY-MM-DD__HH-MM-SS"
-inline std::string time_stamp(const std::string& fmt = "%F__%H-%M-%S") {
+static inline std::string time_stamp(const std::string& fmt = "%F__%H-%M-%S") {
     auto bt = localtime_xp(std::time(0));
     char buf[64];
     return { buf, std::strftime(buf, sizeof(buf), fmt.c_str(), &bt) };
@@ -167,24 +167,23 @@ public:
         
         g_image_width = image_width;
         g_image_height = image_height;
-        //g_image_data = std::vector<unsigned char>(image_width * image_height * 3);
+        g_image_data = std::vector<unsigned char>(image_width * image_height * 3);
     }
 
-    void render_rt() {
-        g_image_data.clear();
-        
+    void render_rt(int first_row, int last_row) {
         // assume camera parameters are all initialized
-        for (int j = 0; j < image_height; j++) {
+        for (int row = first_row; row <= last_row; row++) {
             //std::clog << "\rScanlines remaining: " << (image_height - j) << "     " << std::flush;
-            for (int i = 0; i < image_width; i++) {
-                point4 pixel_center = pixel00_center + (i * pixel_x) + (j * pixel_y);
+            for (int col = 0; col < image_width; col++) {
+                point4 pixel_center = pixel00_center + (col * pixel_x) + (row * pixel_y);
                 vec4 direction = vec4::normalize(pixel_center - camera_center);
                 ray r(camera_center, direction);
-
+                
                 color color = ray_color(r);
-                g_image_data.push_back(static_cast<unsigned char>(std::min(1.f, color.r) * 255.999f));
-                g_image_data.push_back(static_cast<unsigned char>(std::min(1.f, color.g) * 255.999f));
-                g_image_data.push_back(static_cast<unsigned char>(std::min(1.f, color.b) * 255.999f));
+                int idx = row * image_width * 3 + col * 3;
+                g_image_data[idx + 0] = static_cast<unsigned char>(std::min(1.f, color.r) * 255.999f);
+                g_image_data[idx + 1] = static_cast<unsigned char>(std::min(1.f, color.g) * 255.999f);
+                g_image_data[idx + 2] = static_cast<unsigned char>(std::min(1.f, color.b) * 255.999f);
             }
         }
     }

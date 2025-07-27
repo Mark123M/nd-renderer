@@ -19,12 +19,13 @@
 #include <thread>
 #include <mutex>
 
+static constexpr int N = 24;
 
 static void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
 
-void scene1() {
+static void scene1() {
     std::vector<shape*> scene;
     std::unique_ptr<nsphere> sphere1 = std::make_unique<nsphere>(point4(0.f, 0.f, -1.f, 0.4f), 0.5f, color(1.f, 0.647f, 0.f), 4);
     std::unique_ptr<nsphere> sphere2 = std::make_unique<nsphere>(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
@@ -46,7 +47,7 @@ void scene1() {
     }
 }
 
-void scene2() {
+static void scene2() {
     std::vector<shape*> scene;
     //nsphere* sphere1 = new nsphere(point4(0.f, 0.f, -1.f, 0.4f), 0.5f, color(1.f, 0.647f, 0.f), 4);
 
@@ -80,7 +81,7 @@ void scene2() {
     }
 }
 
-void scene3() {
+static void scene3() {
     std::vector<shape*> scene;
 
     std::unique_ptr<cylinder> c1 = std::make_unique<cylinder>(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), false, color(1.f, 0.647f, 0.f));
@@ -104,7 +105,7 @@ void scene3() {
     }
 }
 
-void math_test() {
+static void math_test() {
     mat4 m1 {
         -0.0971147f,  -0.30548878f, -0.63968163f, -0.69860772f,
         0.80357565f, -0.51840114f,  0.26369012f, -0.12646725f,
@@ -128,7 +129,7 @@ void math_test() {
     std::cout << m2;
 }
 
-void rotation_test() {
+static void rotation_test() {
     std::vector<shape*> scene;
     // USE UNIQUE PTRS
     std::unique_ptr<cylinder> c1 = std::make_unique<cylinder>(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), false, color(1.f, 0.647f, 0.f));
@@ -151,7 +152,7 @@ void rotation_test() {
     cam.render();
 }
 
-void tesseract() {
+static void tesseract() {
     std::vector<shape*> scene;
 
     // Assuming side_length = 0.5
@@ -273,8 +274,8 @@ void tesseract() {
     cam.render();
 }
 
-float handle_inputs(const std::vector<shape*> scene, camera& cam) {
-    constexpr float move_amount = 0.1f;
+static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
+    constexpr float move_amount = 0.03f;
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
         for (shape* s : scene) {
@@ -283,8 +284,6 @@ float handle_inputs(const std::vector<shape*> scene, camera& cam) {
             c->b.x -= move_amount;
         }
 
-        //scene.clear();
-        cam.render_rt();
         return true;
     }
 
@@ -295,8 +294,6 @@ float handle_inputs(const std::vector<shape*> scene, camera& cam) {
             c->b.x += move_amount;
         }
 
-        //scene.clear();
-        cam.render_rt();
         return true;
     }
 
@@ -307,8 +304,6 @@ float handle_inputs(const std::vector<shape*> scene, camera& cam) {
             c->b.y += move_amount;
         }
 
-        //scene.clear();
-        cam.render_rt();
         return true;
     }
 
@@ -318,9 +313,7 @@ float handle_inputs(const std::vector<shape*> scene, camera& cam) {
             c->a.y -= move_amount;
             c->b.y -= move_amount;
         }
-
-        //scene.clear();
-        cam.render_rt();
+        
         return true;
     }
 
@@ -490,7 +483,7 @@ int main() {
     //cam.render_normals = true;
     //cam.render();
     cam.initialize();
-    cam.render_rt();
+    //cam.render_rt(0, g_image_height - 1);
     // End of tesseract scene
 
     // --- SETUP OPENGL TEXTURE ---
@@ -507,7 +500,24 @@ int main() {
     int rt_latency = 0;
     int full_latency = 0;
 
-    tesseract();
+    std::vector<std::thread> threads;
+    std::counting_semaphore<N> sem(N);
+    std::atomic<bool> is_rendering = true;
+    int first_row = 0;
+    int row_range = std::ceil((float)g_image_height / N); // range: ceil(height / N)
+
+    for (int i = 0; i < N; i++) {
+        int last_row = std::min(first_row + row_range, g_image_height - 1);
+        
+        threads.push_back(std::thread([&cam, first_row, last_row, &is_rendering, &sem]() { 
+            while (is_rendering) {
+                sem.acquire();
+                cam.render_rt(first_row, last_row);
+            }
+        }));
+
+        first_row += row_range;
+    }
 
     while (!glfwWindowShouldClose(window)) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -529,11 +539,12 @@ int main() {
 
         // --- Render Target Window ---
         ImGui::Begin("Render Output");
-
-        clock_t t0 = clock();
         bool input_changed = handle_inputs(scene, cam);
+
         if (input_changed) {
-            rt_latency = (clock() - t0) / 1000;
+            for (int i = 0; i < N; i++) {
+                sem.release(); // increase the counter by N to ensure at least N threads can be awaken
+            }
         }
         // Check if our render thread has finished and provided new data
         glBindTexture(GL_TEXTURE_2D, render_texture);
@@ -544,9 +555,6 @@ int main() {
         // The (void*)(intptr_t) cast is necessary to convert the GLuint texture ID to ImGui's ImTextureID format
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(g_image_width, g_image_height));
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        if (input_changed) {
-            full_latency = (clock() - t0) / 1000;
-        }
         ImGui::Text("Raytracer latency: %dms   Transfer latency: %dms", rt_latency, full_latency - rt_latency);
         ImGui::End();
 
@@ -562,6 +570,15 @@ int main() {
         glfwSwapBuffers(window);
     }
 
+    is_rendering = false;
+    for (int i = 0; i < N; i++) {
+        sem.release(); // increase the counter by N to ensure at least N threads can be awaken
+    }
+
+    for (int i = 0; i < N; i++) {
+        threads[i].join();
+    }
+    
     glDeleteTextures(1, &render_texture); // Clean up the texture
     
     // Cleanup
