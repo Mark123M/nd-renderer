@@ -16,6 +16,9 @@
 #include "imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
 
+#include <thread>
+#include <mutex>
+
 
 static void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -270,6 +273,60 @@ void tesseract() {
     cam.render();
 }
 
+float handle_inputs(const std::vector<shape*> scene, camera& cam) {
+    constexpr float move_amount = 0.1f;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_A)) {
+        for (shape* s : scene) {
+            cylinder* c = (cylinder*) s;
+            c->a.x -= move_amount;
+            c->b.x -= move_amount;
+        }
+
+        //scene.clear();
+        cam.render_rt();
+        return true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_D)) {
+        for (shape* s : scene) {
+            cylinder* c = (cylinder*) s;
+            c->a.x += move_amount;
+            c->b.x += move_amount;
+        }
+
+        //scene.clear();
+        cam.render_rt();
+        return true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_W)) {
+        for (shape* s : scene) {
+            cylinder* c = (cylinder*) s;
+            c->a.y += move_amount;
+            c->b.y += move_amount;
+        }
+
+        //scene.clear();
+        cam.render_rt();
+        return true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_S)) {
+        for (shape* s : scene) {
+            cylinder* c = (cylinder*) s;
+            c->a.y -= move_amount;
+            c->b.y -= move_amount;
+        }
+
+        //scene.clear();
+        cam.render_rt();
+        return true;
+    }
+
+    return false;
+}
+
 int main() {
     glfwSetErrorCallback(glfw_error_callback);
 
@@ -313,6 +370,145 @@ int main() {
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    // Tesseract Scene
+    std::vector<shape*> scene;
+        // Assuming side_length = 0.5
+    float L = 0.5f; // This is the full side length, not half_side
+
+    // Vertices (as point4 or similar 4-component vector structure)
+    // Each coordinate is either 0.0f or L (0.5f)
+    point4 vertices[16] = {
+        // Vertex Index corresponds to binary (WZYX) -> e.g., 0000 for (0,0,0,0), 1111 for (L,L,L,L)
+
+        // --- Vertices where W = 0.0f ---
+        // Z = 0.0f
+        point4(0.0f, 0.0f, 0.0f, 0.0f), // 0: (0,0,0,0)
+        point4(L,    0.0f, 0.0f, 0.0f), // 1: (L,0,0,0)
+        point4(0.0f, L,    0.0f, 0.0f), // 2: (0,L,0,0)
+        point4(L,    L,    0.0f, 0.0f), // 3: (L,L,0,0)
+        // Z = L
+        point4(0.0f, 0.0f, L,    0.0f), // 4: (0,0,L,0)
+        point4(L,    0.0f, L,    0.0f), // 5: (L,0,L,0)
+        point4(0.0f, L,    L,    0.0f), // 6: (0,L,L,0)
+        point4(L,    L,    L,    0.0f), // 7: (L,L,L,0)
+
+        // --- Vertices where W = L (0.5f) ---
+        // Z = 0.0f
+        point4(0.0f, 0.0f, 0.0f, L),    // 8: (0,0,0,L)
+        point4(L,    0.0f, 0.0f, L),    // 9: (L,0,0,L)
+        point4(0.0f, L,    0.0f, L),    // 10: (0,L,0,L)
+        point4(L,    L,    0.0f, L),    // 11: (L,L,0,L)
+        // Z = L
+        point4(0.0f, 0.0f, L,    L),    // 12: (0,0,L,L)
+        point4(L,    0.0f, L,    L),    // 13: (L,0,L,L)
+        point4(0.0f, L,    L,    L),    // 14: (0,L,L,L)
+        point4(L,    L,    L,    L)     // 15: (L,L,L,L)
+    };
+
+    // Edges (pairs of vertex indices from the `vertices` array above)
+    int edges[32][2] = {
+        // --- Edges within the W=0.0f 'cube' (indices 0-7) ---
+        {0, 1}, // (0,0,0,0) to (L,0,0,0) - X-axis
+        {0, 2}, // (0,0,0,0) to (0,L,0,0) - Y-axis
+        {0, 4}, // (0,0,0,0) to (0,0,L,0) - Z-axis
+
+        {1, 3},
+        {1, 5},
+
+        {2, 3},
+        {2, 6},
+
+        {3, 7},
+
+        {4, 5},
+        {4, 6},
+
+        {5, 7},
+
+        {6, 7},
+
+        // --- Edges within the W=L 'cube' (indices 8-15) ---
+        {8, 9}, // (0,0,0,L) to (L,0,0,L) - X-axis
+        {8, 10}, // (0,0,0,L) to (0,L,0,L) - Y-axis
+        {8, 12}, // (0,0,0,L) to (0,0,L,L) - Z-axis
+
+        {9, 11},
+        {9, 13},
+
+        {10, 11},
+        {10, 14},
+
+        {11, 15},
+
+        {12, 13},
+        {12, 14},
+
+        {13, 15},
+
+        {14, 15},
+
+        // --- Edges connecting the W=0.0f 'cube' to the W=L 'cube' (W-axis edges) ---
+        {0, 8},  // (0,0,0,0) to (0,0,0,L)
+        {1, 9},  // (L,0,0,0) to (L,0,0,L)
+        {2, 10}, // (0,L,0,0) to (0,L,0,L)
+        {3, 11}, // (L,L,0,0) to (L,L,0,L)
+        {4, 12}, // (0,0,L,0) to (0,0,L,L)
+        {5, 13}, // (L,0,L,0) to (L,0,L,L)
+        {6, 14}, // (0,L,L,0) to (0,L,L,L)
+        {7, 15}  // (L,L,L,0) to (L,L,L,L)
+    };
+
+    color edge_color(1.0f, 0.647f, 0.0f); // Orange
+    std::vector<std::unique_ptr<cylinder>> cylinders;
+
+    for (int i = 0; i < 32; ++i) {
+        int idx1 = edges[i][0];
+        int idx2 = edges[i][1];
+
+        std::unique_ptr<cylinder> c = std::make_unique<cylinder>(vertices[idx1], vertices[idx2], true, edge_color);
+        c->basis.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
+        c->basis.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        c->basis.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        c->a = c->basis.local_to_world(c->a);
+        c->b = c->basis.local_to_world(c->b);
+        cylinders.push_back(std::move(c));
+        //c->basis.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
+        //cube1->basis.rotate_yz(deg2rad(50.f));
+        //cube1->basis.rotate_zw(deg2rad(45.f));
+        // rotate on 0.5f, 0.5f, 0.5f, 0.5f
+
+        scene.push_back(cylinders.back().get());
+    }
+
+    std::vector<direction_light> lights;
+    direction_light light1(vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
+    lights.push_back(light1);
+
+    camera cam{ scene, lights };
+    cam.aspect_ratio = 16.f / 9.f;
+    cam.image_width = 400;
+    //cam.render_normals = true;
+    //cam.render();
+    cam.initialize();
+    cam.render_rt();
+    // End of tesseract scene
+
+    // --- SETUP OPENGL TEXTURE ---
+    GLuint render_texture;
+    glGenTextures(1, &render_texture);
+    glBindTexture(GL_TEXTURE_2D, render_texture);
+    // Set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Allocate memory for the texture on the GPU
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, g_image_width, g_image_height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glBindTexture(GL_TEXTURE_2D, 0); // Unbind
+
+    int rt_latency = 0;
+    int full_latency = 0;
+
+    tesseract();
+
     while (!glfwWindowShouldClose(window)) {
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
@@ -331,41 +527,28 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
+        // --- Render Target Window ---
+        ImGui::Begin("Render Output");
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-        {
-            static float f = 0.0f;
-            static int counter = 0;
-
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
+        clock_t t0 = clock();
+        bool input_changed = handle_inputs(scene, cam);
+        if (input_changed) {
+            rt_latency = (clock() - t0) / 1000;
         }
+        // Check if our render thread has finished and provided new data
+        glBindTexture(GL_TEXTURE_2D, render_texture);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_image_width, g_image_height, GL_RGB, GL_UNSIGNED_BYTE, g_image_data.data());
+        glBindTexture(GL_TEXTURE_2D, 0); // Unbind
 
-        // 3. Show another simple window.
-        if (show_another_window) {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
+        // Display the texture in an ImGui::Image widget
+        // The (void*)(intptr_t) cast is necessary to convert the GLuint texture ID to ImGui's ImTextureID format
+        ImGui::Image((void*)(intptr_t)render_texture, ImVec2(g_image_width, g_image_height));
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        if (input_changed) {
+            full_latency = (clock() - t0) / 1000;
         }
+        ImGui::Text("Raytracer latency: %dms   Transfer latency: %dms", rt_latency, full_latency - rt_latency);
+        ImGui::End();
 
         // Rendering
         ImGui::Render();
@@ -379,6 +562,8 @@ int main() {
         glfwSwapBuffers(window);
     }
 
+    glDeleteTextures(1, &render_texture); // Clean up the texture
+    
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -391,6 +576,5 @@ int main() {
     // math_test();
     // scene3();
     // rotation_test();
-    //tesseract();
 	return 0;
 }
