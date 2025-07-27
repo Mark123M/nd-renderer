@@ -12,6 +12,11 @@
 #include <ctime>
 #include <mutex>
 
+std::vector<unsigned char> g_image_data;
+int g_image_width, g_image_height;
+int g_row_update_rate = 50; // number of rows to update per tick
+int g_cur_row = 0;
+
 inline std::tm localtime_xp(std::time_t timer) {
     std::tm bt{};
 #if defined(__unix__)
@@ -42,22 +47,6 @@ class camera {
     point4 pixel00_center;
     std::vector<shape*>& scene;
     std::vector<direction_light>& lights;
-
-    void initialize() {
-        image_height = std::max(1.f, image_width / aspect_ratio);
-
-        float viewport_height = 2.f;
-        float viewport_width = viewport_height * ((float)image_width / image_height);
-        camera_center = point4(0.f, 0.f, 1.f, 0.f);
-
-        vec4 viewport_x = vec4(viewport_width, 0.f, 0.f, 0.f);
-        vec4 viewport_y = vec4(0.f, -viewport_height, 0.f, 0.f);
-        pixel_x = viewport_x / image_width;
-        pixel_y = viewport_y / image_height;
-
-        point4 viewport_top_left = camera_center - vec4(0.f, 0.f, focal_length, 0.f) - viewport_x / 2 - viewport_y / 2;
-        pixel00_center = viewport_top_left + 0.5 * (pixel_x + pixel_y);
-    }
 
     float scene_sdf(const point4& p, shape** target_ptr) {
         float sdf = MAX_DIST + 5;
@@ -160,6 +149,45 @@ public:
     point4 lookat = point4(0.f, 0.f, -1.f, 0.f);
 
     camera(std::vector<shape*>& scene0, std::vector<direction_light>& lights0): scene{ scene0 }, lights{ lights0 } {}
+
+    void initialize() {
+        image_height = std::max(1.f, image_width / aspect_ratio);
+
+        float viewport_height = 2.f;
+        float viewport_width = viewport_height * ((float)image_width / image_height);
+        camera_center = point4(0.f, 0.f, 1.f, 0.f);
+
+        vec4 viewport_x = vec4(viewport_width, 0.f, 0.f, 0.f);
+        vec4 viewport_y = vec4(0.f, -viewport_height, 0.f, 0.f);
+        pixel_x = viewport_x / image_width;
+        pixel_y = viewport_y / image_height;
+
+        point4 viewport_top_left = camera_center - vec4(0.f, 0.f, focal_length, 0.f) - viewport_x / 2 - viewport_y / 2;
+        pixel00_center = viewport_top_left + 0.5 * (pixel_x + pixel_y);
+        
+        g_image_width = image_width;
+        g_image_height = image_height;
+        //g_image_data = std::vector<unsigned char>(image_width * image_height * 3);
+    }
+
+    void render_rt() {
+        g_image_data.clear();
+        
+        // assume camera parameters are all initialized
+        for (int j = 0; j < image_height; j++) {
+            //std::clog << "\rScanlines remaining: " << (image_height - j) << "     " << std::flush;
+            for (int i = 0; i < image_width; i++) {
+                point4 pixel_center = pixel00_center + (i * pixel_x) + (j * pixel_y);
+                vec4 direction = vec4::normalize(pixel_center - camera_center);
+                ray r(camera_center, direction);
+
+                color color = ray_color(r);
+                g_image_data.push_back(static_cast<unsigned char>(std::min(1.f, color.r) * 255.999f));
+                g_image_data.push_back(static_cast<unsigned char>(std::min(1.f, color.g) * 255.999f));
+                g_image_data.push_back(static_cast<unsigned char>(std::min(1.f, color.b) * 255.999f));
+            }
+        }
+    }
 
     void render() {
         initialize();

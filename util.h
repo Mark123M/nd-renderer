@@ -3,7 +3,7 @@
 
 constexpr float TOL = 5e-3f;
 constexpr float EPSILON = 1e-3f;
-constexpr float MAX_DIST = 100.f;
+constexpr float MAX_DIST = 5.f;
 constexpr float AMBIENT = 0.3f;
 
 // Constants
