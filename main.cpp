@@ -158,7 +158,6 @@ static void tesseract() {
     // Assuming side_length = 0.5
     float L = 0.5f; // This is the full side length, not half_side
 
-    // Vertices (as point4 or similar 4-component vector structure)
     // Each coordinate is either 0.0f or L (0.5f)
     point4 vertices[16] = {
         // Vertex Index corresponds to binary (WZYX) -> e.g., 0000 for (0,0,0,0), 1111 for (L,L,L,L)
@@ -249,16 +248,7 @@ static void tesseract() {
         int idx2 = edges[i][1];
 
         std::unique_ptr<cylinder> c = std::make_unique<cylinder>(vertices[idx1], vertices[idx2], true, edge_color);
-        /*c->basis.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
-        c->basis.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        c->basis.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        c->a = c->basis.local_to_world(c->a);
-        c->b = c->basis.local_to_world(c->b); */
         cylinders.push_back(std::move(c));
-        //c->basis.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        //cube1->basis.rotate_yz(deg2rad(50.f));
-        //cube1->basis.rotate_zw(deg2rad(45.f));
-        // rotate on 0.5f, 0.5f, 0.5f, 0.5f
 
         scene.push_back(cylinders.back().get());
     }
@@ -314,8 +304,8 @@ static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
 
     if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
         for (shape* c : scene) {
-            c->basis.rotate_xy(rotate_amount);
-            c->basis.rotate_zw(rotate_amount);
+            c->basis.rotate_xz(rotate_amount);
+            c->basis.rotate_yw(rotate_amount);
         }
 
         did_input = true;
@@ -331,7 +321,7 @@ static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
 
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
         for (shape* c : scene) {
-            c->basis.rotate_xy(rotate_amount);
+            c->basis.rotate_xz(rotate_amount);
         }
 
         did_input = true;
@@ -359,7 +349,7 @@ int main() {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
 
-        // Setup Dear ImGui context
+    // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -473,15 +463,19 @@ int main() {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
-        vec4 move(L / 2, L / 2, 0.f, 0.f);
+        vec4 move(L / 2, L / 2, L / 2, L / 2);
         unique_scene.push_back(std::make_unique<cylinder>(vertices[idx1] - move, vertices[idx2] - move, true, edge_color));
         scene.push_back(unique_scene.back().get());
-        //cylinders.back()->basis.translate(vec4(0.f, 0.f, 2.f,));
-        //c->basis.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        //cube1->basis.rotate_yz(deg2rad(50.f));
-        //cube1->basis.rotate_zw(deg2rad(45.f));
-        // rotate on 0.5f, 0.5f, 0.5f, 0.5f
     }
+
+    std::unique_ptr<cylinder> x_axis = std::make_unique<cylinder>(point4(0, 0, 0, 0), point4(L, 0, 0, 0), true, color(1, 0, 0), 0.01f);
+    std::unique_ptr<cylinder> y_axis = std::make_unique<cylinder>(point4(0, 0, 0, 0), point4(0, L, 0, 0), true, color(0, 1, 0), 0.01f);
+    std::unique_ptr<cylinder> z_axis = std::make_unique<cylinder>(point4(0, 0, 0, 0), point4(0, 0, L, 0), true, color(0, 0, 1), 0.01f);
+    std::unique_ptr<cylinder> w_axis = std::make_unique<cylinder>(point4(0, 0, 0, 0), point4(0, 0, 0, L), true, color(0.73f, 0.33f, 0.827f), 0.01f);
+    scene.push_back(x_axis.get());
+    scene.push_back(y_axis.get());
+    scene.push_back(z_axis.get());
+    scene.push_back(w_axis.get());
 
     std::vector<direction_light> lights;
     direction_light light1(vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
