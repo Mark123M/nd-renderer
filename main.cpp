@@ -19,12 +19,13 @@
 #include <thread>
 #include <mutex>
 
+static constexpr int N = 20;
 
 static void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
 
-void scene1() {
+static void scene1() {
     std::vector<shape*> scene;
     std::unique_ptr<nsphere> sphere1 = std::make_unique<nsphere>(point4(0.f, 0.f, -1.f, 0.4f), 0.5f, color(1.f, 0.647f, 0.f), 4);
     std::unique_ptr<nsphere> sphere2 = std::make_unique<nsphere>(point4(0.f, -100.5f, -1.f, 0.f), 100.f, 4);
@@ -46,7 +47,7 @@ void scene1() {
     }
 }
 
-void scene2() {
+static void scene2() {
     std::vector<shape*> scene;
     //nsphere* sphere1 = new nsphere(point4(0.f, 0.f, -1.f, 0.4f), 0.5f, color(1.f, 0.647f, 0.f), 4);
 
@@ -80,7 +81,7 @@ void scene2() {
     }
 }
 
-void scene3() {
+static void scene3() {
     std::vector<shape*> scene;
 
     std::unique_ptr<cylinder> c1 = std::make_unique<cylinder>(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), false, color(1.f, 0.647f, 0.f));
@@ -104,7 +105,7 @@ void scene3() {
     }
 }
 
-void math_test() {
+static void math_test() {
     mat4 m1 {
         -0.0971147f,  -0.30548878f, -0.63968163f, -0.69860772f,
         0.80357565f, -0.51840114f,  0.26369012f, -0.12646725f,
@@ -128,7 +129,7 @@ void math_test() {
     std::cout << m2;
 }
 
-void rotation_test() {
+static void rotation_test() {
     std::vector<shape*> scene;
     // USE UNIQUE PTRS
     std::unique_ptr<cylinder> c1 = std::make_unique<cylinder>(point4(0.f, 0.f, 0.f, 0.f), point4(0.f, 0.5f, 0.f, 0.f), false, color(1.f, 0.647f, 0.f));
@@ -151,7 +152,7 @@ void rotation_test() {
     cam.render();
 }
 
-void tesseract() {
+static void tesseract() {
     std::vector<shape*> scene;
 
     // Assuming side_length = 0.5
@@ -248,11 +249,11 @@ void tesseract() {
         int idx2 = edges[i][1];
 
         std::unique_ptr<cylinder> c = std::make_unique<cylinder>(vertices[idx1], vertices[idx2], true, edge_color);
-        c->basis.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
+        /*c->basis.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
         c->basis.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         c->basis.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         c->a = c->basis.local_to_world(c->a);
-        c->b = c->basis.local_to_world(c->b);
+        c->b = c->basis.local_to_world(c->b); */
         cylinders.push_back(std::move(c));
         //c->basis.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         //cube1->basis.rotate_yz(deg2rad(50.f));
@@ -273,58 +274,70 @@ void tesseract() {
     cam.render();
 }
 
-float handle_inputs(const std::vector<shape*> scene, camera& cam) {
-    constexpr float move_amount = 0.1f;
+static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
+    constexpr float move_amount = 0.03f;
+    constexpr float rotate_amount = 0.05f;
+
+    bool did_input = false;
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-        for (shape* s : scene) {
-            cylinder* c = (cylinder*) s;
-            c->a.x -= move_amount;
-            c->b.x -= move_amount;
+        for (shape* c : scene) {
+            c->basis.translate(vec4(-move_amount, 0.f, 0.f, 0.f));
         }
 
-        //scene.clear();
-        cam.render_rt();
-        return true;
+        did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-        for (shape* s : scene) {
-            cylinder* c = (cylinder*) s;
-            c->a.x += move_amount;
-            c->b.x += move_amount;
+        for (shape* c : scene) {
+            c->basis.translate(vec4(move_amount, 0.f, 0.f, 0.f));
         }
 
-        //scene.clear();
-        cam.render_rt();
-        return true;
+        did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
-        for (shape* s : scene) {
-            cylinder* c = (cylinder*) s;
-            c->a.y += move_amount;
-            c->b.y += move_amount;
+        for (shape* c : scene) {
+            c->basis.translate(vec4(0.f, move_amount, 0.f, 0.f));
         }
 
-        //scene.clear();
-        cam.render_rt();
-        return true;
+        did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-        for (shape* s : scene) {
-            cylinder* c = (cylinder*) s;
-            c->a.y -= move_amount;
-            c->b.y -= move_amount;
+        for (shape* c : scene) {
+            c->basis.translate(vec4(0.f, -move_amount, 0.f, 0.f));
         }
-
-        //scene.clear();
-        cam.render_rt();
-        return true;
+        
+        did_input = true;
     }
 
-    return false;
+    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
+        for (shape* c : scene) {
+            c->basis.rotate_xy(rotate_amount);
+            c->basis.rotate_zw(rotate_amount);
+        }
+
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+        for (shape* c : scene) {
+            c->basis.rotate_yz(rotate_amount);
+        }
+
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
+        for (shape* c : scene) {
+            c->basis.rotate_xy(rotate_amount);
+        }
+
+        did_input = true;
+    }
+
+    return did_input;
 }
 
 int main() {
@@ -365,18 +378,11 @@ int main() {
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
-
-    bool show_demo_window = true;
-    bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Tesseract Scene
-    std::vector<shape*> scene;
-        // Assuming side_length = 0.5
-    float L = 0.5f; // This is the full side length, not half_side
+    float L = 0.5f;
 
-    // Vertices (as point4 or similar 4-component vector structure)
-    // Each coordinate is either 0.0f or L (0.5f)
     point4 vertices[16] = {
         // Vertex Index corresponds to binary (WZYX) -> e.g., 0000 for (0,0,0,0), 1111 for (L,L,L,L)
 
@@ -404,8 +410,9 @@ int main() {
         point4(0.0f, L,    L,    L),    // 14: (0,L,L,L)
         point4(L,    L,    L,    L)     // 15: (L,L,L,L)
     };
+    
+    //point4 center(L / 2, L / 2, L / 2, L / 2);
 
-    // Edges (pairs of vertex indices from the `vertices` array above)
     int edges[32][2] = {
         // --- Edges within the W=0.0f 'cube' (indices 0-7) ---
         {0, 1}, // (0,0,0,0) to (L,0,0,0) - X-axis
@@ -459,25 +466,21 @@ int main() {
     };
 
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    std::vector<std::unique_ptr<cylinder>> cylinders;
+    std::vector<std::unique_ptr<shape>> unique_scene;
+    std::vector<shape*> scene;
 
     for (int i = 0; i < 32; ++i) {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
-        std::unique_ptr<cylinder> c = std::make_unique<cylinder>(vertices[idx1], vertices[idx2], true, edge_color);
-        c->basis.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
-        c->basis.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        c->basis.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        c->a = c->basis.local_to_world(c->a);
-        c->b = c->basis.local_to_world(c->b);
-        cylinders.push_back(std::move(c));
+        vec4 move(L / 2, L / 2, 0.f, 0.f);
+        unique_scene.push_back(std::make_unique<cylinder>(vertices[idx1] - move, vertices[idx2] - move, true, edge_color));
+        scene.push_back(unique_scene.back().get());
+        //cylinders.back()->basis.translate(vec4(0.f, 0.f, 2.f,));
         //c->basis.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         //cube1->basis.rotate_yz(deg2rad(50.f));
         //cube1->basis.rotate_zw(deg2rad(45.f));
         // rotate on 0.5f, 0.5f, 0.5f, 0.5f
-
-        scene.push_back(cylinders.back().get());
     }
 
     std::vector<direction_light> lights;
@@ -486,12 +489,9 @@ int main() {
 
     camera cam{ scene, lights };
     cam.aspect_ratio = 16.f / 9.f;
-    cam.image_width = 400;
+    cam.image_width = 640;
     //cam.render_normals = true;
-    //cam.render();
     cam.initialize();
-    cam.render_rt();
-    // End of tesseract scene
 
     // --- SETUP OPENGL TEXTURE ---
     GLuint render_texture;
@@ -507,7 +507,24 @@ int main() {
     int rt_latency = 0;
     int full_latency = 0;
 
-    tesseract();
+    std::vector<std::thread> threads;
+    std::counting_semaphore<N> sem(N);
+    bool is_rendering = true; //std::atomic<bool> is_rendering = true;
+    int first_row = 0;
+    int row_range = std::ceil((float)g_image_height / N); // range: ceil(height / N)
+
+    for (int i = 0; i < N; i++) {
+        int last_row = std::min(first_row + row_range, g_image_height - 1);
+
+        threads.push_back(std::thread([&cam, first_row, last_row, &is_rendering, &sem]() { 
+            while (is_rendering) {
+                sem.acquire();
+                cam.render_rt(first_row, last_row);
+            }
+        }));
+
+        first_row += row_range;
+    }
 
     while (!glfwWindowShouldClose(window)) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -529,11 +546,12 @@ int main() {
 
         // --- Render Target Window ---
         ImGui::Begin("Render Output");
-
-        clock_t t0 = clock();
         bool input_changed = handle_inputs(scene, cam);
+
         if (input_changed) {
-            rt_latency = (clock() - t0) / 1000;
+            for (int i = 0; i < N; i++) {
+                sem.release(); // increase the counter by N to ensure at least N threads can be awaken
+            }
         }
         // Check if our render thread has finished and provided new data
         glBindTexture(GL_TEXTURE_2D, render_texture);
@@ -541,13 +559,10 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, 0); // Unbind
 
         // Display the texture in an ImGui::Image widget
-        // The (void*)(intptr_t) cast is necessary to convert the GLuint texture ID to ImGui's ImTextureID format
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(g_image_width, g_image_height));
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        if (input_changed) {
-            full_latency = (clock() - t0) / 1000;
-        }
         ImGui::Text("Raytracer latency: %dms   Transfer latency: %dms", rt_latency, full_latency - rt_latency);
+        //ImGui::Text("Tesseract Center: (%.3f, %.3f, %.3f, %.3f)", center.x, center.y, center.z, center.w);
         ImGui::End();
 
         // Rendering
@@ -562,6 +577,15 @@ int main() {
         glfwSwapBuffers(window);
     }
 
+    is_rendering = false;
+    for (int i = 0; i < N; i++) {
+        sem.release(); // increase the counter by N to ensure at least N threads can be awaken
+    }
+
+    for (int i = 0; i < N; i++) {
+        threads[i].join();
+    }
+    
     glDeleteTextures(1, &render_texture); // Clean up the texture
     
     // Cleanup
