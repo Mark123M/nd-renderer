@@ -40,17 +40,18 @@ struct transform {
 	// simple rotation over the a-b plane
 	void rotate(float angle, int a, int b) {
 		affine R = rotate_mat(angle, a, b);
-		linear = matmul(R, linear); // AR(R^-1A^-1)
-		inv_linear = matmul(inv_linear, R.transpose());
+		linear = matmul(linear, R); // RA(A^-1R^-1)
+		inv_linear = matmul(R.transpose(), inv_linear);
 	}
 
+	// R * T * R
 	void translate(const vec4& t) {
 		affine T;
 		T.m[0][4] = t.x;
 		T.m[1][4] = t.y;
 		T.m[2][4] = t.z;
 		T.m[3][4] = t.w;
-		linear = matmul(T, linear);
+		linear = matmul(T, linear); // TA(A^-1T^-1)
 
 		affine T_inv;
 		T_inv.m[0][4] = -t.x;

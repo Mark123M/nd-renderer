@@ -274,50 +274,50 @@ static void tesseract() {
     cam.render();
 }
 
-static float handle_inputs(const std::vector<cylinder*> scene, camera& cam, point4& center) {
+static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
     constexpr float move_amount = 0.03f;
     constexpr float rotate_amount = 0.05f;
 
     bool did_input = false;
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-        for (cylinder* c : scene) {
+        for (shape* c : scene) {
             c->basis.translate(vec4(-move_amount, 0.f, 0.f, 0.f));
-            center.x -= move_amount;
+            //center.x -= move_amount;
         }
 
         did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-        for (cylinder* c : scene) {
+        for (shape* c : scene) {
             c->basis.translate(vec4(move_amount, 0.f, 0.f, 0.f));
-            center.x += move_amount;
+            //center.x += move_amount;
         }
 
         did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
-        for (cylinder* c : scene) {
+        for (shape* c : scene) {
             c->basis.translate(vec4(0.f, move_amount, 0.f, 0.f));
-            center.y += move_amount;
+            //center.y += move_amount;
         }
 
         did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-        for (cylinder* c : scene) {
+        for (shape* c : scene) {
             c->basis.translate(vec4(0.f, -move_amount, 0.f, 0.f));
-            center.y -= move_amount;
+            //center.y -= move_amount;
         }
         
         did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
-        for (cylinder* c : scene) {
+        for (shape* c : scene) {
             //c->basis.rotate_xy_around_point(rotate_amount, center);
             //c->basis.rotate_zw_around_point(rotate_amount, center);
             c->basis.rotate_xy(rotate_amount);
@@ -331,8 +331,6 @@ static float handle_inputs(const std::vector<cylinder*> scene, camera& cam, poin
 }
 
 int main() {
-    rotation_test();
-
     glfwSetErrorCallback(glfw_error_callback);
 
     if (!glfwInit()) {
@@ -370,18 +368,11 @@ int main() {
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
-
-    bool show_demo_window = true;
-    bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Tesseract Scene
-    std::vector<cylinder*> scene;
-        // Assuming side_length = 0.5
-    float L = 0.5f; // This is the full side length, not half_side
+    float L = 0.5f;
 
-    // Vertices (as point4 or similar 4-component vector structure)
-    // Each coordinate is either 0.0f or L (0.5f)
     point4 vertices[16] = {
         // Vertex Index corresponds to binary (WZYX) -> e.g., 0000 for (0,0,0,0), 1111 for (L,L,L,L)
 
@@ -409,9 +400,9 @@ int main() {
         point4(0.0f, L,    L,    L),    // 14: (0,L,L,L)
         point4(L,    L,    L,    L)     // 15: (L,L,L,L)
     };
-    point4 center(L / 2, L / 2, L / 2, L / 2);
+    
+    //point4 center(L / 2, L / 2, L / 2, L / 2);
 
-    // Edges (pairs of vertex indices from the `vertices` array above)
     int edges[32][2] = {
         // --- Edges within the W=0.0f 'cube' (indices 0-7) ---
         {0, 1}, // (0,0,0,0) to (L,0,0,0) - X-axis
@@ -465,36 +456,32 @@ int main() {
     };
 
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    std::vector<std::unique_ptr<cylinder>> cylinders;
+    std::vector<std::unique_ptr<shape>> unique_scene;
+    std::vector<shape*> scene;
 
     for (int i = 0; i < 32; ++i) {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
-        vec4 move(L / 2, L / 2, L / 2, L / 2);
-        cylinders.push_back(std::move(std::make_unique<cylinder>(vertices[idx1] - move, vertices[idx2] - move, false, edge_color)));
+        vec4 move(L / 2, L / 2, 0.f, 0.f);
+        unique_scene.push_back(std::make_unique<cylinder>(vertices[idx1] - move, vertices[idx2] - move, true, edge_color));
+        scene.push_back(unique_scene.back().get());
         //cylinders.back()->basis.translate(vec4(0.f, 0.f, 2.f,));
         //c->basis.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         //cube1->basis.rotate_yz(deg2rad(50.f));
         //cube1->basis.rotate_zw(deg2rad(45.f));
         // rotate on 0.5f, 0.5f, 0.5f, 0.5f
-
-        scene.push_back(cylinders.back().get());
     }
 
     std::vector<direction_light> lights;
     direction_light light1(vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
     lights.push_back(light1);
 
-    std::vector<shape*> casted_scene(scene.begin(), scene.end());
-    camera cam{ casted_scene, lights };
+    camera cam{ scene, lights };
     cam.aspect_ratio = 16.f / 9.f;
     cam.image_width = 640;
     //cam.render_normals = true;
-    //cam.render();
     cam.initialize();
-    //cam.render_rt(0, g_image_height - 1);
-    // End of tesseract scene
 
     // --- SETUP OPENGL TEXTURE ---
     GLuint render_texture;
@@ -549,7 +536,7 @@ int main() {
 
         // --- Render Target Window ---
         ImGui::Begin("Render Output");
-        bool input_changed = handle_inputs(scene, cam, center);
+        bool input_changed = handle_inputs(scene, cam);
 
         if (input_changed) {
             for (int i = 0; i < N; i++) {
@@ -562,11 +549,10 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, 0); // Unbind
 
         // Display the texture in an ImGui::Image widget
-        // The (void*)(intptr_t) cast is necessary to convert the GLuint texture ID to ImGui's ImTextureID format
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(g_image_width, g_image_height));
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
         ImGui::Text("Raytracer latency: %dms   Transfer latency: %dms", rt_latency, full_latency - rt_latency);
-        ImGui::Text("Tesseract Center: (%.3f, %.3f, %.3f, %.3f)", center.x, center.y, center.z, center.w);
+        //ImGui::Text("Tesseract Center: (%.3f, %.3f, %.3f, %.3f)", center.x, center.y, center.z, center.w);
         ImGui::End();
 
         // Rendering
