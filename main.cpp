@@ -283,7 +283,6 @@ static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
         for (shape* c : scene) {
             c->basis.translate(vec4(-move_amount, 0.f, 0.f, 0.f));
-            //center.x -= move_amount;
         }
 
         did_input = true;
@@ -292,7 +291,6 @@ static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
         for (shape* c : scene) {
             c->basis.translate(vec4(move_amount, 0.f, 0.f, 0.f));
-            //center.x += move_amount;
         }
 
         did_input = true;
@@ -301,7 +299,6 @@ static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
         for (shape* c : scene) {
             c->basis.translate(vec4(0.f, move_amount, 0.f, 0.f));
-            //center.y += move_amount;
         }
 
         did_input = true;
@@ -310,18 +307,31 @@ static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
         for (shape* c : scene) {
             c->basis.translate(vec4(0.f, -move_amount, 0.f, 0.f));
-            //center.y -= move_amount;
         }
         
         did_input = true;
     }
 
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
+    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
         for (shape* c : scene) {
-            //c->basis.rotate_xy_around_point(rotate_amount, center);
-            //c->basis.rotate_zw_around_point(rotate_amount, center);
             c->basis.rotate_xy(rotate_amount);
             c->basis.rotate_zw(rotate_amount);
+        }
+
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+        for (shape* c : scene) {
+            c->basis.rotate_yz(rotate_amount);
+        }
+
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
+        for (shape* c : scene) {
+            c->basis.rotate_xy(rotate_amount);
         }
 
         did_input = true;
