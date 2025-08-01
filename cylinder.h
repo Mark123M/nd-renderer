@@ -17,8 +17,7 @@ struct cylinder : public shape {
 		shape{ albedo, n }, a{ start }, b{ end }, should_project{ should_project }, radius {radius} {}
 
 	float sdf(const point4& p) const override {
-		//point4 pp = transform.world_to_local(p);
-
+		point4 pp = basis.world_to_local(p);
 		point4 aa = a;
 		point4 bb = b;
 
@@ -31,8 +30,7 @@ struct cylinder : public shape {
 		}
 
 		vec4  ba = bb - aa;
-		vec4  pa = p - aa;
-
+		vec4  pa = pp - aa;
 		float baba = vec4::dot(ba, ba);
 		float paba = vec4::dot(pa, ba);
 		float x = vec4::length(pa * baba - ba * paba) - radius * baba;

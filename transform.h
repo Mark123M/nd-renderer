@@ -2,24 +2,18 @@
 #define TRANSFORM_H
 
 #include "util.h"
-#include "mat4.h"
+#include "affine.h"
 
 struct transform {
-	mat4 linear;
-	mat4 inv_linear;
-	vec4 translation;
+	affine linear;
+	affine inv_linear;
 
 	// standard basis
-	transform(): linear{}, inv_linear{}, translation{} {}
+	transform(): linear{}, inv_linear{} {}
 
 	// construct from basis
 	transform(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
 		set_basis(vx, vy, vz, vw);
-	}
-
-	transform(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw, const vec4& translation) {
-		set_basis(vx, vy, vz, vw);
-		set_translation(translation);
 	}
 
 	void set_basis(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
@@ -28,25 +22,42 @@ struct transform {
 		assert(std::abs(vz.length_squared() - 1.f) <= TOL);
 		assert(std::abs(vw.length_squared() - 1.f) <= TOL);
 
-		linear = mat4{
+		linear = affine{
 			vx.x, vy.x, vz.x, vw.x,
 			vx.y, vy.y, vz.y, vw.y,
 			vx.z, vy.z, vz.z, vw.z,
 			vx.w, vy.w, vz.w, vw.w
 		};
 
-		inv_linear = linear.transpose(); // orthogonal matrix
-	}
-
-	void set_translation(const vec4& translation) {
-		this->translation = translation;
+		inv_linear = affine(
+			vx.x, vx.y, vx.z, vx.w,
+			vy.x, vy.y, vy.z, vy.w,
+			vz.x, vz.y, vz.z, vz.w,
+			vw.x, vw.y, vw.z, vw.w
+		);
 	}
 
 	// simple rotation over the a-b plane
 	void rotate(float angle, int a, int b) {
-		mat4 R = rotate_mat(angle, a, b);
-		linear = matmul(linear, R);
-		inv_linear = linear.transpose();
+		affine R = rotate_mat(angle, a, b);
+		linear = matmul(R, linear); // AR(R^-1A^-1)
+		inv_linear = matmul(inv_linear, R.transpose());
+	}
+
+	void translate(const vec4& t) {
+		affine T;
+		T.m[0][4] = t.x;
+		T.m[1][4] = t.y;
+		T.m[2][4] = t.z;
+		T.m[3][4] = t.w;
+		linear = matmul(T, linear);
+
+		affine T_inv;
+		T_inv.m[0][4] = -t.x;
+		T_inv.m[1][4] = -t.y;
+		T_inv.m[2][4] = -t.z;
+		T_inv.m[3][4] = -t.w;
+		inv_linear = matmul(inv_linear, T_inv);
 	}
 
 	void rotate_xy(float angle) {
@@ -74,11 +85,9 @@ struct transform {
 	}
 
 	void rotate_around_point(float angle, const point4& p, int a, int b) {
-		mat4 AR = matmul(linear, rotate_mat(angle, a, b));
-		vec4 b_ = linear.vecmul(p) - AR.vecmul(p) + translation;
-		linear = AR;
-		inv_linear = linear.transpose();
-		translation = b_;
+		translate(-p);
+		rotate(angle, a, b);
+		translate(p);
 	}
 
 	void rotate_xy_around_point(float angle, const point4& p) {
@@ -106,17 +115,17 @@ struct transform {
 	}
 
 	vec4 local_to_world(const vec4& v) const {
-		return linear.vecmul(v) + translation; // Av + b
+		return linear.vecmul(v);
 	}
 
 	vec4 world_to_local(const vec4& w) const {
-		return inv_linear.vecmul(w - translation); // A^-1(w - b)
+		return inv_linear.vecmul(w);
 	}
 
-	inline static mat4 rotate_mat(float angle, int a, int b) {
+	inline static affine rotate_mat(float angle, int a, int b) {
 		assert(a < b);
 
-		mat4 R; // identity
+		affine R; // identity
 		float cos_angle = cos(angle);
 		float sin_angle = sin(angle);
 		R.m[a][a] = cos_angle;
@@ -126,7 +135,7 @@ struct transform {
 
 		return R;
 	}
-
+/*
 	inline static vec4 rotate_vec(const vec4& v, float angle, int a, int b) {
 		return rotate_mat(angle, a, b).vecmul(v);
 	}
@@ -153,7 +162,7 @@ struct transform {
 
 	inline static vec4 rotate_zw_vec(const vec4& v, float angle) {
 		return rotate_vec(v, angle, 2, 3);
-	}
+	} */
 };
 
 #endif // !TRANSFORM_H

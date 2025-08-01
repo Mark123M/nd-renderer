@@ -19,7 +19,7 @@
 #include <thread>
 #include <mutex>
 
-static constexpr int N = 24;
+static constexpr int N = 20;
 
 static void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -249,11 +249,11 @@ static void tesseract() {
         int idx2 = edges[i][1];
 
         std::unique_ptr<cylinder> c = std::make_unique<cylinder>(vertices[idx1], vertices[idx2], true, edge_color);
-        c->basis.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
+        /*c->basis.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
         c->basis.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         c->basis.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         c->a = c->basis.local_to_world(c->a);
-        c->b = c->basis.local_to_world(c->b);
+        c->b = c->basis.local_to_world(c->b); */
         cylinders.push_back(std::move(c));
         //c->basis.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         //cube1->basis.rotate_yz(deg2rad(50.f));
@@ -274,53 +274,65 @@ static void tesseract() {
     cam.render();
 }
 
-static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
+static float handle_inputs(const std::vector<cylinder*> scene, camera& cam, point4& center) {
     constexpr float move_amount = 0.03f;
+    constexpr float rotate_amount = 0.05f;
+
+    bool did_input = false;
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-        for (shape* s : scene) {
-            cylinder* c = (cylinder*) s;
-            c->a.x -= move_amount;
-            c->b.x -= move_amount;
+        for (cylinder* c : scene) {
+            c->basis.translate(vec4(-move_amount, 0.f, 0.f, 0.f));
+            center.x -= move_amount;
         }
 
-        return true;
+        did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-        for (shape* s : scene) {
-            cylinder* c = (cylinder*) s;
-            c->a.x += move_amount;
-            c->b.x += move_amount;
+        for (cylinder* c : scene) {
+            c->basis.translate(vec4(move_amount, 0.f, 0.f, 0.f));
+            center.x += move_amount;
         }
 
-        return true;
+        did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
-        for (shape* s : scene) {
-            cylinder* c = (cylinder*) s;
-            c->a.y += move_amount;
-            c->b.y += move_amount;
+        for (cylinder* c : scene) {
+            c->basis.translate(vec4(0.f, move_amount, 0.f, 0.f));
+            center.y += move_amount;
         }
 
-        return true;
+        did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-        for (shape* s : scene) {
-            cylinder* c = (cylinder*) s;
-            c->a.y -= move_amount;
-            c->b.y -= move_amount;
+        for (cylinder* c : scene) {
+            c->basis.translate(vec4(0.f, -move_amount, 0.f, 0.f));
+            center.y -= move_amount;
         }
         
-        return true;
+        did_input = true;
     }
 
-    return false;
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
+        for (cylinder* c : scene) {
+            //c->basis.rotate_xy_around_point(rotate_amount, center);
+            //c->basis.rotate_zw_around_point(rotate_amount, center);
+            c->basis.rotate_xy(rotate_amount);
+            c->basis.rotate_zw(rotate_amount);
+        }
+
+        did_input = true;
+    }
+
+    return did_input;
 }
 
 int main() {
+    rotation_test();
+
     glfwSetErrorCallback(glfw_error_callback);
 
     if (!glfwInit()) {
@@ -364,7 +376,7 @@ int main() {
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Tesseract Scene
-    std::vector<shape*> scene;
+    std::vector<cylinder*> scene;
         // Assuming side_length = 0.5
     float L = 0.5f; // This is the full side length, not half_side
 
@@ -397,6 +409,7 @@ int main() {
         point4(0.0f, L,    L,    L),    // 14: (0,L,L,L)
         point4(L,    L,    L,    L)     // 15: (L,L,L,L)
     };
+    point4 center(L / 2, L / 2, L / 2, L / 2);
 
     // Edges (pairs of vertex indices from the `vertices` array above)
     int edges[32][2] = {
@@ -458,13 +471,9 @@ int main() {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
-        std::unique_ptr<cylinder> c = std::make_unique<cylinder>(vertices[idx1], vertices[idx2], true, edge_color);
-        c->basis.set_translation(vec4(-0.25f, -0.25f, 0.f, 0.f));
-        c->basis.rotate_xy_around_point(deg2rad(30.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        c->basis.rotate_yz_around_point(deg2rad(50.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
-        c->a = c->basis.local_to_world(c->a);
-        c->b = c->basis.local_to_world(c->b);
-        cylinders.push_back(std::move(c));
+        vec4 move(L / 2, L / 2, L / 2, L / 2);
+        cylinders.push_back(std::move(std::make_unique<cylinder>(vertices[idx1] - move, vertices[idx2] - move, false, edge_color)));
+        //cylinders.back()->basis.translate(vec4(0.f, 0.f, 2.f,));
         //c->basis.rotate_zw_around_point(deg2rad(10.f), point4(0.25f, 0.25f, 0.25f, 0.25f));
         //cube1->basis.rotate_yz(deg2rad(50.f));
         //cube1->basis.rotate_zw(deg2rad(45.f));
@@ -477,9 +486,10 @@ int main() {
     direction_light light1(vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
     lights.push_back(light1);
 
-    camera cam{ scene, lights };
+    std::vector<shape*> casted_scene(scene.begin(), scene.end());
+    camera cam{ casted_scene, lights };
     cam.aspect_ratio = 16.f / 9.f;
-    cam.image_width = 400;
+    cam.image_width = 640;
     //cam.render_normals = true;
     //cam.render();
     cam.initialize();
@@ -502,13 +512,13 @@ int main() {
 
     std::vector<std::thread> threads;
     std::counting_semaphore<N> sem(N);
-    std::atomic<bool> is_rendering = true;
+    bool is_rendering = true; //std::atomic<bool> is_rendering = true;
     int first_row = 0;
     int row_range = std::ceil((float)g_image_height / N); // range: ceil(height / N)
 
     for (int i = 0; i < N; i++) {
         int last_row = std::min(first_row + row_range, g_image_height - 1);
-        
+
         threads.push_back(std::thread([&cam, first_row, last_row, &is_rendering, &sem]() { 
             while (is_rendering) {
                 sem.acquire();
@@ -539,7 +549,7 @@ int main() {
 
         // --- Render Target Window ---
         ImGui::Begin("Render Output");
-        bool input_changed = handle_inputs(scene, cam);
+        bool input_changed = handle_inputs(scene, cam, center);
 
         if (input_changed) {
             for (int i = 0; i < N; i++) {
@@ -556,6 +566,7 @@ int main() {
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(g_image_width, g_image_height));
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
         ImGui::Text("Raytracer latency: %dms   Transfer latency: %dms", rt_latency, full_latency - rt_latency);
+        ImGui::Text("Tesseract Center: (%.3f, %.3f, %.3f, %.3f)", center.x, center.y, center.z, center.w);
         ImGui::End();
 
         // Rendering
