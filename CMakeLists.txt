@@ -4,7 +4,9 @@
 # See README.md for guidance.
 #---------------------------------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
-project(nd-light-transport LANGUAGES CXX)
+project(nd-light-transport LANGUAGES CXX CUDA)
+set(CMAKE_CUDA_ARCHITECTURES "89")
+set(CMAKE_CUDA_STANDARD 20)
 
 # --- ImGui Integration Starts Here ---
 
@@ -47,6 +49,7 @@ set ( SRC_CPU
 )
 
 set ( SRC_GPU
+  main.cu
 )
 
 # Specific compiler flags below. We're not going to add options for all possible compilers, but if
@@ -58,7 +61,7 @@ message (STATUS "Release flags: " ${CMAKE_CXX_FLAGS_RELEASE})
 message (STATUS "Debug flags: " ${CMAKE_CXX_FLAGS_DEBUG})
 
 # Executables
-add_executable(nd-raytracer      ${EXTERNAL} ${SRC_CPU} ${IMGUI_SOURCES})
+add_executable(nd-raytracer      ${SRC_GPU} ${IMGUI_SOURCES})
 
 # --- AddressSanitizer Configuration ---
 # Enable AddressSanitizer for Debug and RelWithDebInfo builds.

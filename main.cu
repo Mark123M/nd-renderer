@@ -1,6 +1,13 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <memory>
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+#include <GLFW/glfw3.h>
+#include <thread>
+
 #include "color.h"
 #include "ray.h"
 #include "nsphere.h"
@@ -10,19 +17,18 @@
 #include "direction_light.h"
 #include "mat4.h"
 #include "util.h"
-#include <memory>
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
-#include <GLFW/glfw3.h>
 
-#include <thread>
-#include <barrier>
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
 
 static constexpr int N = 20;
 
 static void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+}
+
+__global__ void hello() {
+    printf("Hello from block: %u, thread: %u\n", blockIdx.x, threadIdx.x);
 }
 
 static void scene1() {
@@ -331,6 +337,8 @@ static float handle_inputs(const std::vector<shape*> scene, camera& cam) {
 }
 
 int main() {
+    hello<<<1, 64>>>();
+
     glfwSetErrorCallback(glfw_error_callback);
 
     if (!glfwInit()) {
@@ -501,25 +509,9 @@ int main() {
     int rt_latency = 0;
     int full_latency = 0;
 
-    std::vector<std::thread> threads;
-    std::barrier bar(N + 1);
-
+    std::vector<std::thread> threads(N);
     bool is_rendering = true; //std::atomic<bool> is_rendering = true;
-    int first_row = 0;
     int row_range = std::ceil((float)g_image_height / N); // range: ceil(height / N)
-
-    for (int i = 0; i < N; i++) {
-        int last_row = std::min(first_row + row_range, g_image_height - 1);
-
-        threads.push_back(std::thread([&cam, first_row, last_row, &is_rendering, &bar]() { 
-            while (is_rendering) {
-                cam.render_rt(first_row, last_row);
-                bar.arrive_and_wait();
-            }
-        }));
-
-        first_row += row_range;
-    }
 
     while (!glfwWindowShouldClose(window)) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -544,7 +536,22 @@ int main() {
         bool input_changed = handle_inputs(scene, cam);
 
         if (input_changed) {
-            bar.arrive_and_wait(); // Check if our render thread has finished and provided new data
+            int first_row = 0;
+
+            for (int i = 0; i < N; i++) {
+                int last_row = std::min(first_row + row_range, g_image_height - 1);
+
+                threads[i] = std::thread([&cam, first_row, last_row]() { 
+                    cam.render_rt(first_row, last_row);
+                });
+
+                first_row += row_range;
+            }
+
+            for (int i = 0; i < N; i++) {
+                threads[i].join();
+            }
+
             glBindTexture(GL_TEXTURE_2D, render_texture);
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_image_width, g_image_height, GL_RGB, GL_UNSIGNED_BYTE, g_image_data.data());
             glBindTexture(GL_TEXTURE_2D, 0); // Unbind
@@ -570,11 +577,6 @@ int main() {
     }
 
     is_rendering = false;
-    
-    for (int i = 0; i < N; i++) {
-        threads[i].join();
-    }
-    
     glDeleteTextures(1, &render_texture); // Clean up the texture
     
     // Cleanup
