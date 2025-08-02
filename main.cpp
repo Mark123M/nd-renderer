@@ -17,7 +17,7 @@
 #include <GLFW/glfw3.h>
 
 #include <thread>
-#include <mutex>
+#include <barrier>
 
 static constexpr int N = 20;
 
@@ -502,7 +502,8 @@ int main() {
     int full_latency = 0;
 
     std::vector<std::thread> threads;
-    std::counting_semaphore<N> sem(N);
+    std::barrier bar(N + 1);
+
     bool is_rendering = true; //std::atomic<bool> is_rendering = true;
     int first_row = 0;
     int row_range = std::ceil((float)g_image_height / N); // range: ceil(height / N)
@@ -510,10 +511,10 @@ int main() {
     for (int i = 0; i < N; i++) {
         int last_row = std::min(first_row + row_range, g_image_height - 1);
 
-        threads.push_back(std::thread([&cam, first_row, last_row, &is_rendering, &sem]() { 
+        threads.push_back(std::thread([&cam, first_row, last_row, &is_rendering, &bar]() { 
             while (is_rendering) {
-                sem.acquire();
                 cam.render_rt(first_row, last_row);
+                bar.arrive_and_wait();
             }
         }));
 
@@ -543,14 +544,11 @@ int main() {
         bool input_changed = handle_inputs(scene, cam);
 
         if (input_changed) {
-            for (int i = 0; i < N; i++) {
-                sem.release(); // increase the counter by N to ensure at least N threads can be awaken
-            }
+            bar.arrive_and_wait(); // Check if our render thread has finished and provided new data
+            glBindTexture(GL_TEXTURE_2D, render_texture);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_image_width, g_image_height, GL_RGB, GL_UNSIGNED_BYTE, g_image_data.data());
+            glBindTexture(GL_TEXTURE_2D, 0); // Unbind
         }
-        // Check if our render thread has finished and provided new data
-        glBindTexture(GL_TEXTURE_2D, render_texture);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_image_width, g_image_height, GL_RGB, GL_UNSIGNED_BYTE, g_image_data.data());
-        glBindTexture(GL_TEXTURE_2D, 0); // Unbind
 
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(g_image_width, g_image_height));
@@ -572,10 +570,7 @@ int main() {
     }
 
     is_rendering = false;
-    for (int i = 0; i < N; i++) {
-        sem.release(); // increase the counter by N to ensure at least N threads can be awaken
-    }
-
+    
     for (int i = 0; i < N; i++) {
         threads[i].join();
     }

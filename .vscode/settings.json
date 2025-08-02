@@ -67,6 +67,7 @@
         "cfenv": "cpp",
         "variant": "cpp",
         "format": "cpp",
-        "__nullptr": "cpp"
+        "__nullptr": "cpp",
+        "barrier": "cpp"
     }
 }
