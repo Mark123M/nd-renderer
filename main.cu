@@ -18,10 +18,48 @@
 #include "mat4.h"
 #include "util.h"
 
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+#include <cuda_gl_interop.h>
 
-static constexpr int N = 20;
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
+struct cudaGraphicsResource* render_texture_CUDA = nullptr;
+
+__global__ void test_render_kernel(uchar4* d_image_data, int width, int height, float time)
+{
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (x < width && y < height) {
+        // Normalize coordinates to [0, 1]
+        float nx = (float)x / width;
+        float ny = (float)y / height;
+
+        // Simple animation logic
+        float r = 0.5f + 0.5f * sinf(nx * 10.0f + time);
+        float g = 0.5f + 0.5f * sinf(ny * 10.0f + time + 2.0f);
+        float b = 0.5f + 0.5f * sinf((nx + ny) * 5.0f + time + 4.0f);
+
+        // Map to 0-255 range
+        uchar4 pixel;
+        pixel.x = static_cast<unsigned char>(r * 255.0f); // Red
+        pixel.y = static_cast<unsigned char>(g * 255.0f); // Green
+        pixel.z = static_cast<unsigned char>(b * 255.0f); // Blue
+        pixel.w = 255;                                    // Alpha (fully opaque)
+
+        // Write to the linear device memory buffer
+        d_image_data[y * width + x] = pixel;
+    }
+}
 
 static void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -30,6 +68,8 @@ static void glfw_error_callback(int error, const char* description) {
 __global__ void hello() {
     printf("Hello from block: %u, thread: %u\n", blockIdx.x, threadIdx.x);
 }
+
+static constexpr int num_cpu_threads = 20;
 
 static float handle_inputs() {
     constexpr float move_amount = 0.03f;
@@ -261,15 +301,26 @@ int main() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // Allocate memory for the texture on the GPU
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, camera::image_width, camera::image_height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, camera::image_width, camera::image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glBindTexture(GL_TEXTURE_2D, 0); // Unbind
+
+    gpuErrchk(cudaGraphicsGLRegisterImage(
+        &render_texture_CUDA,
+        render_texture,
+        GL_TEXTURE_2D, // Target of the texture (e.g., GL_TEXTURE_2D)
+        cudaGraphicsMapFlagsWriteDiscard
+    ));
 
     int rt_latency = 0;
     int full_latency = 0;
 
-    std::vector<std::thread> threads(N);
+    std::vector<std::thread> threads(num_cpu_threads);
     bool is_rendering = true; //std::atomic<bool> is_rendering = true;
-    int row_range = std::ceil((float)camera::image_height / N); // range: ceil(height / N)
+    int row_range = std::ceil((float)camera::image_height / num_cpu_threads); // range: ceil(height / N)
+
+    uchar4* d_image_data;
+    int numel = camera::image_width * camera::image_height;
+    gpuErrchk(cudaMalloc(&d_image_data, numel * sizeof(uchar4)));
 
     while (!glfwWindowShouldClose(window)) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -293,26 +344,27 @@ int main() {
         ImGui::Begin("Render Output");
         bool input_changed = handle_inputs();
 
-        if (input_changed) {
-            int first_row = 0;
+        if (true) {
+            dim3 threads_per_block(16, 16);
+            dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
+            (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
+            test_render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height, static_cast<float>(glfwGetTime()));
 
-            for (int i = 0; i < N; i++) {
-                int last_row = std::min(first_row + row_range, camera::image_height - 1);
+            cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
+            gpuErrchk(cudaGraphicsMapResources(1, &render_texture_CUDA, 0)); // Map on stream 0
+            gpuErrchk(cudaGraphicsSubResourceGetMappedArray(&d_texture_array, render_texture_CUDA, 0, 0));
 
-                threads[i] = std::thread([first_row, last_row]() { 
-                    camera::render_rt(first_row, last_row);
-                });
-
-                first_row += row_range;
-            }
-
-            for (int i = 0; i < N; i++) {
-                threads[i].join();
-            }
-
-            glBindTexture(GL_TEXTURE_2D, render_texture);
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, camera::image_width, camera::image_height, GL_RGB, GL_UNSIGNED_BYTE, camera::image_data.data());
-            glBindTexture(GL_TEXTURE_2D, 0); // Unbind
+            gpuErrchk(cudaMemcpy2DToArray(d_texture_array, // Destination: CUDA array
+                    0, 0,             // Destination X, Y offsets (start at top-left)
+                    d_image_data,      // Source: Device pointer to your linear pixel data
+                    camera::image_width * sizeof(uchar4), // Source pitch (bytes per row)
+                    camera::image_width * sizeof(uchar4), // Width of the copy (bytes)
+                    camera::image_height, // Height of the copy (rows)
+                    cudaMemcpyDeviceToDevice)); // Type of copy (Device to Array)
+            gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
+            //glBindTexture(GL_TEXTURE_2D, render_texture);
+            //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, camera::image_width, camera::image_height, GL_RGB, GL_UNSIGNED_BYTE, camera::image_data.data());
+            //glBindTexture(GL_TEXTURE_2D, 0); // Unbind
         }
 
         // Display the texture in an ImGui::Image widget
@@ -333,6 +385,10 @@ int main() {
 
         glfwSwapBuffers(window);
     }
+
+    gpuErrchk(cudaGraphicsUnregisterResource(render_texture_CUDA));
+    gpuErrchk(cudaDeviceSynchronize());
+    gpuErrchk(cudaFree(d_image_data));
 
     is_rendering = false;
     glDeleteTextures(1, &render_texture); // Clean up the texture

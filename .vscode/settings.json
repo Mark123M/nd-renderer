@@ -68,6 +68,12 @@
         "variant": "cpp",
         "format": "cpp",
         "__nullptr": "cpp",
-        "barrier": "cpp"
-    }
+        "barrier": "cpp",
+        "__hash_table": "cpp",
+        "__split_buffer": "cpp",
+        "__tree": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "disabled"
 }
