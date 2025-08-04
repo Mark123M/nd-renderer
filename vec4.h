@@ -3,7 +3,6 @@
 
 #include <cmath>
 #include <iostream>
-#include <cassert>
 #include "math_util.h"
 
 struct vec4;
@@ -27,6 +26,7 @@ struct vec4 {
 	__host__ __device__ vec4 operator*(const vec4& v) const { return { x * v.x, y * v.y, z * v.z, w * v.w }; }
 
 	__host__ __device__ vec4 operator/(float k) const {
+		assert(k != 0);
 		return (1 / k) * (*this);
 	}
 

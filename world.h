@@ -104,11 +104,59 @@ __global__ void destruct() {
     delete [] d_lights;
 }
 
-__global__ void translation_kernel(vec4 t) {
+__global__ void translate_kernel(vec4 t) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (idx < d_scene_len) {
         d_scene[idx]->basis.translate(t);
+    }
+}
+
+__global__ void rotate_xy_kernel(float angle) {
+    size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
+    
+    if (idx < d_scene_len) {
+        d_scene[idx]->basis.rotate_xy(angle);
+    }
+}
+
+__global__ void rotate_xz_kernel(float angle) {
+    size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
+    
+    if (idx < d_scene_len) {
+        d_scene[idx]->basis.rotate_xz(angle);
+    }
+}
+
+__global__ void rotate_xw_kernel(float angle) {
+    size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
+    
+    if (idx < d_scene_len) {
+        d_scene[idx]->basis.rotate_xw(angle);
+    }
+}
+
+__global__ void rotate_yz_kernel(float angle) {
+    size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
+    
+    if (idx < d_scene_len) {
+        d_scene[idx]->basis.rotate_yz(angle);
+    }
+}
+
+__global__ void rotate_yw_kernel(float angle) {
+    size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
+    
+    if (idx < d_scene_len) {
+        d_scene[idx]->basis.rotate_yw(angle);
+    }
+}
+
+__global__ void rotate_zw_kernel(float angle) {
+    size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
+    
+    if (idx < d_scene_len) {
+        d_scene[idx]->basis.rotate_zw(angle);
     }
 }
 

@@ -67,47 +67,38 @@ static bool handle_inputs_cuda() {
     uint num_blocks = (scene.size() + threads_per_block - 1) / threads_per_block;
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-        world::translation_kernel<<<num_blocks, threads_per_block>>>(vec4(-MOVE_AMOUNT, 0.f, 0.f, 0.f));
+        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(-MOVE_AMOUNT, 0.f, 0.f, 0.f));
         did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-        world::translation_kernel<<<num_blocks, threads_per_block>>>(vec4(MOVE_AMOUNT, 0.f, 0.f, 0.f));
+        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(MOVE_AMOUNT, 0.f, 0.f, 0.f));
         did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
-        world::translation_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, MOVE_AMOUNT, 0.f, 0.f));
+        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, MOVE_AMOUNT, 0.f, 0.f));
         did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-        world::translation_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, -MOVE_AMOUNT, 0.f, 0.f));
+        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, -MOVE_AMOUNT, 0.f, 0.f));
         did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
-        for (shape* c : scene) {
-            c->basis.rotate_xz(ROTATE_AMOUNT);
-            c->basis.rotate_yw(ROTATE_AMOUNT);
-        }
-
+        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_AMOUNT);
+        world::rotate_yw_kernel<<<num_blocks, threads_per_block>>>(ROTATE_AMOUNT);
         did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-        for (shape* c : scene) {
-            c->basis.rotate_yz(ROTATE_AMOUNT);
-        }
-
+        world::rotate_yz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_AMOUNT);
         did_input = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
-        for (shape* c : scene) {
-            c->basis.rotate_xz(ROTATE_AMOUNT);
-        }
-
+        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_AMOUNT);
         did_input = true;
     }
 
@@ -307,7 +298,7 @@ int main() {
         {7, 15}  // (L,L,L,0) to (L,L,L,L)
     };
 
-    /*color edge_color(1.0f, 0.647f, 0.0f); // Orange
+    color edge_color(1.0f, 0.647f, 0.0f); // Orange
     std::vector<std::unique_ptr<cylinder>> unique_scene;
 
     for (int i = 0; i < 32; ++i) {
@@ -320,12 +311,12 @@ int main() {
         unique_scene.back()->b = vertices[idx2] - move;
         unique_scene.back()->albedo = edge_color;
         scene.push_back(unique_scene.back().get());
-    }*/
+    }
 
-    std::unique_ptr<nsphere> ball = std::make_unique<nsphere>();
+    /*std::unique_ptr<nsphere> ball = std::make_unique<nsphere>();
     ball->radius = 0.5f;
     ball->albedo = color(1.f, 0.f, 0.f);
-    scene.push_back(ball.get());
+    scene.push_back(ball.get());*/
 
     std::unique_ptr<cylinder> x_axis = std::make_unique<cylinder>();
     x_axis->b = point4(L, 0, 0, 0);
@@ -356,7 +347,7 @@ int main() {
 
     world::initialize();
     camera::aspect_ratio = 16.f / 9.f;
-    camera::image_width = 600;
+    camera::image_width = 1280;
     // camera::render_normals = true;
     camera::initialize();
 

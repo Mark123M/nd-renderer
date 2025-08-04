@@ -3,7 +3,6 @@
 
 #include <sstream>
 #include <vector>
-#include <cassert>
 #include <ctime>
 #include <mutex>
 
@@ -275,6 +274,11 @@ void initialize() {
     gpuErrchk(cudaMemcpyToSymbol(d_pixel_y, &pixel_y, sizeof(vec4)));
     gpuErrchk(cudaMemcpyToSymbol(d_camera_center, &camera_center, sizeof(point4)));
     gpuErrchk(cudaMemcpyToSymbol(d_pixel00_center, &pixel00_center, sizeof(point4)));
+
+    gpuErrchk(cudaMemcpyToSymbol(d_delta_x, &delta_x, sizeof(vec4)));
+    gpuErrchk(cudaMemcpyToSymbol(d_delta_y, &delta_y, sizeof(vec4)));
+    gpuErrchk(cudaMemcpyToSymbol(d_delta_z, &delta_z, sizeof(vec4)));
+    gpuErrchk(cudaMemcpyToSymbol(d_delta_w, &delta_w, sizeof(vec4)));
 }
 
 void render_rt(int first_row, int last_row) {
