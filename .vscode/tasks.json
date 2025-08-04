@@ -98,6 +98,50 @@
                 "panel": "new"     // Open a new terminal panel each time
             },
             "dependsOn": "build" // Ensure the RelWithDebInfo build is up-to-date before running
+        },
+        {
+            "label": "cmake-configure-debug-gpu",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-S",
+                "${workspaceFolder}",
+                "-B",
+                "${workspaceFolder}/build/debug",
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-G",
+                "Ninja"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "cmake-build-debug-gpu",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build/debug",
+                //"--config",
+                //"RelWithDebInfo",
+                "-j"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "dependsOn": ["cmake-configure"]
+        },
+        {
+            "label": "build-debug-gpu",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "cmake-configure-debug-gpu",
+                "cmake-build-debug-gpu"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true // Keep this as the default build task
+            }
         }
     ]
 }

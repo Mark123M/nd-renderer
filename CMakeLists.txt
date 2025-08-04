@@ -66,7 +66,7 @@ add_executable(nd-raytracer      ${SRC_GPU} ${IMGUI_SOURCES})
 # --- AddressSanitizer Configuration ---
 # Enable AddressSanitizer for Debug and RelWithDebInfo builds.
 # It adds significant overhead, so it's typically not used for Release builds.
-if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
+if (CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
     # Check if the compiler supports AddressSanitizer
     # GCC and Clang typically support it.
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
@@ -76,6 +76,11 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
     else()
         message(WARNING "AddressSanitizer requested but not supported by compiler: ${CMAKE_CXX_COMPILER_ID}")
     endif()
+endif()
+
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
+    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -g -G -O0 -lineinfo --keep-device-functions")
 endif()
 
 # For VS Code IntelliSense and other tools to pick up compile commands

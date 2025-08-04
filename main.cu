@@ -14,35 +14,25 @@
 #include "ncube.h"
 #include "cylinder.h"
 #include "camera.h"
+#include "world.h"
 #include "direction_light.h"
-#include "mat4.h"
-#include "util.h"
+#include "math_util.h"
 
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <cuda_gl_interop.h>
 
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-   if (code != cudaSuccess) 
-   {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
-}
-
 struct cudaGraphicsResource* render_texture_CUDA = nullptr;
 
 __global__ void test_render_kernel(uchar4* d_image_data, int width, int height, float time)
 {
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int col = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (x < width && y < height) {
+    if (row < height && col < width) {
         // Normalize coordinates to [0, 1]
-        float nx = (float)x / width;
-        float ny = (float)y / height;
+        float nx = (float)row / height;
+        float ny = (float)col / width;
 
         // Simple animation logic
         float r = 0.5f + 0.5f * sinf(nx * 10.0f + time);
@@ -57,7 +47,7 @@ __global__ void test_render_kernel(uchar4* d_image_data, int width, int height, 
         pixel.w = 255;                                    // Alpha (fully opaque)
 
         // Write to the linear device memory buffer
-        d_image_data[y * width + x] = pixel;
+        d_image_data[row * width + col] = pixel;
     }
 }
 
@@ -71,6 +61,59 @@ __global__ void hello() {
 
 static constexpr int num_cpu_threads = 20;
 
+static bool handle_inputs_cuda() {
+    bool did_input = false;
+    uint threads_per_block = 64;
+    uint num_blocks = (scene.size() + threads_per_block - 1) / threads_per_block;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_A)) {
+        world::translation_kernel<<<num_blocks, threads_per_block>>>(vec4(-MOVE_AMOUNT, 0.f, 0.f, 0.f));
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_D)) {
+        world::translation_kernel<<<num_blocks, threads_per_block>>>(vec4(MOVE_AMOUNT, 0.f, 0.f, 0.f));
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_W)) {
+        world::translation_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, MOVE_AMOUNT, 0.f, 0.f));
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_S)) {
+        world::translation_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, -MOVE_AMOUNT, 0.f, 0.f));
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
+        for (shape* c : scene) {
+            c->basis.rotate_xz(ROTATE_AMOUNT);
+            c->basis.rotate_yw(ROTATE_AMOUNT);
+        }
+
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+        for (shape* c : scene) {
+            c->basis.rotate_yz(ROTATE_AMOUNT);
+        }
+
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
+        for (shape* c : scene) {
+            c->basis.rotate_xz(ROTATE_AMOUNT);
+        }
+
+        did_input = true;
+    }
+
+    return did_input;
+}
+
 static float handle_inputs() {
     constexpr float move_amount = 0.03f;
     constexpr float rotate_amount = 0.05f;
@@ -78,7 +121,7 @@ static float handle_inputs() {
     bool did_input = false;
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-        for (shape* c : camera::scene) {
+        for (shape* c : scene) {
             c->basis.translate(vec4(-move_amount, 0.f, 0.f, 0.f));
         }
 
@@ -86,7 +129,7 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-        for (shape* c : camera::scene) {
+        for (shape* c : scene) {
             c->basis.translate(vec4(move_amount, 0.f, 0.f, 0.f));
         }
 
@@ -94,7 +137,7 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
-        for (shape* c : camera::scene) {
+        for (shape* c : scene) {
             c->basis.translate(vec4(0.f, move_amount, 0.f, 0.f));
         }
 
@@ -102,7 +145,7 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-        for (shape* c : camera::scene) {
+        for (shape* c : scene) {
             c->basis.translate(vec4(0.f, -move_amount, 0.f, 0.f));
         }
         
@@ -110,7 +153,7 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
-        for (shape* c : camera::scene) {
+        for (shape* c : scene) {
             c->basis.rotate_xz(rotate_amount);
             c->basis.rotate_yw(rotate_amount);
         }
@@ -119,7 +162,7 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-        for (shape* c : camera::scene) {
+        for (shape* c : scene) {
             c->basis.rotate_yz(rotate_amount);
         }
 
@@ -127,7 +170,7 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
-        for (shape* c : camera::scene) {
+        for (shape* c : scene) {
             c->basis.rotate_xz(rotate_amount);
         }
 
@@ -264,33 +307,57 @@ int main() {
         {7, 15}  // (L,L,L,0) to (L,L,L,L)
     };
 
-    color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    std::vector<std::unique_ptr<shape>> unique_scene;
+    /*color edge_color(1.0f, 0.647f, 0.0f); // Orange
+    std::vector<std::unique_ptr<cylinder>> unique_scene;
 
     for (int i = 0; i < 32; ++i) {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
         vec4 move(L / 2, L / 2, L / 2, L / 2);
-        unique_scene.push_back(std::make_unique<cylinder>(vertices[idx1] - move, vertices[idx2] - move, true, edge_color));
-        camera::scene.push_back(unique_scene.back().get());
-    }
+        unique_scene.push_back(std::make_unique<cylinder>());
+        unique_scene.back()->a = vertices[idx1] - move;
+        unique_scene.back()->b = vertices[idx2] - move;
+        unique_scene.back()->albedo = edge_color;
+        scene.push_back(unique_scene.back().get());
+    }*/
 
-    std::unique_ptr<cylinder> x_axis = std::make_unique<cylinder>(point4(0, 0, 0, 0), point4(L, 0, 0, 0), true, color(1, 0, 0), 0.01f);
-    std::unique_ptr<cylinder> y_axis = std::make_unique<cylinder>(point4(0, 0, 0, 0), point4(0, L, 0, 0), true, color(0, 1, 0), 0.01f);
-    std::unique_ptr<cylinder> z_axis = std::make_unique<cylinder>(point4(0, 0, 0, 0), point4(0, 0, L, 0), true, color(0, 0, 1), 0.01f);
-    std::unique_ptr<cylinder> w_axis = std::make_unique<cylinder>(point4(0, 0, 0, 0), point4(0, 0, 0, L), true, color(0.73f, 0.33f, 0.827f), 0.01f);
-    camera::scene.push_back(x_axis.get());
-    camera::scene.push_back(y_axis.get());
-    camera::scene.push_back(z_axis.get());
-    camera::scene.push_back(w_axis.get());
+    std::unique_ptr<nsphere> ball = std::make_unique<nsphere>();
+    ball->radius = 0.5f;
+    ball->albedo = color(1.f, 0.f, 0.f);
+    scene.push_back(ball.get());
 
-    direction_light light1(vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f)), color(1.0f, 1.0f, 0.9f));
-    camera::lights.push_back(light1);
+    std::unique_ptr<cylinder> x_axis = std::make_unique<cylinder>();
+    x_axis->b = point4(L, 0, 0, 0);
+    x_axis->radius = 0.01f;
+    x_axis->albedo = color(1, 0, 0);
+    std::unique_ptr<cylinder> y_axis = std::make_unique<cylinder>();
+    y_axis->b = point4(0, L, 0, 0);
+    y_axis->radius = 0.01f;
+    y_axis->albedo = color(0, 1, 0);
+    std::unique_ptr<cylinder> z_axis = std::make_unique<cylinder>();
+    z_axis->b = point4(0, 0, L, 0);
+    z_axis->radius = 0.01f;
+    z_axis->albedo = color(0, 0, 1);
+    std::unique_ptr<cylinder> w_axis = std::make_unique<cylinder>();
+    w_axis->b = point4(0, 0, 0, L);
+    w_axis->radius = 0.01f;
+    w_axis->albedo = color(0.73f, 0.33f, 0.827f);
 
+    scene.push_back(x_axis.get());
+    scene.push_back(y_axis.get());
+    scene.push_back(z_axis.get());
+    scene.push_back(w_axis.get());
+
+    std::unique_ptr<direction_light> lig1 = std::make_unique<direction_light>();
+    lig1->col = color(1.0f, 1.0f, 0.9f);
+    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    lights.push_back(lig1.get());
+
+    world::initialize();
     camera::aspect_ratio = 16.f / 9.f;
-    camera::image_width = 640;
-    //cam.render_normals = true;
+    camera::image_width = 600;
+    // camera::render_normals = true;
     camera::initialize();
 
     // --- SETUP OPENGL TEXTURE ---
@@ -318,6 +385,7 @@ int main() {
     bool is_rendering = true; //std::atomic<bool> is_rendering = true;
     int row_range = std::ceil((float)camera::image_height / num_cpu_threads); // range: ceil(height / N)
 
+    image_data = std::vector<uchar4>(camera::image_width * camera::image_height);
     uchar4* d_image_data;
     int numel = camera::image_width * camera::image_height;
     gpuErrchk(cudaMalloc(&d_image_data, numel * sizeof(uchar4)));
@@ -340,11 +408,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // --- Render Target Window ---
-        ImGui::Begin("Render Output");
-        bool input_changed = handle_inputs();
-
-        if (true) {
+        if (false) {
             dim3 threads_per_block(16, 16);
             dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
             (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
@@ -367,6 +431,53 @@ int main() {
             //glBindTexture(GL_TEXTURE_2D, 0); // Unbind
         }
 
+                // --- Render Target Window ---
+        ImGui::Begin("Render Output");
+        //bool input_changed = handle_inputs();
+        bool input_changed_cuda = handle_inputs_cuda();
+
+        if (input_changed_cuda) {
+            dim3 threads_per_block(16, 16);
+            dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
+            (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
+            camera::render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height);
+
+            cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
+            gpuErrchk(cudaGraphicsMapResources(1, &render_texture_CUDA, 0)); // Map on stream 0
+            gpuErrchk(cudaGraphicsSubResourceGetMappedArray(&d_texture_array, render_texture_CUDA, 0, 0));
+
+            gpuErrchk(cudaMemcpy2DToArray(d_texture_array, // Destination: CUDA array
+                    0, 0,             // Destination X, Y offsets (start at top-left)
+                    d_image_data,      // Source: Device pointer to your linear pixel data
+                    camera::image_width * sizeof(uchar4), // Source pitch (bytes per row)
+                    camera::image_width * sizeof(uchar4), // Width of the copy (bytes)
+                    camera::image_height, // Height of the copy (rows)
+                    cudaMemcpyDeviceToDevice)); // Type of copy (Device to Array)
+            gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
+        }
+
+        if (false) {
+            int first_row = 0;
+
+            for (int i = 0; i < num_cpu_threads; i++) {
+                int last_row = std::min(first_row + row_range, camera::image_height - 1);
+
+                threads[i] = std::thread([first_row, last_row]() { 
+                    camera::render_rt(first_row, last_row);
+                });
+
+                first_row += row_range;
+            }
+
+            for (int i = 0; i < num_cpu_threads; i++) {
+                threads[i].join();
+            }
+
+            glBindTexture(GL_TEXTURE_2D, render_texture);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, camera::image_width, camera::image_height, GL_RGBA, GL_UNSIGNED_BYTE, image_data.data());
+            glBindTexture(GL_TEXTURE_2D, 0); // Unbind
+        }
+
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(camera::image_width, camera::image_height));
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
@@ -386,6 +497,7 @@ int main() {
         glfwSwapBuffers(window);
     }
 
+    world::destruct<<<1,1>>>();
     gpuErrchk(cudaGraphicsUnregisterResource(render_texture_CUDA));
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaFree(d_image_data));

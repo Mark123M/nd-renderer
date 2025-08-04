@@ -1,7 +1,7 @@
 #ifndef TRANSFORM_H
 #define TRANSFORM_H
 
-#include "util.h"
+#include "math_util.h"
 #include "affine.h"
 
 struct transform {
@@ -9,14 +9,14 @@ struct transform {
 	affine inv_linear;
 
 	// standard basis
-	transform(): linear{}, inv_linear{} {}
+	__host__ __device__ transform(): linear{}, inv_linear{} {}
 
 	// construct from basis
-	transform(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
+	__host__ __device__ transform(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
 		set_basis(vx, vy, vz, vw);
 	}
 
-	void set_basis(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
+	__host__ __device__ void set_basis(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
 		assert(std::abs(vx.length_squared() - 1.f) <= TOL);
 		assert(std::abs(vy.length_squared() - 1.f) <= TOL);
 		assert(std::abs(vz.length_squared() - 1.f) <= TOL);
@@ -38,14 +38,14 @@ struct transform {
 	}
 
 	// simple rotation over the a-b plane
-	void rotate(float angle, int a, int b) {
+	__host__ __device__ void rotate(float angle, int a, int b) {
 		affine R = rotate_mat(angle, a, b);
 		linear = matmul(linear, R); // RA(A^-1R^-1)
 		inv_linear = matmul(R.transpose(), inv_linear);
 	}
 
 	// R * T * R
-	void translate(const vec4& t) {
+	__host__ __device__ void translate(const vec4& t) {
 		affine T;
 		T.m[0][4] = t.x;
 		T.m[1][4] = t.y;
@@ -61,74 +61,74 @@ struct transform {
 		inv_linear = matmul(inv_linear, T_inv);
 	}
 
-	void rotate_xy(float angle) {
+	__host__ __device__ void rotate_xy(float angle) {
 		rotate(angle, 0, 1);
 	}
 
-	void rotate_xz(float angle) {
+	__host__ __device__ void rotate_xz(float angle) {
 		rotate(angle, 0, 2);
 	}
 
-	void rotate_xw(float angle) {
+	__host__ __device__ void rotate_xw(float angle) {
 		rotate(angle, 0, 3);
 	}
 
-	void rotate_yz(float angle) {
+	__host__ __device__ void rotate_yz(float angle) {
 		rotate(angle, 1, 2);
 	}
 
-	void rotate_yw(float angle) {
+	__host__ __device__ void rotate_yw(float angle) {
 		rotate(angle, 1, 3);
 	}
 
-	void rotate_zw(float angle) {
+	__host__ __device__ void rotate_zw(float angle) {
 		rotate(angle, 2, 3);
 	}
 
-	void rotate_around_point(float angle, const point4& p, int a, int b) {
+	__host__ __device__ void rotate_around_point(float angle, const point4& p, int a, int b) {
 		translate(-p);
 		rotate(angle, a, b);
 		translate(p);
 	}
 
-	void rotate_xy_around_point(float angle, const point4& p) {
+	__host__ __device__ void rotate_xy_around_point(float angle, const point4& p) {
 		rotate_around_point(angle, p, 0, 1);
 	}
 
-	void rotate_xz_around_point(float angle, const point4& p) {
+	__host__ __device__ void rotate_xz_around_point(float angle, const point4& p) {
 		rotate_around_point(angle, p, 0, 2);
 	}
 
-	void rotate_xw_around_point(float angle, const point4& p) {
+	__host__ __device__ void rotate_xw_around_point(float angle, const point4& p) {
 		rotate_around_point(angle, p, 0, 3);
 	}
 
-	void rotate_yz_around_point(float angle, const point4& p) {
+	__host__ __device__ void rotate_yz_around_point(float angle, const point4& p) {
 		rotate_around_point(angle, p, 1, 2);
 	}
 
-	void rotate_yw_around_point(float angle, const point4& p) {
+	__host__ __device__ void rotate_yw_around_point(float angle, const point4& p) {
 		rotate_around_point(angle, p, 1, 3);
 	}
 
-	void rotate_zw_around_point(float angle, const point4& p) {
+	__host__ __device__ void rotate_zw_around_point(float angle, const point4& p) {
 		rotate_around_point(angle, p, 2, 3);
 	}
 
-	vec4 local_to_world(const vec4& v) const {
+	__host__ __device__ vec4 local_to_world(const vec4& v) const {
 		return linear.vecmul(v);
 	}
 
-	vec4 world_to_local(const vec4& w) const {
+	__host__ __device__ vec4 world_to_local(const vec4& w) const {
 		return inv_linear.vecmul(w);
 	}
 
-	inline static affine rotate_mat(float angle, int a, int b) {
+	__host__ __device__ static affine rotate_mat(float angle, int a, int b) {
 		assert(a < b);
 
 		affine R; // identity
-		float cos_angle = cos(angle);
-		float sin_angle = sin(angle);
+		float cos_angle = cosf(angle);
+		float sin_angle = sinf(angle);
 		R.m[a][a] = cos_angle;
 		R.m[b][b] = cos_angle;
 		R.m[a][b] = -sin_angle;

@@ -8,15 +8,19 @@
 struct ncube : public shape {
 	point4 corner;
 
-	ncube(const point4& corner, int n = 4) : shape{n}, corner{ corner } {}
-	ncube(const point4& corner, const color& albedo0, int n = 4) : shape{ albedo0, n }, corner{ corner } {}
+	__host__ __device__ ncube() : shape{}, corner{ 0.f, 0.f, 0.f, 0.f } {}
 
-	float sdf(const point4& p) const override {
+	__host__ __device__ float sdf(const point4& p) const override {
 		point4 pp = basis.world_to_local(p); //multiply_matrix_vec4(example_matrix, p);
 		
 		vec4 q = vec4::abs(pp) - corner;
-		float d = vec4::max(q, 0).length() + std::min(vec4::max_comp(q), 0.f);
+		float d = vec4::max(q, 0).length() + fminf(vec4::max_comp(q), 0.f);
 		return d;
+	}
+
+	__device__ virtual void print_gpu() const override {
+		printf("[GPU] Hypercube | Corner (%.3f, %.3f, %.3f, %.3f)\n",
+		corner.x, corner.y, corner.z, corner.w);
 	}
 };
 

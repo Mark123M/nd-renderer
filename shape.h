@@ -6,14 +6,14 @@
 #include "transform.h"
 
 struct shape {
-	color albedo;
-	int n;
 	transform basis;
+	color albedo;
 
-	shape(int n) : albedo{ 1.f, 1.f, 1.f }, n { n } {}
-	shape(const color& albedo, int n) : albedo{albedo}, n{n} {}
+	__host__ __device__ shape() : basis{}, albedo{ 1.f, 1.f, 1.f } {}
 
-	virtual float sdf(const point4& p) const = 0;
+	__host__ __device__ virtual float sdf(const point4& p) const = 0;
+
+	__device__ virtual void print_gpu() const = 0;
 };
 
 #endif

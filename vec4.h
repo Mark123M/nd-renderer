@@ -4,33 +4,33 @@
 #include <cmath>
 #include <iostream>
 #include <cassert>
+#include "math_util.h"
 
-class vec4;
-inline vec4 operator*(float k, const vec4& v);
+struct vec4;
+__host__ __device__ vec4 operator*(float k, const vec4& v);
 
 using point4 = vec4;
 
 struct vec4 {
 	float x, y, z, w;
 
-	vec4() : x{ 0.f }, y{ 0.f }, z{ 0.f }, w{ 0.f } {}
+	__host__ __device__ vec4() {}
 
-	vec4(float x0, float y0, float z0, float w0) : x{ x0 }, y{ y0 }, z{ z0 }, w{ w0 } {}
+	__host__ __device__ vec4(float x0, float y0, float z0, float w0) : x{ x0 }, y{ y0 }, z{ z0 }, w{ w0 } {}
 
-	vec4 operator-() const { return { -x, -y, -z, -w }; }
+	__host__ __device__ vec4 operator-() const { return { -x, -y, -z, -w }; }
 
-	vec4 operator+(const vec4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
+	__host__ __device__ vec4 operator+(const vec4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
 
-	vec4 operator-(const vec4& v) const { return { x - v.x, y - v.y, z - v.z, w - v.w }; }
+	__host__ __device__ vec4 operator-(const vec4& v) const { return { x - v.x, y - v.y, z - v.z, w - v.w }; }
 
-	vec4 operator*(const vec4& v) const { return { x * v.x, y * v.y, z * v.z, w * v.w }; }
+	__host__ __device__ vec4 operator*(const vec4& v) const { return { x * v.x, y * v.y, z * v.z, w * v.w }; }
 
-	vec4 operator/(float k) const {
-		assert(k != 0);
+	__host__ __device__ vec4 operator/(float k) const {
 		return (1 / k) * (*this);
 	}
 
-	vec4& operator+=(const vec4& v) {
+	__host__ __device__ vec4& operator+=(const vec4& v) {
 		x += v.x;
 		y += v.y;
 		z += v.z;
@@ -38,7 +38,7 @@ struct vec4 {
 		return *this;
 	}
 
-	vec4& operator-=(const vec4& v) {
+	__host__ __device__ vec4& operator-=(const vec4& v) {
 		x -= v.x;
 		y -= v.y;
 		z -= v.z;
@@ -46,7 +46,7 @@ struct vec4 {
 		return *this;
 	}
 
-	vec4& operator *=(const vec4& v) {
+	__host__ __device__ vec4& operator *=(const vec4& v) {
 		x *= v.x;
 		y *= v.y;
 		z *= v.z;
@@ -54,7 +54,7 @@ struct vec4 {
 		return *this;
 	}
 
-	vec4& operator*=(float k) {
+	__host__ __device__ vec4& operator*=(float k) {
 		x *= k;
 		y *= k;
 		z *= k;
@@ -62,7 +62,7 @@ struct vec4 {
 		return *this;
 	}
 
-	vec4& operator/=(float k) {
+	__host__ __device__ vec4& operator/=(float k) {
 		assert(k != 0);
 		x /= k;
 		y /= k;
@@ -71,7 +71,7 @@ struct vec4 {
 		return *this;
 	}
 
-	float get(int idx) const {
+	__host__ __device__ float get(int idx) const {
 		switch (idx) {
 		case 0:
 			return x;
@@ -86,7 +86,7 @@ struct vec4 {
 		return 0.f;
 	}
 
-	void set(int idx, float val) {
+	__host__ __device__ void set(int idx, float val) {
 		switch (idx) {
 		case 0:
 			x = val;
@@ -103,63 +103,66 @@ struct vec4 {
 		}
 	}
 
-	float length() const {
-		return std::sqrt(dot(*this, *this));
+	__host__ __device__ float length() const {
+		return sqrtf(dot(*this, *this));
 	}
 
-	float length_squared() const {
+	__host__ __device__ float length_squared() const {
 		return dot(*this, *this);
 	}
 
-	bool near_zero() const {
-		float t = 1e-8f;
-		return std::fabs(x) < t && std::fabs(y) < t && std::fabs(z) < t;
+	__host__ __device__ bool near_zero() const {
+		return fabsf(x) < TOL && fabsf(y) < TOL && fabsf(z) < TOL; // Use fabsf
 	}
 
-	inline static vec4 normalize(const vec4& v) {
+	__host__ __device__ static vec4 normalize(const vec4& v) {
 		return v / v.length();
 	}
 
-	inline static vec4 reflect(const vec4& v, const vec4& n) {
-		return v - 2 * dot(v, n) * n;
+	__host__ __device__ static vec4 reflect(const vec4& v, const vec4& n) {
+		return v - 2.0f * dot(v, n) * n;
 	}
 
-	inline static vec4 refract(const vec4& v, const vec4& n, float eta) {
-		float cos_theta = std::fmin(dot(-v, n), 1.f);
+	__host__ __device__ static vec4 refract(const vec4& v, const vec4& n, float eta) {
+		float cos_theta = fminf(dot(-v, n), 1.f);
 		vec4 perp = eta * (v + cos_theta * n);
-		vec4 parallel = -std::sqrt(std::fabs(1.f - perp.length_squared())) * n;
+		vec4 parallel = -sqrtf(fabsf(1.f - perp.length_squared())) * n;
 		return perp + parallel;
 	}
 
-	inline static float dot(const vec4& a, const vec4& b) {
+	__host__ __device__ static float dot(const vec4& a, const vec4& b) {
 		return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
 	}
 
-	inline static float max_comp(const vec4& v) {
-		return std::max(v.x, std::max(v.y, std::max(v.z, v.w)));
+	__host__ __device__ static float max_comp(const vec4& v) {
+		return fmaxf(v.x, fmaxf(v.y, fmaxf(v.z, v.w)));
 	}
 
-	inline static vec4 max(const vec4& v, float k) {
-		return { std::max(v.x, k), std::max(v.y, k), std::max(v.z, k), std::max(v.w, k) };
+	__host__ __device__ static vec4 max(const vec4& v, float k) {
+		return { fmaxf(v.x, k), fmaxf(v.y, k), fmaxf(v.z, k), fmaxf(v.w, k) };
 	}
 
-	inline static vec4 abs(const vec4& v) {
-		return { std::abs(v.x), std::abs(v.y), std::abs(v.z), std::abs(v.w) };
+	__host__ __device__ static vec4 abs(const vec4& v) {
+		return { fabsf(v.x), fabsf(v.y), fabsf(v.z), fabsf(v.w) };
 	}
 
-	inline static float length(const vec4& v) {
+	__host__ __device__ static float length(const vec4& v) {
 		return v.length();
 	}
 };
 
-inline vec4 operator*(float k, const vec4& v) { return { k * v.x, k * v.y, k * v.z, k * v.w }; }
+__host__ __device__ vec4 operator*(float k, const vec4& v) { return { k * v.x, k * v.y, k * v.z, k * v.w }; }
 
-inline vec4 operator*(const vec4& v, float k) { return k * v; }
+__host__ __device__ vec4 operator*(const vec4& v, float k) { return k * v; }
 
-inline std::ostream& operator<<(std::ostream& out, const vec4& v) {
-	out << v.x << " " << v.y << " " << v.z << " " << v.w;
-	return out;
-}
-
+// host constants
+const vec4 delta_x(EPSILON, 0.f, 0.f, 0.f);
+__constant__ vec4 d_delta_x;
+const vec4 delta_y(0.f, EPSILON, 0.f, 0.f);
+__constant__ vec4 d_delta_y;
+const vec4 delta_z(0.f, 0.f, EPSILON, 0.f);
+__constant__ vec4 d_delta_z;
+const vec4 delta_w(0.f, 0.f, 0.f, EPSILON);
+__constant__ vec4 d_delta_w;
 
 #endif
