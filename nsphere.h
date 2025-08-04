@@ -9,11 +9,15 @@ struct nsphere : public shape {
 	point4 center;
 	float radius;
 
-	nsphere(const point4& center, float radius, int n = 4) : shape{ n }, center { center }, radius{ radius } {}
-	nsphere(const point4& center, float radius, const color& albedo0, int n = 4) : shape{ albedo0, n }, center { center }, radius{ radius } {}
+	__host__ __device__ nsphere() : shape{}, center { 0.f, 0.f, 0.f, 0.f }, radius{ 0.25f } {}
 
-	float sdf(const point4& p) const {
+	__host__ __device__ float sdf(const point4& p) const {
 		return (center - p).length() - radius;
+	}
+
+	__device__ virtual void print_gpu() const override {
+		printf("[GPU] Hypersphere | Center (%.3f, %.3f, %.3f, %.3f) | Radius %.3f\n",
+		center.x, center.y, center.z, center.w, radius);
 	}
 };
 

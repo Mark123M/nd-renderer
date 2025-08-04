@@ -11,12 +11,9 @@ struct cylinder : public shape {
 	bool should_project;
 	float radius;
 
-	cylinder(const point4& start, const point4& end, bool should_project, float radius = 0.02f, int n = 4):
-		shape{ n }, a{ start }, b{ end }, should_project{ should_project }, radius {radius} {}
-	cylinder(const point4& start, const point4& end, bool should_project, const color& albedo, float radius = 0.02f, int n = 4):
-		shape{ albedo, n }, a{ start }, b{ end }, should_project{ should_project }, radius {radius} {}
+	__host__ __device__ cylinder(): shape{}, a{0.f, 0.f, 0.f, 0.f}, b{0.f, 0.f, 0.f, 0.f}, should_project{true}, radius{0.02f} {}
 
-	float sdf(const point4& p) const override {
+	__host__ __device__ float sdf(const point4& p) const override {
 		//point4 pp = basis.world_to_local(p);
 		point4 aa = basis.local_to_world(a);
 		point4 bb = basis.local_to_world(b);
@@ -34,13 +31,18 @@ struct cylinder : public shape {
 		float baba = vec4::dot(ba, ba);
 		float paba = vec4::dot(pa, ba);
 		float x = vec4::length(pa * baba - ba * paba) - radius * baba;
-		float y = std::abs(paba - baba * 0.5) - baba * 0.5;
+		float y = fabsf(paba - baba * 0.5) - baba * 0.5;
 		float x2 = x * x;
 		float y2 = y * y * baba;
-		float d = (std::max(x, y) < 0.0) ? -std::min(x2, y2) : (((x > 0.0) ? x2 : 0.0) + ((y > 0.0) ? y2 : 0.0));
+		float d = (fmaxf(x, y) < 0.0) ? -fminf(x2, y2) : (((x > 0.0) ? x2 : 0.0) + ((y > 0.0) ? y2 : 0.0));
 		float sign_d = (d > 0) - (d < 0);
 
-		return sign_d * std::sqrt(std::abs(d)) / baba;
+		return sign_d * sqrtf(fabsf(d)) / baba;
+	}
+
+	__device__ virtual void print_gpu() const override {
+		printf("[GPU] Cylinder | Start (%.3f, %.3f, %.3f, %.3f) | End (%.3f, %.3f, %.3f, %.3f) | Radius %.3f | Project %s\n",
+		a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w, radius, should_project ? "true" : "false");
 	}
 };
 

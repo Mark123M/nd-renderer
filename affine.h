@@ -6,7 +6,7 @@
 struct affine {
 	float m[5][5];
 
-	affine() {
+	__host__ __device__ affine() {
 		for (int i = 0; i < 5; i++) {
 			for (int j = 0; j < 5; j++) {
 				m[i][j] = (i == j) ? 1.0f : 0.0f;
@@ -20,7 +20,7 @@ struct affine {
 	float m20, m21, m22, m23;
 	float m30, m31, m32, m33;
 	*/
-	affine(float m00, float m01, float m02, float m03,
+	__host__ __device__ affine(float m00, float m01, float m02, float m03,
 		 float m10, float m11, float m12, float m13,
 		 float m20, float m21, float m22, float m23,
 		 float m30, float m31, float m32, float m33
@@ -32,7 +32,7 @@ struct affine {
         m[4][0] = 0;   m[4][1] = 0;   m[4][2] = 0;   m[4][3] = 0;   m[4][4] = 1;
 	}
 
-	vec4 vecmul(const vec4& v) const {
+	__host__ __device__ vec4 vecmul(const vec4& v) const {
 		vec4 w;
 
 		for (int i = 0; i < 4; i++) {
@@ -48,7 +48,7 @@ struct affine {
 		return w;
 	}
 
-	affine transpose() const {
+	__host__ __device__ affine transpose() const {
 		return {
 			m[0][0], m[1][0], m[2][0], m[3][0],
 			m[0][1], m[1][1], m[2][1], m[3][1],
@@ -57,7 +57,7 @@ struct affine {
 		};
 	}
 
-    void set_b(const vec4& b) {
+    __host__ __device__ void set_b(const vec4& b) {
         m[0][4] = b.x;
         m[1][4] = b.y;
         m[2][4] = b.z;
@@ -65,7 +65,7 @@ struct affine {
     }
 };
 
-inline affine matmul(const affine& m1, const affine& m2) {
+__host__ __device__ affine matmul(const affine& m1, const affine& m2) {
 	affine r;
 
 	for (int i = 0; i < 5; i++) {
@@ -83,7 +83,7 @@ inline affine matmul(const affine& m1, const affine& m2) {
 	return r;
 }
 
-inline std::ostream& operator<<(std::ostream& out, const affine& mat) {
+__host__ std::ostream& operator<<(std::ostream& out, const affine& mat) {
 	for (int i = 0; i < 5; i++) {
 		for (int j = 0; j < 5; j++) {
 			out << mat.m[i][j] << " ";

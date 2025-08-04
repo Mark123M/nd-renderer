@@ -4,7 +4,9 @@
 # See README.md for guidance.
 #---------------------------------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
-project(nd-light-transport LANGUAGES CXX)
+project(nd-light-transport LANGUAGES CXX CUDA)
+set(CMAKE_CUDA_ARCHITECTURES "89")
+set(CMAKE_CUDA_STANDARD 20)
 
 # --- ImGui Integration Starts Here ---
 
@@ -47,6 +49,7 @@ set ( SRC_CPU
 )
 
 set ( SRC_GPU
+  main.cu
 )
 
 # Specific compiler flags below. We're not going to add options for all possible compilers, but if
@@ -58,12 +61,12 @@ message (STATUS "Release flags: " ${CMAKE_CXX_FLAGS_RELEASE})
 message (STATUS "Debug flags: " ${CMAKE_CXX_FLAGS_DEBUG})
 
 # Executables
-add_executable(nd-raytracer      ${EXTERNAL} ${SRC_CPU} ${IMGUI_SOURCES})
+add_executable(nd-raytracer      ${SRC_GPU} ${IMGUI_SOURCES})
 
 # --- AddressSanitizer Configuration ---
 # Enable AddressSanitizer for Debug and RelWithDebInfo builds.
 # It adds significant overhead, so it's typically not used for Release builds.
-if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
+if (CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
     # Check if the compiler supports AddressSanitizer
     # GCC and Clang typically support it.
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
@@ -73,6 +76,11 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
     else()
         message(WARNING "AddressSanitizer requested but not supported by compiler: ${CMAKE_CXX_COMPILER_ID}")
     endif()
+endif()
+
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
+    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -g -G -O0 -lineinfo --keep-device-functions")
 endif()
 
 # For VS Code IntelliSense and other tools to pick up compile commands
