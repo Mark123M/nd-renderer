@@ -11,6 +11,8 @@
                 "-B",
                 "${workspaceFolder}/build",
                 "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                "-DCMAKE_CXX_COMPILER=/usr/bin/g++-12",
+                "-DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++-12",
                 "-G",
                 "Ninja"
             ],
@@ -55,6 +57,8 @@
                 "-B",
                 "${workspaceFolder}/build/release", // Dedicated build directory for Release
                 "-DCMAKE_BUILD_TYPE=Release",       // Set build type to Release
+                "-DCMAKE_CXX_COMPILER=/usr/bin/g++-12",
+                "-DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++-12",
                 "-G",
                 "Ninja"
             ],
@@ -109,6 +113,8 @@
                 "-B",
                 "${workspaceFolder}/build/debug",
                 "-DCMAKE_BUILD_TYPE=Debug",
+                "-DCMAKE_CXX_COMPILER=/usr/bin/g++-12",
+                "-DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++-12",
                 "-G",
                 "Ninja"
             ],

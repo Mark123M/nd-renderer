@@ -8,7 +8,7 @@
 
 #include "color.h"
 #include "ray.h"
-#include "math_util.h"
+#include "util.h"
 #include "light.h"
 #include "transform.h"
 
@@ -43,7 +43,7 @@ std::vector<uchar4> image_data;
 
 namespace camera {
 
-int image_width, image_height;
+uint image_width, image_height;
 float aspect_ratio = 1.f;
 float focal_length = 1.f;
 bool render_normals = false;
@@ -149,10 +149,10 @@ __device__ color ray_color_cuda(ray& r) {
     return final_col;
 }
 
-__global__ void render_kernel(uchar4* d_image_data, int width, int height) {
-    int row = blockDim.x * blockIdx.x + threadIdx.x;
-    int col = blockDim.y * blockIdx.y + threadIdx.y;
-    int idx = row * width + col;
+__global__ void render_kernel(uchar4* d_image_data, uint width, uint height) {
+    uint row = blockDim.x * blockIdx.x + threadIdx.x;
+    uint col = blockDim.y * blockIdx.y + threadIdx.y;
+    uint idx = row * width + col;
 
     if (row < height && col < width) {
         // need device versions of these functions/structs
@@ -165,6 +165,24 @@ __global__ void render_kernel(uchar4* d_image_data, int width, int height) {
         d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, color.g) * 255.999f);
         d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, color.b) * 255.999f);
         d_image_data[idx].w = 255;
+    }
+}
+
+__global__ void render_stride_kernel(uchar4* d_image_data, uint width, uint num_pixels) {
+    for (uint i = blockIdx.x * blockDim.x + threadIdx.x; 
+         i < num_pixels; 
+         i += blockDim.x * gridDim.x) {
+        uint row = i / width, col = i % width;
+        point4 pixel_center = d_pixel00_center + (col * d_pixel_x) + (row * d_pixel_y);
+        vec4 direction = vec4::normalize(pixel_center - d_camera_center);
+        ray r(d_camera_center, direction);
+        
+        color color = ray_color_cuda(r);
+        d_image_data[i].x = static_cast<unsigned char>(fminf(1.f, color.r) * 255.999f);
+        d_image_data[i].y = static_cast<unsigned char>(fminf(1.f, color.g) * 255.999f);
+        d_image_data[i].z = static_cast<unsigned char>(fminf(1.f, color.b) * 255.999f);
+        d_image_data[i].w = 255;
+    
     }
 }
 
@@ -281,12 +299,12 @@ void initialize() {
     gpuErrchk(cudaMemcpyToSymbol(d_delta_w, &delta_w, sizeof(vec4)));
 }
 
-void render_rt(int first_row, int last_row) {
+void render_rt(uint first_row, uint last_row) {
     // assume camera parameters are all initialized
-    for (int row = first_row; row <= last_row; row++) {
+    for (uint row = first_row; row <= last_row; row++) {
         //std::clog << "\rScanlines remaining: " << (image_height - j) << "     " << std::flush;
-        for (int col = 0; col < image_width; col++) {
-            int idx = row * image_width + col;
+        for (uint col = 0; col < image_width; col++) {
+            uint idx = row * image_width + col;
             point4 pixel_center = pixel00_center + (col * pixel_x) + (row * pixel_y);
             vec4 direction = vec4::normalize(pixel_center - camera_center);
             ray r(camera_center, direction);
@@ -308,9 +326,9 @@ void render() {
     clock_t t0 = clock();
     file << "P3\n" << image_width << " " << image_height << "\n255\n";
 
-    for (int j = 0; j < image_height; j++) {
+    for (uint j = 0; j < image_height; j++) {
         std::clog << "\rScanlines remaining: " << (image_height - j) << "     " << std::flush;
-        for (int i = 0; i < image_width; i++) {
+        for (uint i = 0; i < image_width; i++) {
             point4 pixel_center = pixel00_center + (i * pixel_x) + (j * pixel_y);
             vec4 direction = vec4::normalize(pixel_center - camera_center);
             ray r(camera_center, direction);

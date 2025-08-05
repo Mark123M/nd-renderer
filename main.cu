@@ -16,18 +16,21 @@
 #include "camera.h"
 #include "world.h"
 #include "direction_light.h"
-#include "math_util.h"
+#include "util.h"
 
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <cuda_gl_interop.h>
 
+uint g_sm_count;
+uint g_sm_max_threads;
+
 struct cudaGraphicsResource* render_texture_CUDA = nullptr;
 
-__global__ void test_render_kernel(uchar4* d_image_data, int width, int height, float time)
+__global__ void test_render_kernel(uchar4* d_image_data, uint width, uint height, float time)
 {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
-    int col = blockIdx.y * blockDim.y + threadIdx.y;
+    uint row = blockIdx.x * blockDim.x + threadIdx.x;
+    uint col = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (row < height && col < width) {
         // Normalize coordinates to [0, 1]
@@ -59,7 +62,7 @@ __global__ void hello() {
     printf("Hello from block: %u, thread: %u\n", blockIdx.x, threadIdx.x);
 }
 
-static constexpr int num_cpu_threads = 20;
+static constexpr uint num_cpu_threads = 20;
 
 static bool handle_inputs_cuda() {
     bool did_input = false;
@@ -172,7 +175,13 @@ static float handle_inputs() {
 }
 
 int main() {
-    hello<<<1, 64>>>();
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+    g_sm_count = deviceProp.multiProcessorCount;
+    g_sm_max_threads = deviceProp.maxThreadsPerMultiProcessor;
+    uint stride_threads_per_block = 256;
+    uint stride_num_blocks = (g_sm_max_threads / stride_threads_per_block) * g_sm_count;
+    printf("SM count %d | Max threads per SM %d | Stride block count %d\n", g_sm_count, g_sm_max_threads, stride_num_blocks);
 
     glfwSetErrorCallback(glfw_error_callback);
 
@@ -246,7 +255,7 @@ int main() {
     
     //point4 center(L / 2, L / 2, L / 2, L / 2);
 
-    int edges[32][2] = {
+    uint edges[32][2] = {
         // --- Edges within the W=0.0f 'cube' (indices 0-7) ---
         {0, 1}, // (0,0,0,0) to (L,0,0,0) - X-axis
         {0, 2}, // (0,0,0,0) to (0,L,0,0) - Y-axis
@@ -319,20 +328,20 @@ int main() {
     scene.push_back(ball.get());*/
 
     std::unique_ptr<cylinder> x_axis = std::make_unique<cylinder>();
-    x_axis->b = point4(L, 0, 0, 0);
-    x_axis->radius = 0.01f;
+    x_axis->b = point4(AXIS_LEN, 0, 0, 0);
+    x_axis->radius = AXIS_RADIUS;
     x_axis->albedo = color(1, 0, 0);
     std::unique_ptr<cylinder> y_axis = std::make_unique<cylinder>();
-    y_axis->b = point4(0, L, 0, 0);
-    y_axis->radius = 0.01f;
+    y_axis->b = point4(0, AXIS_LEN, 0, 0);
+    y_axis->radius = AXIS_RADIUS;
     y_axis->albedo = color(0, 1, 0);
     std::unique_ptr<cylinder> z_axis = std::make_unique<cylinder>();
-    z_axis->b = point4(0, 0, L, 0);
-    z_axis->radius = 0.01f;
+    z_axis->b = point4(0, 0, AXIS_LEN, 0);
+    z_axis->radius = AXIS_RADIUS;
     z_axis->albedo = color(0, 0, 1);
     std::unique_ptr<cylinder> w_axis = std::make_unique<cylinder>();
-    w_axis->b = point4(0, 0, 0, L);
-    w_axis->radius = 0.01f;
+    w_axis->b = point4(0, 0, 0, AXIS_LEN);
+    w_axis->radius = AXIS_RADIUS;
     w_axis->albedo = color(0.73f, 0.33f, 0.827f);
 
     scene.push_back(x_axis.get());
@@ -374,11 +383,11 @@ int main() {
 
     std::vector<std::thread> threads(num_cpu_threads);
     bool is_rendering = true; //std::atomic<bool> is_rendering = true;
-    int row_range = std::ceil((float)camera::image_height / num_cpu_threads); // range: ceil(height / N)
+    uint row_range = std::ceil((float)camera::image_height / num_cpu_threads); // range: ceil(height / N)
 
     image_data = std::vector<uchar4>(camera::image_width * camera::image_height);
     uchar4* d_image_data;
-    int numel = camera::image_width * camera::image_height;
+    uint numel = camera::image_width * camera::image_height;
     gpuErrchk(cudaMalloc(&d_image_data, numel * sizeof(uchar4)));
 
     while (!glfwWindowShouldClose(window)) {
@@ -428,10 +437,12 @@ int main() {
         bool input_changed_cuda = handle_inputs_cuda();
 
         if (input_changed_cuda) {
-            dim3 threads_per_block(16, 16);
+            /*dim3 threads_per_block(16, 16);
             dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
             (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
-            camera::render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height);
+            camera::render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height);*/
+
+            camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
             cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
             gpuErrchk(cudaGraphicsMapResources(1, &render_texture_CUDA, 0)); // Map on stream 0
@@ -448,10 +459,10 @@ int main() {
         }
 
         if (false) {
-            int first_row = 0;
+            uint first_row = 0;
 
-            for (int i = 0; i < num_cpu_threads; i++) {
-                int last_row = std::min(first_row + row_range, camera::image_height - 1);
+            for (uint i = 0; i < num_cpu_threads; i++) {
+                uint last_row = std::min(first_row + row_range, camera::image_height - 1);
 
                 threads[i] = std::thread([first_row, last_row]() { 
                     camera::render_rt(first_row, last_row);
@@ -460,7 +471,7 @@ int main() {
                 first_row += row_range;
             }
 
-            for (int i = 0; i < num_cpu_threads; i++) {
+            for (uint i = 0; i < num_cpu_threads; i++) {
                 threads[i].join();
             }
 

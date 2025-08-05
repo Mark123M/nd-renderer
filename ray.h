@@ -2,7 +2,7 @@
 #define RAY_H
 
 #include "vec4.h"
-#include "math_util.h"
+#include "util.h"
 
 class entity;
 

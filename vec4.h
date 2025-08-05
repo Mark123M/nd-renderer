@@ -3,7 +3,7 @@
 
 #include <cmath>
 #include <iostream>
-#include "math_util.h"
+#include "util.h"
 
 struct vec4;
 __host__ __device__ vec4 operator*(float k, const vec4& v);
@@ -71,7 +71,7 @@ struct vec4 {
 		return *this;
 	}
 
-	__host__ __device__ float get(int idx) const {
+	__host__ __device__ float get(uint idx) const {
 		switch (idx) {
 		case 0:
 			return x;
@@ -86,7 +86,7 @@ struct vec4 {
 		return 0.f;
 	}
 
-	__host__ __device__ void set(int idx, float val) {
+	__host__ __device__ void set(uint idx, float val) {
 		switch (idx) {
 		case 0:
 			x = val;

@@ -1,5 +1,5 @@
-#ifndef MATH_UTIL_H
-#define MATH_UTIL_H
+#ifndef UTIL_H
+#define UTIL_H
 #include <cuda_runtime.h>
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -12,13 +12,15 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
-// constants
+// program
 constexpr float TOL = 5e-3f;
 constexpr float EPSILON = 1e-3f;
 constexpr float MAX_DIST = 5.f;
 constexpr float AMBIENT = 0.3f;
 constexpr float MOVE_AMOUNT = 0.03f;
 constexpr float ROTATE_AMOUNT = 0.05f;
+constexpr float AXIS_RADIUS = 0.01f;
+constexpr float AXIS_LEN = 0.5;
 
 // math
 constexpr float infinity = std::numeric_limits<float>::infinity();

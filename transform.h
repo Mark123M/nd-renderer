@@ -1,7 +1,7 @@
 #ifndef TRANSFORM_H
 #define TRANSFORM_H
 
-#include "math_util.h"
+#include "util.h"
 #include "affine.h"
 
 struct transform {
@@ -38,7 +38,7 @@ struct transform {
 	}
 
 	// simple rotation over the a-b plane
-	__host__ __device__ void rotate(float angle, int a, int b) {
+	__host__ __device__ void rotate(float angle, uint a, uint b) {
 		affine R = rotate_mat(angle, a, b);
 		linear = matmul(linear, R); // RA(A^-1R^-1)
 		inv_linear = matmul(R.transpose(), inv_linear);
@@ -85,7 +85,7 @@ struct transform {
 		rotate(angle, 2, 3);
 	}
 
-	__host__ __device__ void rotate_around_point(float angle, const point4& p, int a, int b) {
+	__host__ __device__ void rotate_around_point(float angle, const point4& p, uint a, uint b) {
 		translate(-p);
 		rotate(angle, a, b);
 		translate(p);
@@ -123,7 +123,7 @@ struct transform {
 		return inv_linear.vecmul(w);
 	}
 
-	__host__ __device__ static affine rotate_mat(float angle, int a, int b) {
+	__host__ __device__ static affine rotate_mat(float angle, uint a, uint b) {
 		assert(a < b);
 
 		affine R; // identity
@@ -137,7 +137,7 @@ struct transform {
 		return R;
 	}
 /*
-	inline static vec4 rotate_vec(const vec4& v, float angle, int a, int b) {
+	inline static vec4 rotate_vec(const vec4& v, float angle, uint a, uint b) {
 		return rotate_mat(angle, a, b).vecmul(v);
 	}
 
