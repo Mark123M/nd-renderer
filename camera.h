@@ -60,36 +60,76 @@ __constant__ point4 d_pixel00_center;
 //point4 lookfrom = point4(0.f, 0.f, 0.f, 0.f);
 //point4 lookat = point4(0.f, 0.f, -1.f, 0.f);
 
+// Define repetition periods as global constants or pass them to the kernel
+// For simplicity, let's assume they are constants for now.
+// You can make these tunable device constants or pass them as parameters.
+__constant__ float REPEAT_PERIOD_X = 2.0f; // Adjust for your desired tile width
+__constant__ float REPEAT_PERIOD_Y = 2.0f; // Adjust for your desired tile height
+
+// Helper function for modulo that handles negative numbers correctly for a [0, Period) range
+// This ensures `custom_fmodf(-1.0, 10.0)` returns `9.0` instead of `-1.0`.
+__device__ float custom_fmodf(float val, float period) {
+    float res = fmodf(val, period);
+    if (res < 0) {
+        res += period;
+    }
+    return res;
+}
+
 __device__ float scene_sdf_cuda(const point4& p, shape** target_ptr) {
+    // Step 1: Apply domain repetition to the X and Y components of point 'p'
+    point4 p_in_cell = p; // Start with the original point, then modify X and Y
+
+    // Calculate the point's position *within* its repeating cell [0, Period)
+    p_in_cell.x = custom_fmodf(p.x, REPEAT_PERIOD_X);
+    p_in_cell.y = custom_fmodf(p.y, REPEAT_PERIOD_Y);
+    // p_in_cell.z and p_in_cell.w remain unchanged from 'p'
+
+    // Optional: Offset the point so the repeating cell is centered around (0,0,0)
+    // This is common if your base shapes in d_scene are defined around their own origin.
+    p_in_cell.x -= 0.5f * REPEAT_PERIOD_X;
+    p_in_cell.y -= 0.5f * REPEAT_PERIOD_Y;
+    // p_in_cell.z is NOT offset, so the Z-axis remains continuous.
+
+    // Now, proceed with your original SDF calculation using the modified point `p_in_cell`
     float sdf = MAX_DIST + 5;
     
     for (size_t i = 0; i < d_scene_len; i++) {
         shape* obj = d_scene[i];
-        float obj_sdf = obj->sdf(p);
+        float obj_sdf = obj->sdf(p_in_cell); // Pass the folded point here!
 
         if (obj_sdf < sdf) {
             sdf = obj_sdf;
-            *target_ptr = obj; // assign object pointer
+            *target_ptr = obj;
         }
     }
 
-    assert(sdf >= -TOL); // only reflections
+    assert(sdf >= -TOL);
     return sdf;
 }
 
+// You also need to apply the same logic to the other scene_sdf_cuda overload:
 __device__ float scene_sdf_cuda(const point4& p) {
+    // Apply domain repetition logic as above
+    point4 p_in_cell = p; // Start with the original point, then modify X and Y
+
+    p_in_cell.x = custom_fmodf(p.x, REPEAT_PERIOD_X);
+    p_in_cell.y = custom_fmodf(p.y, REPEAT_PERIOD_Y);
+
+    p_in_cell.x -= 0.5f * REPEAT_PERIOD_X;
+    p_in_cell.y -= 0.5f * REPEAT_PERIOD_Y;
+
     float sdf = MAX_DIST + 5;
 
     for (size_t i = 0; i < d_scene_len; i++) {
         shape* obj = d_scene[i];
-        float obj_sdf = obj->sdf(p);
-
+        float obj_sdf = obj->sdf(p_in_cell); // Pass the folded point
         if (obj_sdf < sdf) {
             sdf = obj_sdf;
         }
     }
 
-    assert(sdf >= -TOL); // only reflections
+    assert(sdf >= -TOL);
     return sdf;
 }
 

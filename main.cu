@@ -437,12 +437,12 @@ int main() {
         bool input_changed_cuda = handle_inputs_cuda();
 
         if (input_changed_cuda) {
-            /*dim3 threads_per_block(16, 16);
+            dim3 threads_per_block(16, 16);
             dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
             (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
-            camera::render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height);*/
+            camera::render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height);
 
-            camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
+            //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
             cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
             gpuErrchk(cudaGraphicsMapResources(1, &render_texture_CUDA, 0)); // Map on stream 0
