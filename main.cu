@@ -116,7 +116,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
         for (shape* c : scene) {
-            c->basis.translate(vec4(-move_amount, 0.f, 0.f, 0.f));
+            c->translate(vec4(-move_amount, 0.f, 0.f, 0.f));
         }
 
         did_input = true;
@@ -124,7 +124,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
         for (shape* c : scene) {
-            c->basis.translate(vec4(move_amount, 0.f, 0.f, 0.f));
+            c->translate(vec4(move_amount, 0.f, 0.f, 0.f));
         }
 
         did_input = true;
@@ -132,7 +132,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
         for (shape* c : scene) {
-            c->basis.translate(vec4(0.f, move_amount, 0.f, 0.f));
+            c->translate(vec4(0.f, move_amount, 0.f, 0.f));
         }
 
         did_input = true;
@@ -140,7 +140,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
         for (shape* c : scene) {
-            c->basis.translate(vec4(0.f, -move_amount, 0.f, 0.f));
+            c->translate(vec4(0.f, -move_amount, 0.f, 0.f));
         }
         
         did_input = true;
@@ -148,8 +148,8 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
         for (shape* c : scene) {
-            c->basis.rotate_xz(rotate_amount);
-            c->basis.rotate_yw(rotate_amount);
+            c->rotate_xz(rotate_amount);
+            c->rotate_yw(rotate_amount);
         }
 
         did_input = true;
@@ -157,7 +157,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
         for (shape* c : scene) {
-            c->basis.rotate_yz(rotate_amount);
+            c->rotate_yz(rotate_amount);
         }
 
         did_input = true;
@@ -165,7 +165,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
         for (shape* c : scene) {
-            c->basis.rotate_xz(rotate_amount);
+            c->rotate_xz(rotate_amount);
         }
 
         did_input = true;
@@ -316,8 +316,8 @@ int main() {
 
         vec4 move(L / 2, L / 2, L / 2, L / 2);
         unique_scene.push_back(std::make_unique<cylinder>());
-        unique_scene.back()->a = vertices[idx1] - move;
-        unique_scene.back()->b = vertices[idx2] - move;
+        unique_scene.back()->start0 = vertices[idx1] - move;
+        unique_scene.back()->end0 = vertices[idx2] - move;
         unique_scene.back()->albedo = edge_color;
         scene.push_back(unique_scene.back().get());
     }
@@ -328,19 +328,19 @@ int main() {
     scene.push_back(ball.get());*/
 
     std::unique_ptr<cylinder> x_axis = std::make_unique<cylinder>();
-    x_axis->b = point4(AXIS_LEN, 0, 0, 0);
+    x_axis->end0 = point4(AXIS_LEN, 0, 0, 0);
     x_axis->radius = AXIS_RADIUS;
     x_axis->albedo = color(1, 0, 0);
     std::unique_ptr<cylinder> y_axis = std::make_unique<cylinder>();
-    y_axis->b = point4(0, AXIS_LEN, 0, 0);
+    y_axis->end0 = point4(0, AXIS_LEN, 0, 0);
     y_axis->radius = AXIS_RADIUS;
     y_axis->albedo = color(0, 1, 0);
     std::unique_ptr<cylinder> z_axis = std::make_unique<cylinder>();
-    z_axis->b = point4(0, 0, AXIS_LEN, 0);
+    z_axis->end0 = point4(0, 0, AXIS_LEN, 0);
     z_axis->radius = AXIS_RADIUS;
     z_axis->albedo = color(0, 0, 1);
     std::unique_ptr<cylinder> w_axis = std::make_unique<cylinder>();
-    w_axis->b = point4(0, 0, 0, AXIS_LEN);
+    w_axis->end0 = point4(0, 0, 0, AXIS_LEN);
     w_axis->radius = AXIS_RADIUS;
     w_axis->albedo = color(0.73f, 0.33f, 0.827f);
 
@@ -437,12 +437,12 @@ int main() {
         bool input_changed_cuda = handle_inputs_cuda();
 
         if (input_changed_cuda) {
-            /*dim3 threads_per_block(16, 16);
+            dim3 threads_per_block(16, 16);
             dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
             (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
-            camera::render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height);*/
+            camera::render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height);
 
-            camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
+            //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
             cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
             gpuErrchk(cudaGraphicsMapResources(1, &render_texture_CUDA, 0)); // Map on stream 0

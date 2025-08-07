@@ -6,17 +6,16 @@
 #include "shape.h"
 
 struct cylinder : public shape {
-	point4 a;
-	point4 b;
+	point4 start0, end0;
+	point4 start, end;
 	bool should_project;
 	float radius;
 
-	__host__ __device__ cylinder(): shape{}, a{0.f, 0.f, 0.f, 0.f}, b{0.f, 0.f, 0.f, 0.f}, should_project{true}, radius{0.02f} {}
+	__host__ __device__ cylinder(): shape{}, start0{0.f, 0.f, 0.f, 0.f}, end0{0.f, 0.f, 0.f, 0.f}, should_project{true}, radius{0.02f} {}
 
 	__host__ __device__ float sdf(const point4& p) const override {
 		//point4 pp = basis.world_to_local(p);
-		point4 aa = basis.local_to_world(a);
-		point4 bb = basis.local_to_world(b);
+		point4 aa = start, bb = end;
 
 		// projection should happen after affine transforms
 		if (should_project) {
@@ -40,9 +39,21 @@ struct cylinder : public shape {
 		return sign_d * sqrtf(fabsf(d)) / baba;
 	}
 
+	__host__ __device__ virtual void rotate(float angle, uint a, uint b) override {
+		shape::rotate(angle, a, b);
+		start = basis.local_to_world(start0);
+		end = basis.local_to_world(end0);
+	}
+	
+	__host__ __device__ virtual void translate(const vec4& t) override {
+		shape::translate(t);
+		start = basis.local_to_world(start0);
+		end = basis.local_to_world(end0);
+	}
+
 	__device__ virtual void print_gpu() const override {
 		printf("[GPU] Cylinder | Start (%.3f, %.3f, %.3f, %.3f) | End (%.3f, %.3f, %.3f, %.3f) | Radius %.3f | Project %s\n",
-		a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w, radius, should_project ? "true" : "false");
+		start.x, start.y, start.z, start.w, end.x, end.y, end.z, end.w, radius, should_project ? "true" : "false");
 	}
 };
 

@@ -105,7 +105,7 @@ __device__ vec4 get_normal_cuda(const vec4& p) {
 __device__ void ray_march_cuda(ray& r, shape** target_ptr) {
     //float a = 0.5f * (r.dir.y + 1.f);
     //return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
-    do {
+    for (uint i = 0; i < MAX_ITERS; i++) {
         float dist = scene_sdf_cuda(r.pos, target_ptr);
 
         if (dist <= TOL) {
@@ -116,7 +116,7 @@ __device__ void ray_march_cuda(ray& r, shape** target_ptr) {
         } else {
             r.march(dist);
         }
-    } while (true);
+    }
 }
 
 __device__ color ray_color_cuda(ray& r) {

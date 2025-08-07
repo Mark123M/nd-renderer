@@ -16,8 +16,8 @@ struct shape_params {
     
     point4 sphere_center;
     point4 cube_corner;
-    point4 cylinder_a;
-    point4 cylinder_b;
+    point4 cylinder_start0;
+    point4 cylinder_end0;
     bool cylinder_should_project;
     float radius;
 };
@@ -45,8 +45,8 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             c->basis = params.basis;
             c->albedo = params.albedo;
 
-            c->a = params.cylinder_a;
-            c->b = params.cylinder_b;
+            c->start0 = params.cylinder_start0;
+            c->end0 = params.cylinder_end0;
             c->should_project = params.cylinder_should_project;
             c->radius = params.radius;
             d_scene[i] = c;
@@ -108,7 +108,7 @@ __global__ void translate_kernel(vec4 t) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (idx < d_scene_len) {
-        d_scene[idx]->basis.translate(t);
+        d_scene[idx]->translate(t);
     }
 }
 
@@ -116,7 +116,7 @@ __global__ void rotate_xy_kernel(float angle) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
     
     if (idx < d_scene_len) {
-        d_scene[idx]->basis.rotate_xy(angle);
+        d_scene[idx]->rotate_xy(angle);
     }
 }
 
@@ -124,7 +124,7 @@ __global__ void rotate_xz_kernel(float angle) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
     
     if (idx < d_scene_len) {
-        d_scene[idx]->basis.rotate_xz(angle);
+        d_scene[idx]->rotate_xz(angle);
     }
 }
 
@@ -132,7 +132,7 @@ __global__ void rotate_xw_kernel(float angle) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
     
     if (idx < d_scene_len) {
-        d_scene[idx]->basis.rotate_xw(angle);
+        d_scene[idx]->rotate_xw(angle);
     }
 }
 
@@ -140,7 +140,7 @@ __global__ void rotate_yz_kernel(float angle) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
     
     if (idx < d_scene_len) {
-        d_scene[idx]->basis.rotate_yz(angle);
+        d_scene[idx]->rotate_yz(angle);
     }
 }
 
@@ -148,7 +148,7 @@ __global__ void rotate_yw_kernel(float angle) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
     
     if (idx < d_scene_len) {
-        d_scene[idx]->basis.rotate_yw(angle);
+        d_scene[idx]->rotate_yw(angle);
     }
 }
 
@@ -156,7 +156,7 @@ __global__ void rotate_zw_kernel(float angle) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
     
     if (idx < d_scene_len) {
-        d_scene[idx]->basis.rotate_zw(angle);
+        d_scene[idx]->rotate_zw(angle);
     }
 }
 
@@ -178,8 +178,8 @@ void initialize() {
 
         if (cylinder_ptr) {
             params.type = shape_type::CYLINDER;
-            params.cylinder_a = cylinder_ptr->a;
-            params.cylinder_b = cylinder_ptr->b;
+            params.cylinder_start0 = cylinder_ptr->start0;
+            params.cylinder_end0 = cylinder_ptr->end0;
             params.cylinder_should_project = cylinder_ptr->should_project;
             params.radius = cylinder_ptr->radius;
         } else if (nsphere_ptr) {

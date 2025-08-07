@@ -12,10 +12,13 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
-// program
+// rendering
 constexpr float TOL = 5e-3f;
 constexpr float EPSILON = 1e-3f;
 constexpr float MAX_DIST = 5.f;
+constexpr uint MAX_ITERS = 50;
+
+// scene
 constexpr float AMBIENT = 0.3f;
 constexpr float MOVE_AMOUNT = 0.03f;
 constexpr float ROTATE_AMOUNT = 0.05f;
