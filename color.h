@@ -10,7 +10,7 @@ struct color {
     float g;
     float b;
 
-    __host__ __device__ color(): r{0}, g{0}, b{0} {}
+    __host__ __device__ color(): r{0.f}, g{0.f}, b{0.f} {}
 
     __host__ __device__ color(float r0, float g0, float b0): r{r0}, g{g0}, b{b0} {}
 
