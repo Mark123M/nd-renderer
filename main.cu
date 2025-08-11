@@ -21,6 +21,7 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <cuda_gl_interop.h>
+#include <nvtx3/nvToolsExt.h>
 
 uint g_sm_count;
 uint g_sm_max_threads;
@@ -319,6 +320,7 @@ int main() {
         unique_scene.back()->start0 = vertices[idx1] - move;
         unique_scene.back()->end0 = vertices[idx2] - move;
         unique_scene.back()->albedo = edge_color;
+        //unique_scene.back()->should_project = false;
         scene.push_back(unique_scene.back().get());
     }
 
@@ -437,6 +439,7 @@ int main() {
         bool input_changed_cuda = handle_inputs_cuda();
 
         if (input_changed_cuda) {
+            nvtxRangePush("Processing Inputs");
             dim3 threads_per_block(16, 16);
             dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
             (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
@@ -456,6 +459,7 @@ int main() {
                     camera::image_height, // Height of the copy (rows)
                     cudaMemcpyDeviceToDevice)); // Type of copy (Device to Array)
             gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
+            nvtxRangePop();
         }
 
         if (false) {

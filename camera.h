@@ -61,7 +61,7 @@ __constant__ point4 d_pixel00_center;
 //point4 lookat = point4(0.f, 0.f, -1.f, 0.f);
 
 __device__ float scene_sdf_cuda(const point4& p, shape** target_ptr) {
-    float sdf = MAX_DIST + 5;
+    float sdf = MAX_DIST + 5.f;
     
     for (size_t i = 0; i < d_scene_len; i++) {
         shape* obj = d_scene[i];
@@ -78,7 +78,7 @@ __device__ float scene_sdf_cuda(const point4& p, shape** target_ptr) {
 }
 
 __device__ float scene_sdf_cuda(const point4& p) {
-    float sdf = MAX_DIST + 5;
+    float sdf = MAX_DIST + 5.f;
 
     for (size_t i = 0; i < d_scene_len; i++) {
         shape* obj = d_scene[i];
@@ -132,7 +132,7 @@ __device__ color ray_color_cuda(ray& r) {
     vec4 normal = get_normal_cuda(r.pos);
 
     if (d_render_normals) {
-        return 0.5 * color(normal.x + 1, normal.y + 1, normal.z + 1);
+        return 0.5f * color(normal.x + 1.f, normal.y + 1.f, normal.z + 1.f);
     }
 
     color total_lighting(0.f, 0.f, 0.f);
@@ -187,7 +187,7 @@ __global__ void render_stride_kernel(uchar4* d_image_data, uint width, uint num_
 }
 
 float scene_sdf(const point4& p, shape** target_ptr) {
-    float sdf = MAX_DIST + 5;
+    float sdf = MAX_DIST + 5.f;
     
     for (shape* obj : scene) {
         float obj_sdf = obj->sdf(p);
@@ -203,7 +203,7 @@ float scene_sdf(const point4& p, shape** target_ptr) {
 }
 
 float scene_sdf(const point4& p) {
-    float sdf = MAX_DIST + 5;
+    float sdf = MAX_DIST + 5.f;
 
     for (shape* obj : scene) {
         float obj_sdf = obj->sdf(p);
@@ -256,7 +256,7 @@ color ray_color(ray& r) {
     vec4 normal = get_normal(r.pos);
 
     if (render_normals) {
-        return 0.5 * color(normal.x + 1, normal.y + 1, normal.z + 1);
+        return 0.5f * color(normal.x + 1.f, normal.y + 1.f, normal.z + 1.f);
     }
 
     color total_lighting(0.f, 0.f, 0.f);
@@ -284,8 +284,8 @@ void initialize() {
     pixel_x = viewport_x / image_width;
     pixel_y = viewport_y / image_height;
 
-    point4 viewport_top_left = camera_center - vec4(0.f, 0.f, focal_length, 0.f) - viewport_x / 2 - viewport_y / 2;
-    pixel00_center = viewport_top_left + 0.5 * (pixel_x + pixel_y);
+    point4 viewport_top_left = camera_center - vec4(0.f, 0.f, focal_length, 0.f) - viewport_x / 2.f - viewport_y / 2.f;
+    pixel00_center = viewport_top_left + 0.5f * (pixel_x + pixel_y);
 
     gpuErrchk(cudaMemcpyToSymbol(d_render_normals, &render_normals, sizeof(bool)));
     gpuErrchk(cudaMemcpyToSymbol(d_pixel_x, &pixel_x, sizeof(vec4)));

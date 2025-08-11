@@ -21,8 +21,8 @@ struct cylinder : public shape {
 		if (should_project) {
 			aa = aa / (1.f + aa.w);
 			bb = bb / (1.f + bb.w);
-			aa.w = 0;
-			bb.w = 0;
+			aa.w = 0.f;
+			bb.w = 0.f;
 		}
 
 		vec4  ba = bb - aa;
@@ -30,11 +30,11 @@ struct cylinder : public shape {
 		float baba = vec4::dot(ba, ba);
 		float paba = vec4::dot(pa, ba);
 		float x = vec4::length(pa * baba - ba * paba) - radius * baba;
-		float y = fabsf(paba - baba * 0.5) - baba * 0.5;
+		float y = fabsf(paba - baba * 0.5f) - baba * 0.5f;
 		float x2 = x * x;
 		float y2 = y * y * baba;
-		float d = (fmaxf(x, y) < 0.0) ? -fminf(x2, y2) : (((x > 0.0) ? x2 : 0.0) + ((y > 0.0) ? y2 : 0.0));
-		float sign_d = (d > 0) - (d < 0);
+		float d = (fmaxf(x, y) < 0.f) ? -fminf(x2, y2) : (((x > 0.f) ? x2 : 0.f) + ((y > 0.f) ? y2 : 0.f));
+		float sign_d = (d > 0.f) - (d < 0.f);
 
 		return sign_d * sqrtf(fabsf(d)) / baba;
 	}
