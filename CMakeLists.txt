@@ -7,6 +7,7 @@ cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(nd-light-transport LANGUAGES CXX CUDA)
 set(CMAKE_CUDA_ARCHITECTURES "89")
 set(CMAKE_CUDA_STANDARD 20)
+set(CMAKE_CXX_STANDARD 20) 
 
 # --- ImGui Integration Starts Here ---
 
@@ -80,7 +81,7 @@ endif()
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
-    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -g -G -O0 -lineinfo --keep-device-functions")
+    #set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -g -G -O0 -maxrregcount=48 --generate-line-info --keep-device-functions")
 endif()
 
 # For VS Code IntelliSense and other tools to pick up compile commands
@@ -89,8 +90,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Request that particles be built with -std=c++11
 # As this is a public compile feature anything that links to 
 # particles will also build with -std=c++11
-target_compile_features(nd-raytracer PUBLIC cxx_std_20)
-target_compile_options(nd-raytracer PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=48>")
+#target_compile_features(nd-raytracer PUBLIC cxx_std_20)
+target_compile_options(nd-raytracer PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>" "$<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>")
 
 target_include_directories(nd-raytracer PUBLIC
     "${IMGUI_DIR}"
