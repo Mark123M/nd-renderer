@@ -15,6 +15,10 @@ struct nsphere : public shape {
 		return (center - p).length() - radius;
 	}
 
+	__host__ __device__ size_t size() const override {
+		return sizeof(nsphere);
+	}
+	
 	__device__ virtual void print_gpu() const override {
 		printf("[GPU] Hypersphere | Center (%.3f, %.3f, %.3f, %.3f) | Radius %.3f\n",
 		center.x, center.y, center.z, center.w, radius);

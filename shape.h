@@ -5,6 +5,10 @@
 #include "color.h"
 #include "transform.h"
 
+enum shape_type {
+    NONE, CYLINDER, PROJECTED_CYLINDER, HYPERSPHERE, HYPERCUBE
+};
+
 struct shape {
 	transform basis;
 	color albedo;
@@ -44,6 +48,8 @@ struct shape {
 	__host__ __device__ void rotate_zw(float angle) {
 		rotate(angle, 2, 3);
 	}
+
+	__host__ __device__ virtual size_t size() const = 0;
 
 	__device__ virtual void print_gpu() const = 0;
 };

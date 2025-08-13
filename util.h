@@ -15,18 +15,18 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 // rendering
 constexpr float TOL = 5e-3f;
 constexpr float EPSILON = 1e-3f;
-constexpr float MAX_DIST = 5.f;
+constexpr float MAX_MARCH_DIST = 5.f;
 constexpr uint MAX_ITERS = 50;
 constexpr uint NUM_CPU_THREADS = 20;
 constexpr float SIMULATION_RATE = 60.f;
 constexpr float MIN_DELTA_TIME = 1.f / SIMULATION_RATE;
-constexpr float MOVE_RATE = 0.5f;
-constexpr float ROTATE_RATE = 1.5f;
 
 // scene
 constexpr float AMBIENT = 0.3f;
 constexpr float AXIS_RADIUS = 0.01f;
 constexpr float AXIS_LEN = 0.5f;
+constexpr float MOVE_RATE = 0.5f;
+constexpr float ROTATE_RATE = 1.5f;
 
 // math
 constexpr float infinity = std::numeric_limits<float>::infinity();

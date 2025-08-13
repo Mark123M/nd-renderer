@@ -5,10 +5,6 @@
 #include "camera.h"
 #include "direction_light.h"
 
-enum shape_type {
-    CYLINDER, HYPERSPHERE, HYPERCUBE
-};
-
 struct shape_params {
     shape_type type;
     transform basis;
@@ -18,12 +14,7 @@ struct shape_params {
     point4 cube_corner;
     point4 cylinder_start0;
     point4 cylinder_end0;
-    bool cylinder_should_project;
     float radius;
-};
-
-enum light_type {
-    DIRECTION, POINT, AREA
 };
 
 struct light_params {
@@ -34,31 +25,46 @@ struct light_params {
 
 namespace world {
 
-__global__ void construct(shape_params* d_scene_params_list, light_params* d_lights_params_list) {
+__global__ void construct(shape_params* d_scene_params_list, light_params* d_lights_params_list, size_t h_total_scene_bytes, size_t h_total_lights_bytes) {
+    d_scene_data = new char[h_total_scene_bytes];
+    char* cur_shape_data = d_scene_data;
     d_scene = new shape*[d_scene_len];
     
     for (size_t i = 0; i < d_scene_len; i++) {
         shape_params& params = d_scene_params_list[i];
         
         if (params.type == shape_type::CYLINDER) {
-            cylinder* c = new cylinder;
+            //cylinder* c = new cylinder;
+            cylinder* c = new(cur_shape_data) cylinder;
+            cur_shape_data += c->size();
             c->basis = params.basis;
             c->albedo = params.albedo;
 
             c->start0 = params.cylinder_start0;
             c->end0 = params.cylinder_end0;
-            c->should_project = params.cylinder_should_project;
             c->radius = params.radius;
             d_scene[i] = c;
+        } else if (params.type == shape_type::PROJECTED_CYLINDER) {
+            projected_cylinder* pc = new(cur_shape_data) projected_cylinder;
+            cur_shape_data += pc->size();
+            pc->basis = params.basis;
+            pc->albedo = params.albedo;
+
+            pc->start0 = params.cylinder_start0;
+            pc->end0 = params.cylinder_end0;
+            pc->radius = params.radius;
+            d_scene[i] = pc;
         } else if (params.type == shape_type::HYPERCUBE) {
-            ncube* nc = new ncube;
+            ncube* nc = new(cur_shape_data) ncube;
+            cur_shape_data += nc->size();
             nc->basis = params.basis;
             nc->albedo = params.albedo;
 
             nc->corner = params.cube_corner;
             d_scene[i] = nc;
         } else if (params.type == shape_type::HYPERSPHERE) {
-            nsphere* ns = new nsphere;
+            nsphere* ns = new(cur_shape_data) nsphere;
+            cur_shape_data += ns->size();
             ns->basis = params.basis;
             ns->albedo = params.albedo;
 
@@ -72,13 +78,16 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
         d_scene[i]->print_gpu();
     }
 
+    d_lights_data = new char[h_total_lights_bytes];
+    char* cur_light_data = d_lights_data;
     d_lights = new light*[d_lights_len];
 
     for (size_t i = 0; i < d_lights_len; i++) {
         light_params& params = d_lights_params_list[i];
 
         if (params.type == light_type::DIRECTION) {
-            direction_light* dl = new direction_light;
+            direction_light* dl = new(cur_light_data) direction_light;
+            cur_light_data += dl->size();
             dl->col = params.col;
             dl->dir = params.dir;
             d_lights[i] = dl;
@@ -91,16 +100,10 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
 }
 
 __global__ void destruct() {
-    for (size_t i = 0; i < d_scene_len; i++) {
-        delete d_scene[i];
-    }
-
+    delete [] d_scene_data;
     delete [] d_scene;
 
-    for (size_t i = 0; i < d_lights_len; i++) {
-        delete d_lights[i];
-    }
-
+    delete [] d_lights_data;
     delete [] d_lights;
 }
 
@@ -169,6 +172,7 @@ void initialize() {
 
     for (size_t i = 0; i < scene_len; i++) {
         cylinder* cylinder_ptr = dynamic_cast<cylinder*>(scene[i]);
+        projected_cylinder* projected_cylinder_ptr = dynamic_cast<projected_cylinder*>(scene[i]);
         nsphere* nsphere_ptr = dynamic_cast<nsphere*>(scene[i]);
         ncube* ncube_ptr = dynamic_cast<ncube*>(scene[i]);
 
@@ -180,8 +184,12 @@ void initialize() {
             params.type = shape_type::CYLINDER;
             params.cylinder_start0 = cylinder_ptr->start0;
             params.cylinder_end0 = cylinder_ptr->end0;
-            params.cylinder_should_project = cylinder_ptr->should_project;
             params.radius = cylinder_ptr->radius;
+        } else if (projected_cylinder_ptr) {
+            params.type = shape_type::PROJECTED_CYLINDER;
+            params.cylinder_start0 = projected_cylinder_ptr->start0;
+            params.cylinder_end0 = projected_cylinder_ptr->end0;
+            params.radius = projected_cylinder_ptr->radius;
         } else if (nsphere_ptr) {
             params.type = shape_type::HYPERSPHERE;
             params.sphere_center = nsphere_ptr->center;
@@ -216,7 +224,7 @@ void initialize() {
     gpuErrchk(cudaMalloc(&d_lights_params_list, lights_size));
     gpuErrchk(cudaMemcpy(d_lights_params_list, lights_params_list, lights_size, cudaMemcpyHostToDevice));
 
-    construct<<<1, 1>>>(d_scene_params_list, d_lights_params_list);
+    construct<<<1, 1>>>(d_scene_params_list, d_lights_params_list, total_scene_bytes, total_lights_bytes);
     delete [] scene_params_list;
     gpuErrchk(cudaFree(d_scene_params_list));
     delete [] lights_params_list;

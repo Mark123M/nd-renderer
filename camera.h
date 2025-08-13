@@ -35,10 +35,16 @@ static inline std::string time_stamp(const std::string& fmt = "%F__%H-%M-%S") {
 
 std::vector<shape*> scene;
 __device__ shape** d_scene;
+__device__ char* d_scene_data;
 __constant__ size_t d_scene_len;
+size_t total_scene_bytes = 0;
+
 std::vector<light*> lights;
 __device__ light** d_lights;
+__device__ char* d_lights_data;
 __constant__ size_t d_lights_len;
+size_t total_lights_bytes = 0;
+
 std::vector<uchar4> image_data;
 
 namespace camera {
@@ -60,16 +66,19 @@ __constant__ point4 d_pixel00_center;
 //point4 lookfrom = point4(0.f, 0.f, 0.f, 0.f);
 //point4 lookat = point4(0.f, 0.f, -1.f, 0.f);
 
-__device__ float scene_sdf_cuda(const point4& p, shape** target_ptr) {
-    float sdf = MAX_DIST + 5.f;
+__device__ float scene_sdf_cuda(const point4& p, shape** shared_scene, light** shared_lights, shape** target_ptr) {
+    float sdf = MAX_MARCH_DIST + 5.f;
     
     for (size_t i = 0; i < d_scene_len; i++) {
-        shape* obj = d_scene[i];
+        shape* obj = shared_scene[i];
         float obj_sdf = obj->sdf(p);
 
         if (obj_sdf < sdf) {
             sdf = obj_sdf;
-            *target_ptr = obj; // assign object pointer
+
+            if (target_ptr) {
+                *target_ptr = obj; // assign object pointer
+            }
         }
     }
 
@@ -77,40 +86,30 @@ __device__ float scene_sdf_cuda(const point4& p, shape** target_ptr) {
     return sdf;
 }
 
-__device__ float scene_sdf_cuda(const point4& p) {
-    float sdf = MAX_DIST + 5.f;
-
-    for (size_t i = 0; i < d_scene_len; i++) {
-        shape* obj = d_scene[i];
-        float obj_sdf = obj->sdf(p);
-
-        if (obj_sdf < sdf) {
-            sdf = obj_sdf;
-        }
-    }
-
-    assert(sdf >= -TOL); // only reflections
-    return sdf;
+__device__ float scene_sdf_mod_cuda(const point4& p, shape** shared_scene, light** shared_lights, shape** target_ptr = nullptr) {
+    float s = 1.0f;
+    point4 q(p.x - s * roundf(p.x / s), p.y - s * roundf(p.y / s), p.z, p.w);
+    return scene_sdf_cuda(q, shared_scene, shared_lights, target_ptr);
 }
 
-__device__ vec4 get_normal_cuda(const vec4& p) {
-    float sdf_diff_x = scene_sdf_cuda(p + d_delta_x) - scene_sdf_cuda(p - d_delta_x);
-    float sdf_diff_y = scene_sdf_cuda(p + d_delta_y) - scene_sdf_cuda(p - d_delta_y);
-    float sdf_diff_z = scene_sdf_cuda(p + d_delta_z) - scene_sdf_cuda(p - d_delta_z);
-    float sdf_diff_w = scene_sdf_cuda(p + d_delta_w) - scene_sdf_cuda(p - d_delta_w);
+__device__ vec4 get_normal_cuda(const vec4& p, shape** shared_scene, light** shared_lights) {
+    float sdf_diff_x = scene_sdf_mod_cuda(p + d_delta_x, shared_scene, shared_lights) - scene_sdf_mod_cuda(p - d_delta_x, shared_scene, shared_lights);
+    float sdf_diff_y = scene_sdf_mod_cuda(p + d_delta_y, shared_scene, shared_lights) - scene_sdf_mod_cuda(p - d_delta_y, shared_scene, shared_lights);
+    float sdf_diff_z = scene_sdf_mod_cuda(p + d_delta_z, shared_scene, shared_lights) - scene_sdf_mod_cuda(p - d_delta_z, shared_scene, shared_lights);
+    float sdf_diff_w = scene_sdf_mod_cuda(p + d_delta_w, shared_scene, shared_lights) - scene_sdf_mod_cuda(p - d_delta_w, shared_scene, shared_lights);
 
     return vec4::normalize(vec4(sdf_diff_x, sdf_diff_y, sdf_diff_z, sdf_diff_w));
 }
 
-__device__ void ray_march_cuda(ray& r, shape** target_ptr) {
+__device__ void ray_march_cuda(ray& r, shape** target_ptr, shape** shared_scene, light** shared_lights) {
     //float a = 0.5f * (r.dir.y + 1.f);
     //return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
     for (uint i = 0; i < MAX_ITERS; i++) {
-        float dist = scene_sdf_cuda(r.pos, target_ptr);
+        float dist = scene_sdf_mod_cuda(r.pos, shared_scene, shared_lights, target_ptr);
 
         if (dist <= TOL) {
             return;
-        } else if (dist > MAX_DIST) {
+        } else if (dist > MAX_MARCH_DIST) {
             *target_ptr = nullptr; // no object hit
             return;
         } else {
@@ -119,9 +118,9 @@ __device__ void ray_march_cuda(ray& r, shape** target_ptr) {
     }
 }
 
-__device__ color ray_color_cuda(ray& r) {
+__device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights) {
     shape* target = nullptr;
-    ray_march_cuda(r, &target);
+    ray_march_cuda(r, &target, shared_scene, shared_lights);
 
     if (target == nullptr) {
         vec4 unit_direction = vec4::normalize(r.dir);
@@ -129,7 +128,7 @@ __device__ color ray_color_cuda(ray& r) {
         return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
     }
 
-    vec4 normal = get_normal_cuda(r.pos);
+    vec4 normal = get_normal_cuda(r.pos, shared_scene, shared_lights);
 
     if (d_render_normals) {
         return 0.5f * color(normal.x + 1.f, normal.y + 1.f, normal.z + 1.f);
@@ -138,18 +137,42 @@ __device__ color ray_color_cuda(ray& r) {
     color total_lighting(0.f, 0.f, 0.f);
 
     for (size_t i = 0; i < d_lights_len; i++) {
-        light* lig = d_lights[i];
-        total_lighting += lig->Le_cuda(r.pos, normal);
+        light* lig = shared_lights[i];
+        total_lighting += lig->Le_cuda(r.pos, normal, shared_scene, shared_lights);
         //printf("[GPU] Hit pos (%.3f, %.3f, %.3f, %.3f) | Total lighting (%.3f, %.3f, %.3f)\n",
         //r.pos.x, r.pos.y, r.pos.z, r.pos.w, total_lighting.r, total_lighting.g, total_lighting.b);
     }
 
-    color final_col = target->albedo * total_lighting;
-
-    return final_col;
+    return target->albedo * total_lighting;
 }
 
-__global__ void render_kernel(uchar4* d_image_data, uint width, uint height) {
+__global__ void render_kernel(uchar4* d_image_data, uint width, uint height, size_t h_total_scene_bytes, size_t h_total_lights_bytes) {
+    extern __shared__ char buffer[];
+
+    // buffer layout for shared memory
+    // total_scene_bytes d_scene_len * 8 total_lights_bytes d_lights_len * 8    
+    // [all shape data | shape pointers | all light data | light pointers]
+    char* cur_shape_data = buffer;
+    shape** shared_scene = (shape**)(cur_shape_data + h_total_scene_bytes);
+    char* cur_light_data = (char*)(shared_scene + d_scene_len);
+    light** shared_lights = (light**)(cur_light_data + h_total_lights_bytes);
+
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+        memcpy(cur_shape_data, d_scene_data, h_total_scene_bytes);
+        for (size_t i = 0; i < d_scene_len; i++) {
+            shared_scene[i] = (shape*)cur_shape_data;
+            cur_shape_data += shared_scene[i]->size();
+        }
+
+        memcpy(cur_light_data, d_lights_data, h_total_lights_bytes);
+        for (size_t i = 0; i < d_lights_len; i++) {
+            shared_lights[i] = (light*)cur_light_data;
+            cur_light_data += shared_lights[i]->size();
+        }
+    }
+
+    __syncthreads();
+
     uint row = blockDim.x * blockIdx.x + threadIdx.x;
     uint col = blockDim.y * blockIdx.y + threadIdx.y;
     uint idx = row * width + col;
@@ -160,10 +183,10 @@ __global__ void render_kernel(uchar4* d_image_data, uint width, uint height) {
         vec4 direction = vec4::normalize(pixel_center - d_camera_center);
         ray r(d_camera_center, direction);
         
-        color color = ray_color_cuda(r);
-        d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, color.r) * 255.999f);
-        d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, color.g) * 255.999f);
-        d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, color.b) * 255.999f);
+        color col = ray_color_cuda(r, shared_scene, shared_lights);
+        d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, col.r) * 255.999f);
+        d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, col.g) * 255.999f);
+        d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, col.b) * 255.999f);
         d_image_data[idx].w = 255;
     }
 }
@@ -177,17 +200,17 @@ __global__ void render_stride_kernel(uchar4* d_image_data, uint width, uint num_
         vec4 direction = vec4::normalize(pixel_center - d_camera_center);
         ray r(d_camera_center, direction);
         
-        color color = ray_color_cuda(r);
+        /*color color = ray_color_cuda(r);
         d_image_data[i].x = static_cast<unsigned char>(fminf(1.f, color.r) * 255.999f);
         d_image_data[i].y = static_cast<unsigned char>(fminf(1.f, color.g) * 255.999f);
         d_image_data[i].z = static_cast<unsigned char>(fminf(1.f, color.b) * 255.999f);
-        d_image_data[i].w = 255;
+        d_image_data[i].w = 255; */
     
     }
 }
 
 float scene_sdf(const point4& p, shape** target_ptr) {
-    float sdf = MAX_DIST + 5.f;
+    float sdf = MAX_MARCH_DIST + 5.f;
     
     for (shape* obj : scene) {
         float obj_sdf = obj->sdf(p);
@@ -203,7 +226,7 @@ float scene_sdf(const point4& p, shape** target_ptr) {
 }
 
 float scene_sdf(const point4& p) {
-    float sdf = MAX_DIST + 5.f;
+    float sdf = MAX_MARCH_DIST + 5.f;
 
     for (shape* obj : scene) {
         float obj_sdf = obj->sdf(p);
@@ -234,7 +257,7 @@ void ray_march(ray& r, shape** target_ptr) {
 
         if (dist <= TOL) {
             return;
-        } else if (dist > MAX_DIST) {
+        } else if (dist > MAX_MARCH_DIST) {
             *target_ptr = nullptr; // no object hit
             return;
         } else {

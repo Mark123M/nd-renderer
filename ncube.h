@@ -18,6 +18,10 @@ struct ncube : public shape {
 		return d;
 	}
 
+	__host__ __device__ size_t size() const override {
+		return sizeof(ncube);
+	}
+
 	__device__ virtual void print_gpu() const override {
 		printf("[GPU] Hypercube | Corner (%.3f, %.3f, %.3f, %.3f)\n",
 		corner.x, corner.y, corner.z, corner.w);
