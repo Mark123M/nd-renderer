@@ -79,6 +79,10 @@ __device__ float scene_sdf_cuda(const point4& p, shape** shared_scene, light** s
             if (target_ptr) {
                 *target_ptr = obj; // assign object pointer
             }
+
+            if (sdf <= TOL) {
+                return sdf;
+            }
         }
     }
 
