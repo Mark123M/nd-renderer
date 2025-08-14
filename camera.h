@@ -91,8 +91,8 @@ __device__ float scene_sdf_cuda(const point4& p, shape** shared_scene, light** s
 }
 
 __device__ float scene_sdf_mod_cuda(const point4& p, shape** shared_scene, light** shared_lights, shape** target_ptr = nullptr) {
-    float s = 1.0f;
-    point4 q(p.x - s * roundf(p.x / s), p.y - s * roundf(p.y / s), p.z, p.w);
+    float s = 5.f;
+    point4 q(p.x - s * roundf(p.x / s), p.y - s * roundf(p.y / s), p.z - s * roundf(p.z / s), p.w);
     return scene_sdf_cuda(q, shared_scene, shared_lights, target_ptr);
 }
 
@@ -309,7 +309,7 @@ void refresh_view() {
     pixel00_center = viewport_top_left + 0.5f * (pixel_x + pixel_y);
 }
 
-__global__ void refresh_view_cuda() {
+__device__ void refresh_view_cuda() {
     vec4 viewport_x = d_viewport_width * d_camera_transform.get_vec_x();
     vec4 viewport_y = -d_viewport_height * d_camera_transform.get_vec_y();
     d_pixel_x = viewport_x / d_image_width;
@@ -317,6 +317,10 @@ __global__ void refresh_view_cuda() {
 
     point4 viewport_top_left = d_camera_transform.get_pos() - d_camera_transform.get_vec_z() - viewport_x / 2.f - viewport_y / 2.f;
     d_pixel00_center = viewport_top_left + 0.5f * (d_pixel_x + d_pixel_y);
+}
+
+__global__ void refresh_view_cuda_kernel() {
+    refresh_view_cuda();
 }
 
 void initialize() {
@@ -333,7 +337,7 @@ void initialize() {
     gpuErrchk(cudaMemcpyToSymbol(d_camera_transform, &camera_transform, sizeof(transform)));
 
     refresh_view();
-    refresh_view_cuda<<<1,1>>>();
+    refresh_view_cuda_kernel<<<1,1>>>();
 
     gpuErrchk(cudaMemcpyToSymbol(d_delta_x, &delta_x, sizeof(vec4)));
     gpuErrchk(cudaMemcpyToSymbol(d_delta_y, &delta_y, sizeof(vec4)));

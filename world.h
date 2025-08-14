@@ -115,6 +115,26 @@ __global__ void translate_kernel(vec4 t) {
     }
 }
 
+__global__ void move_camera_x_kernel(float amount) {
+    camera::d_camera_transform.translate(amount * camera::d_camera_transform.get_vec_x());
+    camera::refresh_view_cuda();
+}
+
+__global__ void move_camera_z_kernel(float amount) {
+    camera::d_camera_transform.translate(amount * camera::d_camera_transform.get_vec_z());
+    camera::refresh_view_cuda();
+}
+
+__global__ void rotate_camera_horizontal_kernel(float angle) {
+    camera::d_camera_transform.rotate_xz(angle);
+    camera::refresh_view_cuda();
+}
+
+__global__ void rotate_camera_vertical_kernel(float angle) {
+    camera::d_camera_transform.rotate_yz(-angle);
+    camera::refresh_view_cuda();
+}
+
 __global__ void rotate_xy_kernel(float angle) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
     

@@ -70,23 +70,40 @@ static bool handle_inputs_cuda() {
     uint threads_per_block = 64;
     uint num_blocks = (scene.size() + threads_per_block - 1) / threads_per_block;
 
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 mouse_delta = io.MouseDelta;
+    
+    if (mouse_delta.x != 0.0f) {
+        world::rotate_camera_horizontal_kernel<<<1, 1>>>(mouse_delta.x * CAMERA_ROTATE_RATE * fixed_delta_time);
+        did_input = true;
+    }
+
+    if (mouse_delta.y != 0.0f) {
+        world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
+        did_input = true;
+    }
+
     if (ImGui::IsKeyDown(ImGuiKey_A)) {
-        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(-MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
+        //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(-MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
+        world::move_camera_x_kernel<<<1, 1>>>(-CAMERA_MOVE_RATE * fixed_delta_time);
         did_input = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_D)) {
-        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
+        //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
+        world::move_camera_x_kernel<<<1, 1>>>(CAMERA_MOVE_RATE * fixed_delta_time);
         did_input = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_W)) {
-        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, MOVE_RATE * fixed_delta_time, 0.f, 0.f));
+        //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, MOVE_RATE * fixed_delta_time, 0.f, 0.f));
+        world::move_camera_z_kernel<<<1, 1>>>(-CAMERA_MOVE_RATE * fixed_delta_time);
         did_input = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_S)) {
-        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, -MOVE_RATE * fixed_delta_time, 0.f, 0.f));
+        //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, -MOVE_RATE * fixed_delta_time, 0.f, 0.f));
+        world::move_camera_z_kernel<<<1, 1>>>(CAMERA_MOVE_RATE * fixed_delta_time);
         did_input = true;
     }
 
@@ -114,7 +131,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
         for (shape* c : scene) {
-            c->translate(vec4(-MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
+            c->translate(vec4(-CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
         }
 
         did_input = true;
@@ -122,7 +139,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
         for (shape* c : scene) {
-            c->translate(vec4(MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
+            c->translate(vec4(CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
         }
 
         did_input = true;
@@ -130,7 +147,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
         for (shape* c : scene) {
-            c->translate(vec4(0.f, MOVE_RATE * fixed_delta_time, 0.f, 0.f));
+            c->translate(vec4(0.f, CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         }
 
         did_input = true;
@@ -138,7 +155,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
         for (shape* c : scene) {
-            c->translate(vec4(0.f, -MOVE_RATE * fixed_delta_time, 0.f, 0.f));
+            c->translate(vec4(0.f, -CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         }
         
         did_input = true;

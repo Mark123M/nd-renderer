@@ -25,7 +25,8 @@ constexpr float MIN_DELTA_TIME = 1.f / SIMULATION_RATE;
 constexpr float AMBIENT = 0.3f;
 constexpr float AXIS_RADIUS = 0.01f;
 constexpr float AXIS_LEN = 0.5f;
-constexpr float MOVE_RATE = 0.5f;
+constexpr float CAMERA_MOVE_RATE = 2.f;
+constexpr float CAMERA_ROTATE_RATE = 0.2f;
 constexpr float ROTATE_RATE = 1.5f;
 
 // math
