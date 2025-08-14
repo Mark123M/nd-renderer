@@ -1,20 +1,23 @@
-#ifndef CYLINDER_H
-#define CYLINDER_H
+#ifndef PROJECTED_CYLINDER_H
+#define PROJECTED_CYLINDER_H
 
 #include "vec4.h"
 #include "color.h"
 #include "shape.h"
 
-struct cylinder : public shape {
+struct projected_cylinder : public shape {
 	point4 start0, end0;
 	point4 start, end;
 	float radius;
 
-	__host__ __device__ cylinder(): shape{}, start0{0.f, 0.f, 0.f, 0.f}, end0{0.f, 0.f, 0.f, 0.f}, radius{0.02f} {}
+	__host__ __device__ projected_cylinder(): shape{}, start0{0.f, 0.f, 0.f, 0.f}, end0{0.f, 0.f, 0.f, 0.f}, radius{0.02f} {}
 
 	__host__ __device__ float sdf(const point4& p) const override {
-		//point4 pp = basis.world_to_local(p);
 		point4 aa = start, bb = end;
+        aa = aa / (1.f + aa.w);
+        bb = bb / (1.f + bb.w);
+        aa.w = 0.f;
+        bb.w = 0.f;
 
 		vec4  ba = bb - aa;
 		vec4  pa = p - aa;
@@ -43,11 +46,11 @@ struct cylinder : public shape {
 	}
 
 	__host__ __device__ size_t size() const override {
-		return sizeof(cylinder);
+		return sizeof(projected_cylinder);
 	}
 
 	__device__ virtual void print_gpu() const override {
-		printf("[GPU] Cylinder | Start (%.3f, %.3f, %.3f, %.3f) | End (%.3f, %.3f, %.3f, %.3f) | Radius %.3f\n",
+		printf("[GPU] Projected Cylinder | Start (%.3f, %.3f, %.3f, %.3f) | End (%.3f, %.3f, %.3f, %.3f) | Radius %.3f\n",
 		start0.x, start0.y, start0.z, start0.w, end0.x, end0.y, end0.z, end0.w, radius);
 	}
 };

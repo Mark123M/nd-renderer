@@ -3,7 +3,7 @@
 
 #include <cmath>
 #include <iostream>
-#include "math_util.h"
+#include "util.h"
 
 struct vec4;
 __host__ __device__ vec4 operator*(float k, const vec4& v);
@@ -26,7 +26,7 @@ struct vec4 {
 	__host__ __device__ vec4 operator*(const vec4& v) const { return { x * v.x, y * v.y, z * v.z, w * v.w }; }
 
 	__host__ __device__ vec4 operator/(float k) const {
-		assert(k != 0);
+		assert(k != 0.f);
 		return (1 / k) * (*this);
 	}
 
@@ -63,7 +63,7 @@ struct vec4 {
 	}
 
 	__host__ __device__ vec4& operator/=(float k) {
-		assert(k != 0);
+		assert(k != 0.f);
 		x /= k;
 		y /= k;
 		z /= k;
@@ -71,7 +71,7 @@ struct vec4 {
 		return *this;
 	}
 
-	__host__ __device__ float get(int idx) const {
+	__host__ __device__ float get(uint idx) const {
 		switch (idx) {
 		case 0:
 			return x;
@@ -86,7 +86,7 @@ struct vec4 {
 		return 0.f;
 	}
 
-	__host__ __device__ void set(int idx, float val) {
+	__host__ __device__ void set(uint idx, float val) {
 		switch (idx) {
 		case 0:
 			x = val;
@@ -120,7 +120,7 @@ struct vec4 {
 	}
 
 	__host__ __device__ static vec4 reflect(const vec4& v, const vec4& n) {
-		return v - 2.0f * dot(v, n) * n;
+		return v - 2.f * dot(v, n) * n;
 	}
 
 	__host__ __device__ static vec4 refract(const vec4& v, const vec4& n, float eta) {

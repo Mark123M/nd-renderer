@@ -13,21 +13,27 @@
 #include "nsphere.h"
 #include "ncube.h"
 #include "cylinder.h"
+#include "projected_cylinder.h"
 #include "camera.h"
 #include "world.h"
 #include "direction_light.h"
-#include "math_util.h"
+#include "util.h"
 
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <cuda_gl_interop.h>
+#include <nvtx3/nvToolsExt.h>
+
+uint g_sm_count;
+uint g_sm_max_threads;
+float fixed_delta_time = 0.f;
 
 struct cudaGraphicsResource* render_texture_CUDA = nullptr;
 
-__global__ void test_render_kernel(uchar4* d_image_data, int width, int height, float time)
+__global__ void test_render_kernel(uchar4* d_image_data, uint width, uint height, float time)
 {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
-    int col = blockIdx.y * blockDim.y + threadIdx.y;
+    uint row = blockIdx.x * blockDim.x + threadIdx.x;
+    uint col = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (row < height && col < width) {
         // Normalize coordinates to [0, 1]
@@ -59,46 +65,61 @@ __global__ void hello() {
     printf("Hello from block: %u, thread: %u\n", blockIdx.x, threadIdx.x);
 }
 
-static constexpr int num_cpu_threads = 20;
-
 static bool handle_inputs_cuda() {
     bool did_input = false;
     uint threads_per_block = 64;
     uint num_blocks = (scene.size() + threads_per_block - 1) / threads_per_block;
 
-    if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(-MOVE_AMOUNT, 0.f, 0.f, 0.f));
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 mouse_delta = io.MouseDelta;
+    
+    if (mouse_delta.x != 0.0f) {
+        world::rotate_camera_horizontal_kernel<<<1, 1>>>(mouse_delta.x * CAMERA_ROTATE_RATE * fixed_delta_time);
         did_input = true;
     }
 
-    if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(MOVE_AMOUNT, 0.f, 0.f, 0.f));
+    if (mouse_delta.y != 0.0f) {
+        world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
         did_input = true;
     }
 
-    if (ImGui::IsKeyPressed(ImGuiKey_W)) {
-        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, MOVE_AMOUNT, 0.f, 0.f));
+    if (ImGui::IsKeyDown(ImGuiKey_A)) {
+        //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(-MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
+        world::move_camera_x_kernel<<<1, 1>>>(-CAMERA_MOVE_RATE * fixed_delta_time);
         did_input = true;
     }
 
-    if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-        world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, -MOVE_AMOUNT, 0.f, 0.f));
+    if (ImGui::IsKeyDown(ImGuiKey_D)) {
+        //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
+        world::move_camera_x_kernel<<<1, 1>>>(CAMERA_MOVE_RATE * fixed_delta_time);
         did_input = true;
     }
 
-    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
-        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_AMOUNT);
-        world::rotate_yw_kernel<<<num_blocks, threads_per_block>>>(ROTATE_AMOUNT);
+    if (ImGui::IsKeyDown(ImGuiKey_W)) {
+        //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, MOVE_RATE * fixed_delta_time, 0.f, 0.f));
+        world::move_camera_z_kernel<<<1, 1>>>(-CAMERA_MOVE_RATE * fixed_delta_time);
         did_input = true;
     }
 
-    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-        world::rotate_yz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_AMOUNT);
+    if (ImGui::IsKeyDown(ImGuiKey_S)) {
+        //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, -MOVE_RATE * fixed_delta_time, 0.f, 0.f));
+        world::move_camera_z_kernel<<<1, 1>>>(CAMERA_MOVE_RATE * fixed_delta_time);
         did_input = true;
     }
 
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
-        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_AMOUNT);
+    if (ImGui::IsKeyDown(ImGuiKey_UpArrow)) {
+        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
+        world::rotate_yw_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyDown(ImGuiKey_DownArrow)) {
+        world::rotate_yz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyDown(ImGuiKey_LeftArrow)) {
+        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
         did_input = true;
     }
 
@@ -106,14 +127,11 @@ static bool handle_inputs_cuda() {
 }
 
 static float handle_inputs() {
-    constexpr float move_amount = 0.03f;
-    constexpr float rotate_amount = 0.05f;
-
     bool did_input = false;
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
         for (shape* c : scene) {
-            c->basis.translate(vec4(-move_amount, 0.f, 0.f, 0.f));
+            c->translate(vec4(-CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
         }
 
         did_input = true;
@@ -121,7 +139,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
         for (shape* c : scene) {
-            c->basis.translate(vec4(move_amount, 0.f, 0.f, 0.f));
+            c->translate(vec4(CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
         }
 
         did_input = true;
@@ -129,7 +147,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
         for (shape* c : scene) {
-            c->basis.translate(vec4(0.f, move_amount, 0.f, 0.f));
+            c->translate(vec4(0.f, CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         }
 
         did_input = true;
@@ -137,7 +155,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
         for (shape* c : scene) {
-            c->basis.translate(vec4(0.f, -move_amount, 0.f, 0.f));
+            c->translate(vec4(0.f, -CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         }
         
         did_input = true;
@@ -145,8 +163,8 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
         for (shape* c : scene) {
-            c->basis.rotate_xz(rotate_amount);
-            c->basis.rotate_yw(rotate_amount);
+            c->rotate_xz(ROTATE_RATE * fixed_delta_time);
+            c->rotate_yw(ROTATE_RATE * fixed_delta_time);
         }
 
         did_input = true;
@@ -154,7 +172,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
         for (shape* c : scene) {
-            c->basis.rotate_yz(rotate_amount);
+            c->rotate_yz(ROTATE_RATE * fixed_delta_time);
         }
 
         did_input = true;
@@ -162,7 +180,7 @@ static float handle_inputs() {
 
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
         for (shape* c : scene) {
-            c->basis.rotate_xz(rotate_amount);
+            c->rotate_xz(ROTATE_RATE * fixed_delta_time);
         }
 
         did_input = true;
@@ -172,7 +190,13 @@ static float handle_inputs() {
 }
 
 int main() {
-    hello<<<1, 64>>>();
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+    g_sm_count = deviceProp.multiProcessorCount;
+    g_sm_max_threads = deviceProp.maxThreadsPerMultiProcessor;
+    uint stride_threads_per_block = 256;
+    uint stride_num_blocks = (g_sm_max_threads / stride_threads_per_block) * g_sm_count;
+    printf("SM count %d | Max threads per SM %d | Stride block count %d\n", g_sm_count, g_sm_max_threads, stride_num_blocks);
 
     glfwSetErrorCallback(glfw_error_callback);
 
@@ -246,7 +270,7 @@ int main() {
     
     //point4 center(L / 2, L / 2, L / 2, L / 2);
 
-    int edges[32][2] = {
+    uint edges[32][2] = {
         // --- Edges within the W=0.0f 'cube' (indices 0-7) ---
         {0, 1}, // (0,0,0,0) to (L,0,0,0) - X-axis
         {0, 2}, // (0,0,0,0) to (0,L,0,0) - Y-axis
@@ -299,16 +323,16 @@ int main() {
     };
 
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    std::vector<std::unique_ptr<cylinder>> unique_scene;
+    std::vector<std::unique_ptr<projected_cylinder>> unique_scene;
 
     for (int i = 0; i < 32; ++i) {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
         vec4 move(L / 2, L / 2, L / 2, L / 2);
-        unique_scene.push_back(std::make_unique<cylinder>());
-        unique_scene.back()->a = vertices[idx1] - move;
-        unique_scene.back()->b = vertices[idx2] - move;
+        unique_scene.push_back(std::make_unique<projected_cylinder>());
+        unique_scene.back()->start0 = vertices[idx1] - move;
+        unique_scene.back()->end0 = vertices[idx2] - move;
         unique_scene.back()->albedo = edge_color;
         scene.push_back(unique_scene.back().get());
     }
@@ -318,21 +342,21 @@ int main() {
     ball->albedo = color(1.f, 0.f, 0.f);
     scene.push_back(ball.get());*/
 
-    std::unique_ptr<cylinder> x_axis = std::make_unique<cylinder>();
-    x_axis->b = point4(L, 0, 0, 0);
-    x_axis->radius = 0.01f;
+    std::unique_ptr<projected_cylinder> x_axis = std::make_unique<projected_cylinder>();
+    x_axis->end0 = point4(AXIS_LEN, 0, 0, 0);
+    x_axis->radius = AXIS_RADIUS;
     x_axis->albedo = color(1, 0, 0);
-    std::unique_ptr<cylinder> y_axis = std::make_unique<cylinder>();
-    y_axis->b = point4(0, L, 0, 0);
-    y_axis->radius = 0.01f;
+    std::unique_ptr<projected_cylinder> y_axis = std::make_unique<projected_cylinder>();
+    y_axis->end0 = point4(0, AXIS_LEN, 0, 0);
+    y_axis->radius = AXIS_RADIUS;
     y_axis->albedo = color(0, 1, 0);
-    std::unique_ptr<cylinder> z_axis = std::make_unique<cylinder>();
-    z_axis->b = point4(0, 0, L, 0);
-    z_axis->radius = 0.01f;
+    std::unique_ptr<projected_cylinder> z_axis = std::make_unique<projected_cylinder>();
+    z_axis->end0 = point4(0, 0, AXIS_LEN, 0);
+    z_axis->radius = AXIS_RADIUS;
     z_axis->albedo = color(0, 0, 1);
-    std::unique_ptr<cylinder> w_axis = std::make_unique<cylinder>();
-    w_axis->b = point4(0, 0, 0, L);
-    w_axis->radius = 0.01f;
+    std::unique_ptr<projected_cylinder> w_axis = std::make_unique<projected_cylinder>();
+    w_axis->end0 = point4(0, 0, 0, AXIS_LEN);
+    w_axis->radius = AXIS_RADIUS;
     w_axis->albedo = color(0.73f, 0.33f, 0.827f);
 
     scene.push_back(x_axis.get());
@@ -344,6 +368,14 @@ int main() {
     lig1->col = color(1.0f, 1.0f, 0.9f);
     lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1.get());
+
+    for (shape* s : scene) {
+        total_scene_bytes += s->size();
+    }
+    
+    for (light* l : lights) {
+        total_lights_bytes += l->size();
+    }
 
     world::initialize();
     camera::aspect_ratio = 16.f / 9.f;
@@ -369,25 +401,35 @@ int main() {
         cudaGraphicsMapFlagsWriteDiscard
     ));
 
+    float prev_frame = 0.f;
+    float current_frame = 0.f;
     int rt_latency = 0;
     int full_latency = 0;
 
-    std::vector<std::thread> threads(num_cpu_threads);
+    std::vector<std::thread> threads(NUM_CPU_THREADS);
     bool is_rendering = true; //std::atomic<bool> is_rendering = true;
-    int row_range = std::ceil((float)camera::image_height / num_cpu_threads); // range: ceil(height / N)
+    uint row_range = std::ceil((float)camera::image_height / NUM_CPU_THREADS); // range: ceil(height / N)
 
     image_data = std::vector<uchar4>(camera::image_width * camera::image_height);
     uchar4* d_image_data;
-    int numel = camera::image_width * camera::image_height;
+    uint numel = camera::image_width * camera::image_height;
     gpuErrchk(cudaMalloc(&d_image_data, numel * sizeof(uchar4)));
 
     while (!glfwWindowShouldClose(window)) {
+        current_frame = glfwGetTime();
+        fixed_delta_time = current_frame - prev_frame;
+
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
+
+        if (fixed_delta_time < MIN_DELTA_TIME) {
+            continue;
+        }
+        prev_frame = current_frame;
 
         if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0) {
             ImGui_ImplGlfw_Sleep(10);
@@ -428,10 +470,15 @@ int main() {
         bool input_changed_cuda = handle_inputs_cuda();
 
         if (input_changed_cuda) {
+            nvtxRangePush("Processing Inputs");
             dim3 threads_per_block(16, 16);
             dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
             (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
-            camera::render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height);
+
+            camera::render_kernel<<<num_blocks, threads_per_block, total_scene_bytes + total_lights_bytes + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*)>>>
+            (d_image_data, camera::image_width, camera::image_height, total_scene_bytes, total_lights_bytes);
+
+            //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
             cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
             gpuErrchk(cudaGraphicsMapResources(1, &render_texture_CUDA, 0)); // Map on stream 0
@@ -445,13 +492,14 @@ int main() {
                     camera::image_height, // Height of the copy (rows)
                     cudaMemcpyDeviceToDevice)); // Type of copy (Device to Array)
             gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
+            nvtxRangePop();
         }
 
         if (false) {
-            int first_row = 0;
+            uint first_row = 0;
 
-            for (int i = 0; i < num_cpu_threads; i++) {
-                int last_row = std::min(first_row + row_range, camera::image_height - 1);
+            for (uint i = 0; i < NUM_CPU_THREADS; i++) {
+                uint last_row = std::min(first_row + row_range, camera::image_height - 1);
 
                 threads[i] = std::thread([first_row, last_row]() { 
                     camera::render_rt(first_row, last_row);
@@ -460,7 +508,7 @@ int main() {
                 first_row += row_range;
             }
 
-            for (int i = 0; i < num_cpu_threads; i++) {
+            for (uint i = 0; i < NUM_CPU_THREADS; i++) {
                 threads[i].join();
             }
 
