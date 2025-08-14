@@ -8,33 +8,27 @@ struct transform {
 	affine linear;
 	affine inv_linear;
 
-	// standard basis
-	__host__ __device__ transform(): linear{}, inv_linear{} {}
-
-	// construct from basis
-	__host__ __device__ transform(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
-		set_basis(vx, vy, vz, vw);
-	}
-
 	__host__ __device__ void set_basis(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
 		assert(std::abs(vx.length_squared() - 1.f) <= TOL);
 		assert(std::abs(vy.length_squared() - 1.f) <= TOL);
 		assert(std::abs(vz.length_squared() - 1.f) <= TOL);
 		assert(std::abs(vw.length_squared() - 1.f) <= TOL);
 
-		linear = affine{
-			vx.x, vy.x, vz.x, vw.x,
-			vx.y, vy.y, vz.y, vw.y,
-			vx.z, vy.z, vz.z, vw.z,
-			vx.w, vy.w, vz.w, vw.w
-		};
+		linear = affine{{
+			{vx.x, vy.x, vz.x, vw.x, 0.f},
+			{vx.y, vy.y, vz.y, vw.y, 0.f},
+			{vx.z, vy.z, vz.z, vw.z, 0.f},
+			{vx.w, vy.w, vz.w, vw.w, 0.f},
+			{0.f,  0.f,  0.f,  0.f,  1.f}
+		}};
 
-		inv_linear = affine(
-			vx.x, vx.y, vx.z, vx.w,
-			vy.x, vy.y, vy.z, vy.w,
-			vz.x, vz.y, vz.z, vz.w,
-			vw.x, vw.y, vw.z, vw.w
-		);
+		inv_linear = affine{{
+			{vx.x, vx.y, vx.z, vx.w, 0.f},
+			{vy.x, vy.y, vy.z, vy.w, 0.f},
+			{vz.x, vz.y, vz.z, vz.w, 0.f},
+			{vw.x, vw.y, vw.z, vw.w, 0.f},
+			{0.f,  0.f,  0.f,  0.f,  1.f}
+		}};
 	}
 
 	// simple rotation over the a-b plane
@@ -46,14 +40,14 @@ struct transform {
 
 	// R * T * R
 	__host__ __device__ void translate(const vec4& t) {
-		affine T;
+		affine T = identity_affine;
 		T.m[0][4] = t.x;
 		T.m[1][4] = t.y;
 		T.m[2][4] = t.z;
 		T.m[3][4] = t.w;
 		linear = matmul(T, linear); // TA(A^-1T^-1)
 
-		affine T_inv;
+		affine T_inv = identity_affine;
 		T_inv.m[0][4] = -t.x;
 		T_inv.m[1][4] = -t.y;
 		T_inv.m[2][4] = -t.z;
@@ -126,7 +120,7 @@ struct transform {
 	__host__ __device__ static affine rotate_mat(float angle, uint a, uint b) {
 		assert(a < b);
 
-		affine R; // identity
+		affine R = identity_affine; // identity
 		float cos_angle = cosf(angle);
 		float sin_angle = sinf(angle);
 		R.m[a][a] = cos_angle;
@@ -136,34 +130,30 @@ struct transform {
 
 		return R;
 	}
-/*
-	inline static vec4 rotate_vec(const vec4& v, float angle, uint a, uint b) {
-		return rotate_mat(angle, a, b).vecmul(v);
+
+	__host__ __device__ vec4 get_vec_x() {
+		return linear.get_x();
 	}
 
-	inline static vec4 rotate_xy_vec(const vec4& v, float angle) {
-		return rotate_vec(v, angle, 0, 1);
+	__host__ __device__ vec4 get_vec_y() {
+		return linear.get_y();
 	}
 
-	inline static vec4 rotate_xz_vec(const vec4& v, float angle) {
-		return rotate_vec(v, angle, 0, 2);
+	__host__ __device__ vec4 get_vec_z() {
+		return linear.get_z();
 	}
 
-	inline static vec4 rotate_xw_vec(const vec4& v, float angle) {
-		return rotate_vec(v, angle, 0, 3);
+	__host__ __device__ vec4 get_vec_w() {
+		return linear.get_w();
 	}
 
-	inline static vec4 rotate_yz_vec(const vec4& v, float angle) {
-		return rotate_vec(v, angle, 1, 2);
+	__host__ __device__ point4 get_pos() {
+		return linear.get_b();
 	}
 
-	inline static vec4 rotate_yw_vec(const vec4& v, float angle) {
-		return rotate_vec(v, angle, 1, 3);
+	__host__ __device__ void set_pos(const point4& pos) {
+		return linear.set_b(pos);
 	}
-
-	inline static vec4 rotate_zw_vec(const vec4& v, float angle) {
-		return rotate_vec(v, angle, 2, 3);
-	} */
 };
 
 #endif // !TRANSFORM_H

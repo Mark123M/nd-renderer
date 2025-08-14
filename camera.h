@@ -49,22 +49,22 @@ std::vector<uchar4> image_data;
 
 namespace camera {
 
-uint image_width, image_height;
 float aspect_ratio = 1.f;
-float focal_length = 1.f;
+uint image_width, image_height;
+__constant__ uint d_image_width, d_image_height;
+float viewport_width, viewport_height;
+__constant__ float d_viewport_width, d_viewport_height;
 bool render_normals = false;
 __constant__ bool d_render_normals;
 
+transform camera_transform{identity_affine, identity_affine};
+__device__ transform d_camera_transform;
 vec4 pixel_x;
-__constant__ vec4 d_pixel_x;
+__device__ vec4 d_pixel_x;
 vec4 pixel_y;
-__constant__ vec4 d_pixel_y;
-point4 camera_center;
-__constant__ point4 d_camera_center;
+__device__ vec4 d_pixel_y;
 point4 pixel00_center;
-__constant__ point4 d_pixel00_center;
-//point4 lookfrom = point4(0.f, 0.f, 0.f, 0.f);
-//point4 lookat = point4(0.f, 0.f, -1.f, 0.f);
+__device__ point4 d_pixel00_center;
 
 __device__ float scene_sdf_cuda(const point4& p, shape** shared_scene, light** shared_lights, shape** target_ptr) {
     float sdf = MAX_MARCH_DIST + 5.f;
@@ -184,13 +184,13 @@ __global__ void render_kernel(uchar4* d_image_data, uint width, uint height, siz
     if (row < height && col < width) {
         // need device versions of these functions/structs
         point4 pixel_center = d_pixel00_center + (col * d_pixel_x) + (row * d_pixel_y);
-        vec4 direction = vec4::normalize(pixel_center - d_camera_center);
-        ray r(d_camera_center, direction);
+        vec4 direction = vec4::normalize(pixel_center - d_camera_transform.get_pos());
+        ray r(d_camera_transform.get_pos(), direction);
         
-        color col = ray_color_cuda(r, shared_scene, shared_lights);
-        d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, col.r) * 255.999f);
-        d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, col.g) * 255.999f);
-        d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, col.b) * 255.999f);
+        color c = ray_color_cuda(r, shared_scene, shared_lights);
+        d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, c.r) * 255.999f);
+        d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, c.g) * 255.999f);
+        d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, c.b) * 255.999f);
         d_image_data[idx].w = 255;
     }
 }
@@ -201,8 +201,8 @@ __global__ void render_stride_kernel(uchar4* d_image_data, uint width, uint num_
          i += blockDim.x * gridDim.x) {
         uint row = i / width, col = i % width;
         point4 pixel_center = d_pixel00_center + (col * d_pixel_x) + (row * d_pixel_y);
-        vec4 direction = vec4::normalize(pixel_center - d_camera_center);
-        ray r(d_camera_center, direction);
+        vec4 direction = vec4::normalize(pixel_center - d_camera_transform.get_pos());
+        ray r(d_camera_transform.get_pos(), direction);
         
         /*color color = ray_color_cuda(r);
         d_image_data[i].x = static_cast<unsigned char>(fminf(1.f, color.r) * 255.999f);
@@ -299,26 +299,41 @@ color ray_color(ray& r) {
     return final_col;
 }
 
-void initialize() {
-    image_height = std::max(1.f, image_width / aspect_ratio);
-
-    float viewport_height = 2.f;
-    float viewport_width = viewport_height * ((float)image_width / image_height);
-    camera_center = point4(0.f, 0.f, 1.f, 0.f);
-
-    vec4 viewport_x = vec4(viewport_width, 0.f, 0.f, 0.f);
-    vec4 viewport_y = vec4(0.f, -viewport_height, 0.f, 0.f);
+void refresh_view() {
+    vec4 viewport_x = viewport_width * camera_transform.get_vec_x();
+    vec4 viewport_y = -viewport_height * camera_transform.get_vec_y();
     pixel_x = viewport_x / image_width;
     pixel_y = viewport_y / image_height;
 
-    point4 viewport_top_left = camera_center - vec4(0.f, 0.f, focal_length, 0.f) - viewport_x / 2.f - viewport_y / 2.f;
+    point4 viewport_top_left = camera_transform.get_pos() - camera_transform.get_vec_z() - viewport_x / 2.f - viewport_y / 2.f;
     pixel00_center = viewport_top_left + 0.5f * (pixel_x + pixel_y);
+}
+
+__global__ void refresh_view_cuda() {
+    vec4 viewport_x = d_viewport_width * d_camera_transform.get_vec_x();
+    vec4 viewport_y = -d_viewport_height * d_camera_transform.get_vec_y();
+    d_pixel_x = viewport_x / d_image_width;
+    d_pixel_y = viewport_y / d_image_height;
+
+    point4 viewport_top_left = d_camera_transform.get_pos() - d_camera_transform.get_vec_z() - viewport_x / 2.f - viewport_y / 2.f;
+    d_pixel00_center = viewport_top_left + 0.5f * (d_pixel_x + d_pixel_y);
+}
+
+void initialize() {
+    image_height = std::max(1.f, image_width / aspect_ratio);
+    viewport_height = 2.f;
+    viewport_width = viewport_height * ((float)image_width / image_height);
+    camera_transform.set_pos(point4(0.f, 0.f, 1.f, 0.f));
 
     gpuErrchk(cudaMemcpyToSymbol(d_render_normals, &render_normals, sizeof(bool)));
-    gpuErrchk(cudaMemcpyToSymbol(d_pixel_x, &pixel_x, sizeof(vec4)));
-    gpuErrchk(cudaMemcpyToSymbol(d_pixel_y, &pixel_y, sizeof(vec4)));
-    gpuErrchk(cudaMemcpyToSymbol(d_camera_center, &camera_center, sizeof(point4)));
-    gpuErrchk(cudaMemcpyToSymbol(d_pixel00_center, &pixel00_center, sizeof(point4)));
+    gpuErrchk(cudaMemcpyToSymbol(d_image_width, &image_width, sizeof(uint)));
+    gpuErrchk(cudaMemcpyToSymbol(d_image_height, &image_height, sizeof(uint)));
+    gpuErrchk(cudaMemcpyToSymbol(d_viewport_width, &viewport_width, sizeof(float)));
+    gpuErrchk(cudaMemcpyToSymbol(d_viewport_height, &viewport_height, sizeof(float)));
+    gpuErrchk(cudaMemcpyToSymbol(d_camera_transform, &camera_transform, sizeof(transform)));
+
+    refresh_view();
+    refresh_view_cuda<<<1,1>>>();
 
     gpuErrchk(cudaMemcpyToSymbol(d_delta_x, &delta_x, sizeof(vec4)));
     gpuErrchk(cudaMemcpyToSymbol(d_delta_y, &delta_y, sizeof(vec4)));
@@ -333,8 +348,8 @@ void render_rt(uint first_row, uint last_row) {
         for (uint col = 0; col < image_width; col++) {
             uint idx = row * image_width + col;
             point4 pixel_center = pixel00_center + (col * pixel_x) + (row * pixel_y);
-            vec4 direction = vec4::normalize(pixel_center - camera_center);
-            ray r(camera_center, direction);
+            vec4 direction = vec4::normalize(pixel_center - camera_transform.get_pos());
+            ray r(camera_transform.get_pos(), direction);
             
             color color = ray_color(r);
             image_data[idx].x = static_cast<unsigned char>(fminf(1.f, color.r) * 255.999f);
@@ -357,8 +372,8 @@ void render() {
         std::clog << "\rScanlines remaining: " << (image_height - j) << "     " << std::flush;
         for (uint i = 0; i < image_width; i++) {
             point4 pixel_center = pixel00_center + (i * pixel_x) + (j * pixel_y);
-            vec4 direction = vec4::normalize(pixel_center - camera_center);
-            ray r(camera_center, direction);
+            vec4 direction = vec4::normalize(pixel_center - camera_transform.get_pos());
+            ray r(camera_transform.get_pos(), direction);
 
             color color = ray_color(r);
             write_color(file, color);
