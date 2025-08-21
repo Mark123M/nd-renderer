@@ -91,7 +91,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # As this is a public compile feature anything that links to 
 # particles will also build with -std=c++11
 #target_compile_features(nd-raytracer PUBLIC cxx_std_20)
-target_compile_options(nd-raytracer PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>" "$<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>" "$<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=64>")
+#target_compile_options(nd-raytracer PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>" "$<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>" "$<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=64>")
+target_compile_options(nd-raytracer PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>" "$<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>" "$<$<COMPILE_LANGUAGE:CUDA>:-maxrregcount=64>" "$<$<COMPILE_LANGUAGE:CUDA>:-Xptxas>" "$<$<COMPILE_LANGUAGE:CUDA>:-v>")
 
 target_include_directories(nd-raytracer PUBLIC
     "${IMGUI_DIR}"

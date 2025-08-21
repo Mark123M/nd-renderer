@@ -337,6 +337,12 @@ int main() {
         scene.push_back(unique_scene.back().get());
     }
 
+    /*std::unique_ptr<ncube> nc = std::make_unique<ncube>();
+    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    nc->corner = cor;
+    nc->albedo = edge_color;
+    scene.push_back(nc.get()); */
+
     /*std::unique_ptr<nsphere> ball = std::make_unique<nsphere>();
     ball->radius = 0.5f;
     ball->albedo = color(1.f, 0.f, 0.f);
