@@ -149,6 +149,28 @@ struct vec4 {
 	__host__ __device__ static float length(const vec4& v) {
 		return v.length();
 	}
+
+	// random vector in unit 3-sphere (naive)
+	__host__ __device__ static vec4 rand_unit_vector(uint64_t& pcg_state) {
+		while (true) {
+			vec4 p = vec4{ randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state)};
+			float lensq = p.length_squared();
+			if (1e-80 < lensq && lensq <= 1) {
+				return p / sqrtf(lensq);
+			}
+		}
+	}
+
+	// random vector in unit 3-half-sphere (naive)
+	__host__ __device__ static vec4 rand_halfsphere_vector(uint64_t& pcg_state) {
+		vec4 unit = rand_unit_vector(pcg_state);
+
+		if (unit.y > 0) {
+			return unit;
+		} else {
+			return -unit;
+		}
+	}
 };
 
 __host__ __device__ vec4 operator*(float k, const vec4& v) { return { k * v.x, k * v.y, k * v.z, k * v.w }; }

@@ -122,7 +122,7 @@ __device__ void ray_march_cuda(ray& r, shape** target_ptr, shape** shared_scene,
     }
 }
 
-__device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights) {
+__device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, uint64_t& pcg_state) {
     shape* target = nullptr;
     ray_march_cuda(r, &target, shared_scene, shared_lights);
 
@@ -187,7 +187,10 @@ __global__ void render_kernel(uchar4* d_image_data, uint width, uint height, siz
         vec4 direction = vec4::normalize(pixel_center - d_camera_transform.get_pos());
         ray r(d_camera_transform.get_pos(), direction);
         
-        color c = ray_color_cuda(r, shared_scene, shared_lights);
+        uint64_t pcg_state = 0x4d595df4d0f33173;
+        pcg32_init(idx, pcg_state);
+
+        color c = ray_color_cuda(r, shared_scene, shared_lights, pcg_state);
         d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, c.r) * 255.999f);
         d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, c.g) * 255.999f);
         d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, c.b) * 255.999f);
