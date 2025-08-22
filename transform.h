@@ -9,10 +9,10 @@ struct transform {
 	affine inv_linear;
 
 	__host__ __device__ void set_basis(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
-		assert(std::abs(vx.length_squared() - 1.f) <= TOL);
-		assert(std::abs(vy.length_squared() - 1.f) <= TOL);
-		assert(std::abs(vz.length_squared() - 1.f) <= TOL);
-		assert(std::abs(vw.length_squared() - 1.f) <= TOL);
+		assert(fabsf(vx.length_squared() - 1.f) <= TOL);
+		assert(fabsf(vy.length_squared() - 1.f) <= TOL);
+		assert(fabsf(vz.length_squared() - 1.f) <= TOL);
+		assert(fabsf(vw.length_squared() - 1.f) <= TOL);
 
 		linear = affine{{
 			{vx.x, vy.x, vz.x, vw.x, 0.f},
@@ -153,6 +153,44 @@ struct transform {
 
 	__host__ __device__ void set_pos(const point4& pos) {
 		return linear.set_b(pos);
+	}
+
+	__host__ __device__ static transform get_shading_transform(vec4& normal) {
+		vec4 v[4];
+		vec4 u[4];
+		v[0] = normal;
+
+		if (normal.x != 0.f) {
+			v[1] = standard_y;
+			v[2] = standard_z;
+			v[3] = standard_w;
+		} else if (normal.y != 0.f) {
+			v[1] = standard_x;
+			v[2] = standard_z;
+			v[3] = standard_w;
+		} else if (normal.z != 0.f) {
+			v[1] = standard_x;
+			v[2] = standard_y;
+			v[3] = standard_w;
+		} else {
+			v[1] = standard_x;
+			v[2] = standard_y;
+			v[3] = standard_z;
+		}
+
+		// stable gram-schmidt algorithm
+		for (int i = 0; i < 4; i++) {
+			u[i] = v[i];
+			u[i] = vec4::normalize(u[i]);
+			
+			for (int k = i + 1; k < 4; k++) {
+				v[k] -= vec4::dot(v[k], u[i]) * u[i];
+			}
+		}
+
+		transform t;
+		t.set_basis(u[1], u[0], u[2], u[3]); // the normal should be the y-axis (up)
+		return t;
 	}
 };
 

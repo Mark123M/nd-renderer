@@ -64,6 +64,17 @@ struct affine {
         m[2][4] = b.z;
         m[3][4] = b.w;
 	}
+
+	__host__ __device__ void print() {
+		for (int i = 0; i < 5; i++) {
+			for (int j = 0; j < 5; j++) {
+				printf("%.3f ", m[i][j]);
+			}
+			printf("\n");
+		}
+
+		printf("\n");
+	}
 };
 
 __host__ __device__ affine matmul(const affine& m1, const affine& m2) {

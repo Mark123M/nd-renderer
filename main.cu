@@ -189,6 +189,19 @@ static float handle_inputs() {
     return did_input;
 }
 
+
+__global__ void math_test() {
+    vec4 N(-1.4f, 0.5f, -3.f, 2.f);
+    transform t = transform::get_shading_transform(N);
+    vec4 vx = t.get_vec_x(), vy = t.get_vec_y(), vz = t.get_vec_z(), vw = t.get_vec_w();
+    printf("%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", vec4::dot(vx, vy), vec4::dot(vx, vz), vec4::dot(vx, vw), vec4::dot(vy, vz), vec4::dot(vy, vw), vec4::dot(vz, vw), vec4::length(vx), vec4::length(vy), vec4::length(vz), vec4::length(vw));
+    t.linear.print();
+
+    vec4 N2(1.f, 0.f, 0.f, 0.f);
+    transform t2 = transform::get_shading_transform(N2);
+    t2.linear.print();
+}
+
 int main() {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
@@ -197,6 +210,8 @@ int main() {
     uint stride_threads_per_block = 256;
     uint stride_num_blocks = (g_sm_max_threads / stride_threads_per_block) * g_sm_count;
     printf("SM count %d | Max threads per SM %d | Stride block count %d\n", g_sm_count, g_sm_max_threads, stride_num_blocks);
+
+    math_test<<<1, 1>>>();
 
     glfwSetErrorCallback(glfw_error_callback);
 

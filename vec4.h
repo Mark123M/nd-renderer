@@ -13,10 +13,6 @@ using point4 = vec4;
 struct vec4 {
 	float x, y, z, w;
 
-	__host__ __device__ vec4() {}
-
-	__host__ __device__ vec4(float x0, float y0, float z0, float w0) : x{ x0 }, y{ y0 }, z{ z0 }, w{ w0 } {}
-
 	__host__ __device__ vec4 operator-() const { return { -x, -y, -z, -w }; }
 
 	__host__ __device__ vec4 operator+(const vec4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
@@ -171,6 +167,10 @@ struct vec4 {
 			return -unit;
 		}
 	}
+
+	__host__ __device__ void print() {
+		printf("vec4(%.3f, %.3f, %.3f, %.3f)\n", x, y, z, w);
+	}
 };
 
 __host__ __device__ vec4 operator*(float k, const vec4& v) { return { k * v.x, k * v.y, k * v.z, k * v.w }; }
@@ -178,13 +178,18 @@ __host__ __device__ vec4 operator*(float k, const vec4& v) { return { k * v.x, k
 __host__ __device__ vec4 operator*(const vec4& v, float k) { return k * v; }
 
 // host constants
-const vec4 delta_x(EPSILON, 0.f, 0.f, 0.f);
+constexpr vec4 delta_x{EPSILON, 0.f, 0.f, 0.f};
 __constant__ vec4 d_delta_x;
-const vec4 delta_y(0.f, EPSILON, 0.f, 0.f);
+constexpr vec4 delta_y{0.f, EPSILON, 0.f, 0.f};
 __constant__ vec4 d_delta_y;
-const vec4 delta_z(0.f, 0.f, EPSILON, 0.f);
+constexpr vec4 delta_z{0.f, 0.f, EPSILON, 0.f};
 __constant__ vec4 d_delta_z;
-const vec4 delta_w(0.f, 0.f, 0.f, EPSILON);
+constexpr vec4 delta_w{0.f, 0.f, 0.f, EPSILON};
 __constant__ vec4 d_delta_w;
+
+constexpr vec4 standard_x{1.f, 0.f, 0.f, 0.f};
+constexpr vec4 standard_y{0.f, 1.f, 0.f, 0.f};
+constexpr vec4 standard_z{0.f, 0.f, 1.f, 0.f};
+constexpr vec4 standard_w{0.f, 0.f, 0.f, 1.f};
 
 #endif
