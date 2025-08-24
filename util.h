@@ -18,8 +18,8 @@ constexpr float SIMULATION_RATE = 60.f;
 constexpr float MIN_DELTA_TIME = 1.f / SIMULATION_RATE;
 
 // rendering
-constexpr float TOL = 1e-3f;
-constexpr float EPSILON = 1e-3f;
+constexpr float TOL = 1e-4f;
+constexpr float EPSILON = 1e-3f; // should be < TOL to avoid z-fighting
 constexpr float MAX_MARCH_DIST = 5.f;
 constexpr uint MAX_MARCH_STEPS = 50;
 constexpr uint SAMPLES_PER_PIXEL = 10;

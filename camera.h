@@ -152,7 +152,7 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
 
         mat->sample_f(-r.dir, t, bs, pcg_state);
         col *= bs.f;
-        r = ray(r.pos + 0.01f * bs.wi, bs.wi);
+        r = ray(r.pos + EPSILON * bs.wi, bs.wi);
         
         /* color total_lighting(0.f, 0.f, 0.f);
         for (size_t i = 0; i < d_lights_len; i++) {
