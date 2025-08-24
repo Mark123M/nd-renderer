@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 #include "camera.h"
 #include "direction_light.h"
+#include "lambertian.h"
 
 struct shape_params {
     shape_type type;
@@ -23,9 +24,14 @@ struct light_params {
 	color col;
 };
 
+struct material_params {
+    material_type type;
+    color lambertian_albedo;
+};
+
 namespace world {
 
-__global__ void construct(shape_params* d_scene_params_list, light_params* d_lights_params_list, size_t h_total_scene_bytes, size_t h_total_lights_bytes) {
+__global__ void construct(shape_params* d_scene_params_list, light_params* d_lights_params_list, material_params* d_materials_params_list, size_t h_total_scene_bytes, size_t h_total_lights_bytes, size_t h_total_materials_bytes) {
     d_scene_data = new char[h_total_scene_bytes];
     char* cur_shape_data = d_scene_data;
     d_scene = new shape*[d_scene_len];
@@ -97,6 +103,25 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
     for (size_t i = 0; i < d_lights_len; i++) {
         d_lights[i]->print_gpu();
     }
+
+    d_materials_data = new char[h_total_materials_bytes];
+    char* cur_material_data = d_materials_data;
+    d_materials = new material*[d_materials_len];
+
+    for (size_t i = 0; i < d_materials_len; i++) {
+        material_params& params = d_materials_params_list[i];
+
+        if (params.type == material_type::LAMBERTIAN) {
+            lambertian* l = new(cur_material_data) lambertian;
+            cur_material_data += l->size();
+            l->albedo = params.lambertian_albedo;
+            d_materials[i] = l;
+        }
+    }
+
+    for (size_t i = 0; i < d_materials_len; i++) {
+        d_materials[i]->print_gpu();
+    }
 }
 
 __global__ void destruct() {
@@ -105,6 +130,9 @@ __global__ void destruct() {
 
     delete [] d_lights_data;
     delete [] d_lights;
+
+    delete [] d_materials_data;
+    delete [] d_materials;
 }
 
 __global__ void translate_kernel(vec4 t) {
@@ -244,11 +272,34 @@ void initialize() {
     gpuErrchk(cudaMalloc(&d_lights_params_list, lights_size));
     gpuErrchk(cudaMemcpy(d_lights_params_list, lights_params_list, lights_size, cudaMemcpyHostToDevice));
 
-    construct<<<1, 1>>>(d_scene_params_list, d_lights_params_list, total_scene_bytes, total_lights_bytes);
+    size_t materials_len = materials.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_materials_len, &materials_len, sizeof(size_t)));
+    material_params* materials_params_list = new material_params[materials_len];
+    material_params* d_materials_params_list;
+    size_t materials_size = materials_len * sizeof(material_params);
+
+    for (size_t i = 0; i < materials_len; i++) {
+        lambertian* lambertian_ptr = dynamic_cast<lambertian*>(materials[i]);
+
+        material_params& params = materials_params_list[i];
+        
+        if (lambertian_ptr) {
+            params.type = material_type::LAMBERTIAN;
+            params.lambertian_albedo = lambertian_ptr->albedo;
+        }
+    }
+
+    gpuErrchk(cudaMalloc(&d_materials_params_list, materials_size));
+    gpuErrchk(cudaMemcpy(d_materials_params_list, materials_params_list, materials_size, cudaMemcpyHostToDevice));
+
+    construct<<<1, 1>>>(d_scene_params_list, d_lights_params_list, d_materials_params_list, total_scene_bytes, total_lights_bytes, total_materials_bytes);
+    
     delete [] scene_params_list;
     gpuErrchk(cudaFree(d_scene_params_list));
     delete [] lights_params_list;
     gpuErrchk(cudaFree(d_lights_params_list));
+    delete [] materials_params_list;
+    gpuErrchk(cudaFree(d_materials_params_list));
     //light_params* 
 
    /* std::vector<shape*> scene;

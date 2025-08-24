@@ -151,7 +151,7 @@ struct vec4 {
 		while (true) {
 			vec4 p = vec4{ randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state)};
 			float lensq = p.length_squared();
-			if (1e-80 < lensq && lensq <= 1) {
+			if (EPSILON < lensq && lensq <= 1) {
 				return p / sqrtf(lensq);
 			}
 		}

@@ -17,6 +17,7 @@
 #include "camera.h"
 #include "world.h"
 #include "direction_light.h"
+#include "lambertian.h"
 #include "util.h"
 
 #include <cuda_runtime.h>
@@ -337,8 +338,10 @@ int main() {
         {7, 15}  // (L,L,L,0) to (L,L,L,L)
     };
 
-    color edge_color(1.0f, 0.647f, 0.0f); // Orange
     std::vector<std::unique_ptr<projected_cylinder>> unique_scene;
+    color edge_color(1.0f, 0.647f, 0.0f); // Orange
+    std::vector<std::unique_ptr<material>> unique_materials;
+    unique_materials.push_back(std::make_unique<lambertian>(edge_color));
 
     for (int i = 0; i < 32; ++i) {
         int idx1 = edges[i][0];
@@ -348,7 +351,10 @@ int main() {
         unique_scene.push_back(std::make_unique<projected_cylinder>());
         unique_scene.back()->start0 = vertices[idx1] - move;
         unique_scene.back()->end0 = vertices[idx2] - move;
-        unique_scene.back()->albedo = edge_color;
+        unique_scene.back()->mat_idx = materials.size();
+        materials.push_back(unique_materials.back().get());
+        //unique_scene.back()->albedo = edge_color;
+        //unique_materials.push_back()
         scene.push_back(unique_scene.back().get());
     }
 
@@ -364,25 +370,35 @@ int main() {
     scene.push_back(ball.get());*/
 
     std::unique_ptr<projected_cylinder> x_axis = std::make_unique<projected_cylinder>();
-    x_axis->end0 = point4(AXIS_LEN, 0, 0, 0);
+    x_axis->end0 = point4(AXIS_LEN, 0.f, 0.f, 0.f);
     x_axis->radius = AXIS_RADIUS;
-    x_axis->albedo = color(1, 0, 0);
-    std::unique_ptr<projected_cylinder> y_axis = std::make_unique<projected_cylinder>();
-    y_axis->end0 = point4(0, AXIS_LEN, 0, 0);
-    y_axis->radius = AXIS_RADIUS;
-    y_axis->albedo = color(0, 1, 0);
-    std::unique_ptr<projected_cylinder> z_axis = std::make_unique<projected_cylinder>();
-    z_axis->end0 = point4(0, 0, AXIS_LEN, 0);
-    z_axis->radius = AXIS_RADIUS;
-    z_axis->albedo = color(0, 0, 1);
-    std::unique_ptr<projected_cylinder> w_axis = std::make_unique<projected_cylinder>();
-    w_axis->end0 = point4(0, 0, 0, AXIS_LEN);
-    w_axis->radius = AXIS_RADIUS;
-    w_axis->albedo = color(0.73f, 0.33f, 0.827f);
-
+    std::unique_ptr<lambertian> x_mat = std::make_unique<lambertian>(color(1.f, 0.f, 0.f));
+    x_axis->mat_idx = materials.size();
+    materials.push_back(x_mat.get());
     scene.push_back(x_axis.get());
+
+    std::unique_ptr<projected_cylinder> y_axis = std::make_unique<projected_cylinder>();
+    y_axis->end0 = point4(0.f, AXIS_LEN, 0.f, 0.f);
+    y_axis->radius = AXIS_RADIUS;
+    std::unique_ptr<lambertian> y_mat = std::make_unique<lambertian>(color(0.f, 1.f, 0.f));
+    y_axis->mat_idx = materials.size();
+    materials.push_back(y_mat.get());
     scene.push_back(y_axis.get());
+
+    std::unique_ptr<projected_cylinder> z_axis = std::make_unique<projected_cylinder>();
+    z_axis->end0 = point4(0.f, 0.f, AXIS_LEN, 0.f);
+    z_axis->radius = AXIS_RADIUS;
+    std::unique_ptr<lambertian> z_mat = std::make_unique<lambertian>(color(0.f, 0.f, 1.f));
+    z_axis->mat_idx = materials.size();
+    materials.push_back(z_mat.get());
     scene.push_back(z_axis.get());
+
+    std::unique_ptr<projected_cylinder> w_axis = std::make_unique<projected_cylinder>();
+    w_axis->end0 = point4(0.f, 0.f, 0.f, AXIS_LEN);
+    w_axis->radius = AXIS_RADIUS;
+    std::unique_ptr<lambertian> w_mat = std::make_unique<lambertian>(color(0.73f, 0.33f, 0.827f));
+    w_axis->mat_idx = materials.size();
+    materials.push_back(w_mat.get());
     scene.push_back(w_axis.get());
 
     std::unique_ptr<direction_light> lig1 = std::make_unique<direction_light>();
@@ -392,6 +408,10 @@ int main() {
 
     for (shape* s : scene) {
         total_scene_bytes += s->size();
+    }
+
+    for (material* mat : materials) {
+        total_materials_bytes += mat->size();
     }
     
     for (light* l : lights) {
@@ -496,8 +516,8 @@ int main() {
             dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
             (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
 
-            camera::render_kernel<<<num_blocks, threads_per_block, total_scene_bytes + total_lights_bytes + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*)>>>
-            (d_image_data, camera::image_width, camera::image_height, total_scene_bytes, total_lights_bytes);
+            camera::render_kernel<<<num_blocks, threads_per_block, total_scene_bytes + total_lights_bytes + total_materials_bytes + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
+            (d_image_data, camera::image_width, camera::image_height, total_scene_bytes, total_lights_bytes, total_materials_bytes);
 
             //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 

@@ -45,6 +45,12 @@ __device__ char* d_lights_data;
 __constant__ size_t d_lights_len;
 size_t total_lights_bytes = 0;
 
+std::vector<material*> materials;
+__device__ material** d_materials;
+__device__ char* d_materials_data;
+__constant__ size_t d_materials_len;
+size_t total_materials_bytes = 0;
+
 std::vector<uchar4> image_data;
 
 namespace camera {
@@ -91,9 +97,9 @@ __device__ float scene_sdf_cuda(const point4& p, shape** shared_scene, light** s
 }
 
 __device__ float scene_sdf_mod_cuda(const point4& p, shape** shared_scene, light** shared_lights, shape** target_ptr = nullptr) {
-    float s = 5.f;
-    point4 q(p.x - s * roundf(p.x / s), p.y - s * roundf(p.y / s), p.z - s * roundf(p.z / s), p.w);
-    return scene_sdf_cuda(q, shared_scene, shared_lights, target_ptr);
+    //float s = 5.f;
+    //point4 q(p.x - s * roundf(p.x / s), p.y - s * roundf(p.y / s), p.z - s * roundf(p.z / s), p.w);
+    return scene_sdf_cuda(p, shared_scene, shared_lights, target_ptr);
 }
 
 __device__ vec4 get_normal_cuda(const vec4& p, shape** shared_scene, light** shared_lights) {
@@ -122,56 +128,78 @@ __device__ void ray_march_cuda(ray& r, shape** target_ptr, shape** shared_scene,
     }
 }
 
-__device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, uint64_t& pcg_state) {
+__device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
     shape* target = nullptr;
-    ray_march_cuda(r, &target, shared_scene, shared_lights);
+    color col(1.f, 1.f, 1.f);
 
-    if (target == nullptr) {
-        vec4 unit_direction = vec4::normalize(r.dir);
-        float a = 0.5f * (unit_direction.y + 1.f);
-        return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+    for (uint k = 0; k < MAX_RAY_BOUNCES; k++) {
+        ray_march_cuda(r, &target, shared_scene, shared_lights);
+
+        if (target == nullptr) {
+            vec4 unit_direction = vec4::normalize(r.dir);
+            float a = 0.5f * (unit_direction.y + 1.f);
+            return col * (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+        }
+
+        vec4 normal = get_normal_cuda(r.pos, shared_scene, shared_lights);
+
+        if (d_render_normals) {
+            return 0.5f * color(normal.x + 1.f, normal.y + 1.f, normal.z + 1.f);
+        }
+        
+        material* mat = shared_materials[target->mat_idx];
+        transform t = transform::get_shading_transform(normal);
+        bsdf_sample bs;
+
+        mat->sample_f(-r.dir, t, bs, pcg_state);
+        col *= bs.f;
+        r = ray(r.pos, bs.wi);
+        
+        /* color total_lighting(0.f, 0.f, 0.f);
+        for (size_t i = 0; i < d_lights_len; i++) {
+            light* lig = shared_lights[i];
+            total_lighting += lig->Le_cuda(r.pos, normal, shared_scene, shared_lights);
+            //printf("[GPU] Hit pos (%.3f, %.3f, %.3f, %.3f) | Total lighting (%.3f, %.3f, %.3f)\n",
+            //r.pos.x, r.pos.y, r.pos.z, r.pos.w, total_lighting.r, total_lighting.g, total_lighting.b);
+        } 
+
+        return target->albedo * total_lighting; */
     }
 
-    vec4 normal = get_normal_cuda(r.pos, shared_scene, shared_lights);
-
-    if (d_render_normals) {
-        return 0.5f * color(normal.x + 1.f, normal.y + 1.f, normal.z + 1.f);
-    }
-
-    color total_lighting(0.f, 0.f, 0.f);
-
-    for (size_t i = 0; i < d_lights_len; i++) {
-        light* lig = shared_lights[i];
-        total_lighting += lig->Le_cuda(r.pos, normal, shared_scene, shared_lights);
-        //printf("[GPU] Hit pos (%.3f, %.3f, %.3f, %.3f) | Total lighting (%.3f, %.3f, %.3f)\n",
-        //r.pos.x, r.pos.y, r.pos.z, r.pos.w, total_lighting.r, total_lighting.g, total_lighting.b);
-    }
-
-    return target->albedo * total_lighting;
+    return color(1.f, 1.f, 1.f);
 }
 
-__global__ void render_kernel(uchar4* d_image_data, uint width, uint height, size_t h_total_scene_bytes, size_t h_total_lights_bytes) {
+__global__ void render_kernel(uchar4* d_image_data, uint width, uint height, size_t h_total_scene_bytes, size_t h_total_lights_bytes, size_t h_total_materials_bytes) {
     extern __shared__ char buffer[];
 
     // buffer layout for shared memory
     // total_scene_bytes d_scene_len * 8 total_lights_bytes d_lights_len * 8    
-    // [all shape data | shape pointers | all light data | light pointers]
+    // [all shape data | shape pointers | all light data | light pointers | all material data | material pointers]
     char* cur_shape_data = buffer;
     shape** shared_scene = (shape**)(cur_shape_data + h_total_scene_bytes);
     char* cur_light_data = (char*)(shared_scene + d_scene_len);
     light** shared_lights = (light**)(cur_light_data + h_total_lights_bytes);
+    char* cur_material_data = (char*)(shared_lights + d_lights_len);
+    material** shared_materials = (material**)(cur_material_data + h_total_materials_bytes);
 
     if (threadIdx.x == 0 && threadIdx.y == 0) {
         memcpy(cur_shape_data, d_scene_data, h_total_scene_bytes);
+        memcpy(cur_light_data, d_lights_data, h_total_lights_bytes);
+        memcpy(cur_material_data, d_materials_data, h_total_materials_bytes);
+        
         for (size_t i = 0; i < d_scene_len; i++) {
             shared_scene[i] = (shape*)cur_shape_data;
             cur_shape_data += shared_scene[i]->size();
         }
 
-        memcpy(cur_light_data, d_lights_data, h_total_lights_bytes);
         for (size_t i = 0; i < d_lights_len; i++) {
             shared_lights[i] = (light*)cur_light_data;
             cur_light_data += shared_lights[i]->size();
+        }
+
+        for(size_t i = 0; i < d_materials_len; i++) {
+            shared_materials[i] = (material*)cur_material_data;
+            cur_material_data += shared_materials[i]->size();
         }
     }
 
@@ -190,7 +218,7 @@ __global__ void render_kernel(uchar4* d_image_data, uint width, uint height, siz
         uint64_t pcg_state = 0x4d595df4d0f33173;
         pcg32_init(idx, pcg_state);
 
-        color c = ray_color_cuda(r, shared_scene, shared_lights, pcg_state);
+        color c = ray_color_cuda(r, shared_scene, shared_lights, shared_materials, pcg_state);
         d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, c.r) * 255.999f);
         d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, c.g) * 255.999f);
         d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, c.b) * 255.999f);

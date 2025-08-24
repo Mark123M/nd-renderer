@@ -1,0 +1,9 @@
+break camera.h:156
+disable $bpnum
+break material.h:34
+disable $bpnum
+break camera.h:158
+disable $bpnum
+break vec4.h:155
+disable $bpnum
+break camera.h:171
