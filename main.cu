@@ -203,57 +203,8 @@ __global__ void math_test() {
     t2.linear.print();
 }
 
-int main() {
-    cudaDeviceProp deviceProp;
-    cudaGetDeviceProperties(&deviceProp, 0);
-    g_sm_count = deviceProp.multiProcessorCount;
-    g_sm_max_threads = deviceProp.maxThreadsPerMultiProcessor;
-    uint stride_threads_per_block = 256;
-    uint stride_num_blocks = (g_sm_max_threads / stride_threads_per_block) * g_sm_count;
-    printf("SM count %d | Max threads per SM %d | Stride block count %d\n", g_sm_count, g_sm_max_threads, stride_num_blocks);
-
-    math_test<<<1, 1>>>();
-
-    glfwSetErrorCallback(glfw_error_callback);
-
-    if (!glfwInit()) {
-        return 1;
-    }
-
-    // GL 3.0 + GLSL 130
-    const char* glsl_version = "#version 130";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-
-    float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor()); // Valid on GLFW 3.3+ only
-    GLFWwindow* window = glfwCreateWindow((int)(1280 * main_scale), (int)(800 * main_scale), "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
-    if (window == nullptr)
-        return 1;
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
-
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
-     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
-
-    // Setup scaling
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(main_scale);        // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this requires resetting Style + calling this again)
-    style.FontScaleDpi = main_scale;        // Set initial font scale. (using io.ConfigDpiScaleFonts=true makes this unnecessary. We leave both here for documentation purpose)
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-    // Tesseract Scene
+void tesseract_lines() {
+        // Tesseract Scene
     float L = 0.5f;
 
     point4 vertices[16] = {
@@ -338,24 +289,20 @@ int main() {
         {7, 15}  // (L,L,L,0) to (L,L,L,L)
     };
 
-    std::vector<std::unique_ptr<projected_cylinder>> unique_scene;
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    std::vector<std::unique_ptr<material>> unique_materials;
-    unique_materials.push_back(std::make_unique<lambertian>(edge_color));
+    material* edge_mat = new lambertian(edge_color);
+    materials.push_back(edge_mat);
 
     for (int i = 0; i < 32; ++i) {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
         vec4 move(L / 2, L / 2, L / 2, L / 2);
-        unique_scene.push_back(std::make_unique<projected_cylinder>());
-        unique_scene.back()->start0 = vertices[idx1] - move;
-        unique_scene.back()->end0 = vertices[idx2] - move;
-        unique_scene.back()->mat_idx = materials.size();
-        materials.push_back(unique_materials.back().get());
-        //unique_scene.back()->albedo = edge_color;
-        //unique_materials.push_back()
-        scene.push_back(unique_scene.back().get());
+        projected_cylinder* pc = new projected_cylinder;
+        pc->start0 = vertices[idx1] - move;
+        pc->end0 = vertices[idx2] - move;
+        pc->mat_idx = 0;
+        scene.push_back(pc);
     }
 
     /*std::unique_ptr<ncube> nc = std::make_unique<ncube>();
@@ -368,43 +315,117 @@ int main() {
     ball->radius = 0.5f;
     ball->albedo = color(1.f, 0.f, 0.f);
     scene.push_back(ball.get());*/
-
-    std::unique_ptr<projected_cylinder> x_axis = std::make_unique<projected_cylinder>();
-    x_axis->end0 = point4(AXIS_LEN, 0.f, 0.f, 0.f);
-    x_axis->radius = AXIS_RADIUS;
-    std::unique_ptr<lambertian> x_mat = std::make_unique<lambertian>(color(1.f, 0.f, 0.f));
-    x_axis->mat_idx = materials.size();
-    materials.push_back(x_mat.get());
-    scene.push_back(x_axis.get());
-
-    std::unique_ptr<projected_cylinder> y_axis = std::make_unique<projected_cylinder>();
-    y_axis->end0 = point4(0.f, AXIS_LEN, 0.f, 0.f);
-    y_axis->radius = AXIS_RADIUS;
-    std::unique_ptr<lambertian> y_mat = std::make_unique<lambertian>(color(0.f, 1.f, 0.f));
-    y_axis->mat_idx = materials.size();
-    materials.push_back(y_mat.get());
-    scene.push_back(y_axis.get());
-
-    std::unique_ptr<projected_cylinder> z_axis = std::make_unique<projected_cylinder>();
-    z_axis->end0 = point4(0.f, 0.f, AXIS_LEN, 0.f);
-    z_axis->radius = AXIS_RADIUS;
-    std::unique_ptr<lambertian> z_mat = std::make_unique<lambertian>(color(0.f, 0.f, 1.f));
-    z_axis->mat_idx = materials.size();
-    materials.push_back(z_mat.get());
-    scene.push_back(z_axis.get());
-
-    std::unique_ptr<projected_cylinder> w_axis = std::make_unique<projected_cylinder>();
-    w_axis->end0 = point4(0.f, 0.f, 0.f, AXIS_LEN);
-    w_axis->radius = AXIS_RADIUS;
-    std::unique_ptr<lambertian> w_mat = std::make_unique<lambertian>(color(0.73f, 0.33f, 0.827f));
-    w_axis->mat_idx = materials.size();
-    materials.push_back(w_mat.get());
-    scene.push_back(w_axis.get());
-
-    std::unique_ptr<direction_light> lig1 = std::make_unique<direction_light>();
+    direction_light* lig1 = new direction_light;
     lig1->col = color(1.0f, 1.0f, 0.9f);
     lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
-    lights.push_back(lig1.get());
+    lights.push_back(lig1);
+}
+
+void tesseract() {
+    color edge_color(1.0f, 0.647f, 0.0f); // Orange
+    material* edge_mat = new lambertian(edge_color);
+    materials.push_back(edge_mat);
+
+    ncube* nc = new ncube;
+    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    nc->corner = cor;
+    nc->albedo = edge_color;
+    nc->mat_idx = 0;
+    scene.push_back(nc);
+
+    direction_light* lig1 = new direction_light;
+    lig1->col = color(1.0f, 1.0f, 0.9f);
+    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    lights.push_back(lig1);
+}
+
+void shape_axes() {
+    projected_cylinder* x_axis = new projected_cylinder;
+    x_axis->end0 = point4(AXIS_LEN, 0.f, 0.f, 0.f);
+    x_axis->radius = AXIS_RADIUS;
+    material* x_mat = new lambertian(color(1.f, 0.f, 0.f));
+    x_axis->mat_idx = materials.size();
+    materials.push_back(x_mat);
+    scene.push_back(x_axis);
+
+    projected_cylinder* y_axis = new projected_cylinder;
+    y_axis->end0 = point4(0.f, AXIS_LEN, 0.f, 0.f);
+    y_axis->radius = AXIS_RADIUS;
+    material* y_mat = new lambertian(color(0.f, 1.f, 0.f));
+    y_axis->mat_idx = materials.size();
+    materials.push_back(y_mat);
+    scene.push_back(y_axis);
+
+    projected_cylinder* z_axis = new projected_cylinder;
+    z_axis->end0 = point4(0.f, 0.f, AXIS_LEN, 0.f);
+    z_axis->radius = AXIS_RADIUS;
+    material* z_mat = new lambertian(color(0.f, 0.f, 1.f));
+    z_axis->mat_idx = materials.size();
+    materials.push_back(z_mat);
+    scene.push_back(z_axis);
+
+    projected_cylinder* w_axis = new projected_cylinder;
+    w_axis->end0 = point4(0.f, 0.f, 0.f, AXIS_LEN);
+    w_axis->radius = AXIS_RADIUS;
+    material* w_mat = new lambertian(color(0.73f, 0.33f, 0.827f));
+    w_axis->mat_idx = materials.size();
+    materials.push_back(w_mat);
+    scene.push_back(w_axis);
+}
+
+int main() {
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+    g_sm_count = deviceProp.multiProcessorCount;
+    g_sm_max_threads = deviceProp.maxThreadsPerMultiProcessor;
+    uint stride_threads_per_block = 256;
+    uint stride_num_blocks = (g_sm_max_threads / stride_threads_per_block) * g_sm_count;
+    printf("SM count %d | Max threads per SM %d | Stride block count %d\n", g_sm_count, g_sm_max_threads, stride_num_blocks);
+
+    math_test<<<1, 1>>>();
+
+    glfwSetErrorCallback(glfw_error_callback);
+
+    if (!glfwInit()) {
+        return 1;
+    }
+
+    // GL 3.0 + GLSL 130
+    const char* glsl_version = "#version 130";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+
+    float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor()); // Valid on GLFW 3.3+ only
+    GLFWwindow* window = glfwCreateWindow((int)(1280 * main_scale), (int)(800 * main_scale), "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    if (window == nullptr)
+        return 1;
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // Enable vsync
+
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+     // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsLight();
+
+    // Setup scaling
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.ScaleAllSizes(main_scale);        // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this requires resetting Style + calling this again)
+    style.FontScaleDpi = main_scale;        // Set initial font scale. (using io.ConfigDpiScaleFonts=true makes this unnecessary. We leave both here for documentation purpose)
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    //tesseract_lines();
+    tesseract();
+    shape_axes();
 
     for (shape* s : scene) {
         total_scene_bytes += s->size();
@@ -444,8 +465,6 @@ int main() {
 
     float prev_frame = 0.f;
     float current_frame = 0.f;
-    int rt_latency = 0;
-    int full_latency = 0;
 
     std::vector<std::thread> threads(NUM_CPU_THREADS);
     bool is_rendering = true; //std::atomic<bool> is_rendering = true;
@@ -561,7 +580,6 @@ int main() {
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(camera::image_width, camera::image_height));
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        ImGui::Text("Raytracer latency: %dms   Transfer latency: %dms", rt_latency, full_latency - rt_latency);
         //ImGui::Text("Tesseract Center: (%.3f, %.3f, %.3f, %.3f)", center.x, center.y, center.z, center.w);
         ImGui::End();
 
@@ -578,6 +596,19 @@ int main() {
     }
 
     world::destruct<<<1,1>>>();
+    
+    for (shape* s : scene) {
+        delete s;
+    }
+
+    for (light* l : lights) {
+        delete l;
+    }
+
+    for (material* m : materials) {
+        delete m;
+    }
+
     gpuErrchk(cudaGraphicsUnregisterResource(render_texture_CUDA));
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaFree(d_image_data));

@@ -18,12 +18,12 @@ constexpr float SIMULATION_RATE = 60.f;
 constexpr float MIN_DELTA_TIME = 1.f / SIMULATION_RATE;
 
 // rendering
-constexpr float TOL = 5e-3f;
+constexpr float TOL = 1e-3f;
 constexpr float EPSILON = 1e-3f;
 constexpr float MAX_MARCH_DIST = 5.f;
 constexpr uint MAX_MARCH_STEPS = 50;
-constexpr uint SAMPLES_PER_PIXEL = 20;
-constexpr uint MAX_RAY_BOUNCES = 20;
+constexpr uint SAMPLES_PER_PIXEL = 10;
+constexpr uint MAX_RAY_BOUNCES = 10;
 
 // scene
 constexpr float AMBIENT = 0.3f;
