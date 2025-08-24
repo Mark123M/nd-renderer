@@ -74,13 +74,13 @@ static bool handle_inputs_cuda() {
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 mouse_delta = io.MouseDelta;
     
-    if (mouse_delta.x != 0.0f) {
+    if (ImGui::IsKeyDown(ImGuiKey_Space) && mouse_delta.x != 0.0f) {
         world::rotate_camera_horizontal_kernel<<<1, 1>>>(mouse_delta.x * CAMERA_ROTATE_RATE * fixed_delta_time);
         did_input = true;
     }
 
     if (mouse_delta.y != 0.0f) {
-        world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
+        //world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
         did_input = true;
     }
 
@@ -326,12 +326,33 @@ void tesseract() {
     material* edge_mat = new lambertian(edge_color);
     materials.push_back(edge_mat);
 
+    color sphere_color(0.f, 0.f, 1.f);
+    material* sphere_mat = new lambertian(sphere_color);
+    materials.push_back(sphere_mat);
+
+    color floor_color(0.5f, 0.5f, 0.5f);
+    material* floor_mat = new lambertian(floor_color);
+    materials.push_back(floor_mat);
+
     ncube* nc = new ncube;
     point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     nc->corner = cor;
     nc->albedo = edge_color;
     nc->mat_idx = 0;
     scene.push_back(nc);
+
+    nsphere* ns = new nsphere;
+    //ns->center = point4(-1.f, 0.f, -1.f, 0.f);
+    ns->radius = 0.5f;
+    ns->mat_idx = 1;
+    ns->translate(point4(-1.f, 0.f, -1.f, 0.4f));
+    scene.push_back(ns);
+
+    nsphere* floor = new nsphere;
+    floor->radius = 100.f;
+    floor->mat_idx = 2;
+    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
     lig1->col = color(1.0f, 1.0f, 0.9f);
