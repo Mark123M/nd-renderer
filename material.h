@@ -35,7 +35,7 @@ struct material {
             return false;
         }
 
-        bs.wi = t.local_to_world(bs.wi);
+        bs.wi = vec4::normalize(t.local_to_world(bs.wi)); // re-normalize for for accumulated fp errors
         return true;
     }
 

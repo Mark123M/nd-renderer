@@ -10,6 +10,7 @@ struct shape_params {
     shape_type type;
     transform basis;
     color albedo;
+    size_t mat_idx;
     
     point4 sphere_center;
     point4 cube_corner;
@@ -45,6 +46,7 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             cur_shape_data += c->size();
             c->basis = params.basis;
             c->albedo = params.albedo;
+            c->mat_idx = params.mat_idx;
 
             c->start0 = params.cylinder_start0;
             c->end0 = params.cylinder_end0;
@@ -55,6 +57,7 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             cur_shape_data += pc->size();
             pc->basis = params.basis;
             pc->albedo = params.albedo;
+            pc->mat_idx = params.mat_idx;
 
             pc->start0 = params.cylinder_start0;
             pc->end0 = params.cylinder_end0;
@@ -65,6 +68,7 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             cur_shape_data += nc->size();
             nc->basis = params.basis;
             nc->albedo = params.albedo;
+            nc->mat_idx = params.mat_idx;
 
             nc->corner = params.cube_corner;
             d_scene[i] = nc;
@@ -73,6 +77,7 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             cur_shape_data += ns->size();
             ns->basis = params.basis;
             ns->albedo = params.albedo;
+            ns->mat_idx = params.mat_idx;
 
             ns->center = params.sphere_center;
             ns->radius = params.radius;
@@ -219,14 +224,16 @@ void initialize() {
     size_t scene_size = scene_len * sizeof(shape_params);
 
     for (size_t i = 0; i < scene_len; i++) {
-        cylinder* cylinder_ptr = dynamic_cast<cylinder*>(scene[i]);
-        projected_cylinder* projected_cylinder_ptr = dynamic_cast<projected_cylinder*>(scene[i]);
-        nsphere* nsphere_ptr = dynamic_cast<nsphere*>(scene[i]);
-        ncube* ncube_ptr = dynamic_cast<ncube*>(scene[i]);
+        shape* shape_ptr = scene[i];
+        cylinder* cylinder_ptr = dynamic_cast<cylinder*>(shape_ptr);
+        projected_cylinder* projected_cylinder_ptr = dynamic_cast<projected_cylinder*>(shape_ptr);
+        nsphere* nsphere_ptr = dynamic_cast<nsphere*>(shape_ptr);
+        ncube* ncube_ptr = dynamic_cast<ncube*>(shape_ptr);
 
         shape_params& params = scene_params_list[i];
-        params.basis = scene[i]->basis;
-        params.albedo = scene[i]->albedo;
+        params.basis = shape_ptr->basis;
+        params.albedo = shape_ptr->albedo;
+        params.mat_idx = shape_ptr->mat_idx;
 
         if (cylinder_ptr) {
             params.type = shape_type::CYLINDER;

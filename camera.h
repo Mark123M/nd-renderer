@@ -136,8 +136,7 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         ray_march_cuda(r, &target, shared_scene, shared_lights);
 
         if (target == nullptr) {
-            vec4 unit_direction = vec4::normalize(r.dir);
-            float a = 0.5f * (unit_direction.y + 1.f);
+            float a = 0.5f * (r.dir.y + 1.f);
             return col * (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
         }
 
