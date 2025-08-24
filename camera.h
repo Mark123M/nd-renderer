@@ -114,7 +114,7 @@ __device__ vec4 get_normal_cuda(const vec4& p, shape** shared_scene, light** sha
 __device__ void ray_march_cuda(ray& r, shape** target_ptr, shape** shared_scene, light** shared_lights) {
     //float a = 0.5f * (r.dir.y + 1.f);
     //return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
-    for (uint i = 0; i < MAX_ITERS; i++) {
+    for (uint i = 0; i < MAX_MARCH_STEPS; i++) {
         float dist = scene_sdf_mod_cuda(r.pos, shared_scene, shared_lights, target_ptr);
 
         if (dist <= TOL) {
@@ -165,7 +165,7 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         return target->albedo * total_lighting; */
     }
 
-    return color(1.f, 1.f, 1.f);
+    return color(0.f, 0.f, 0.f);
 }
 
 __global__ void render_kernel(uchar4* d_image_data, uint width, uint height, size_t h_total_scene_bytes, size_t h_total_lights_bytes, size_t h_total_materials_bytes) {
@@ -210,17 +210,28 @@ __global__ void render_kernel(uchar4* d_image_data, uint width, uint height, siz
 
     if (row < height && col < width) {
         // need device versions of these functions/structs
-        point4 pixel_center = d_pixel00_center + (col * d_pixel_x) + (row * d_pixel_y);
-        vec4 direction = vec4::normalize(pixel_center - d_camera_transform.get_pos());
-        ray r(d_camera_transform.get_pos(), direction);
-        
+        //point4 pixel_center = d_pixel00_center + (col * d_pixel_x) + (row * d_pixel_y);
+        //vec4 direction = vec4::normalize(pixel_center - d_camera_transform.get_pos());
+        //ray r(d_camera_transform.get_pos(), direction);
+
         uint64_t pcg_state = 0x4d595df4d0f33173;
         pcg32_init(idx, pcg_state);
+        point4 camera_pos = d_camera_transform.get_pos();
+        color c(0.f, 0.f, 0.f);
 
-        color c = ray_color_cuda(r, shared_scene, shared_lights, shared_materials, pcg_state);
-        d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, c.r) * 255.999f);
-        d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, c.g) * 255.999f);
-        d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, c.b) * 255.999f);
+        for (uint s = 0; s < SAMPLES_PER_PIXEL; s++) {
+            float row_offset = randf_pcg32(-0.5f, 0.5f, pcg_state);
+            float col_offset = randf_pcg32(-0.5f, 0.5f, pcg_state);
+            //vec4 offset{ randf_pcg32(-0.5f, 0.5f, pcg_state), randf_pcg32(-0.5f, 0.5f, pcg_state), 0.f, 0.f }; // Random point from center of unit square -0.5 <= x, y < 0.5
+            point4 sample = d_pixel00_center + ((col + col_offset) * d_pixel_x) + ((row + row_offset) * d_pixel_y);
+            vec4 direction = vec4::normalize(sample - camera_pos);
+            ray r(camera_pos, direction);
+            c += ray_color_cuda(r, shared_scene, shared_lights, shared_materials, pcg_state);
+        }
+
+        d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, c.r / SAMPLES_PER_PIXEL) * 255.999f);
+        d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, c.g / SAMPLES_PER_PIXEL) * 255.999f);
+        d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, c.b / SAMPLES_PER_PIXEL) * 255.999f);
         d_image_data[idx].w = 255;
     }
 }
