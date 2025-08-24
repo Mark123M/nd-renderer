@@ -131,23 +131,23 @@ struct transform {
 		return R;
 	}
 
-	__host__ __device__ vec4 get_vec_x() {
+	__host__ __device__ vec4 get_vec_x() const {
 		return linear.get_x();
 	}
 
-	__host__ __device__ vec4 get_vec_y() {
+	__host__ __device__ vec4 get_vec_y() const {
 		return linear.get_y();
 	}
 
-	__host__ __device__ vec4 get_vec_z() {
+	__host__ __device__ vec4 get_vec_z() const {
 		return linear.get_z();
 	}
 
-	__host__ __device__ vec4 get_vec_w() {
+	__host__ __device__ vec4 get_vec_w() const {
 		return linear.get_w();
 	}
 
-	__host__ __device__ point4 get_pos() {
+	__host__ __device__ point4 get_pos() const {
 		return linear.get_b();
 	}
 

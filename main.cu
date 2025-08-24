@@ -326,8 +326,8 @@ void tesseract() {
     material* edge_mat = new lambertian(edge_color);
     materials.push_back(edge_mat);
 
-    color sphere_color(0.f, 0.f, 1.f);
-    material* sphere_mat = new lambertian(sphere_color);
+    color sphere_color(0.f, 1.f, 0.f);
+    material* sphere_mat = new specular(sphere_color);
     materials.push_back(sphere_mat);
 
     color floor_color(0.5f, 0.5f, 0.5f);
@@ -345,7 +345,7 @@ void tesseract() {
     //ns->center = point4(-1.f, 0.f, -1.f, 0.f);
     ns->radius = 0.5f;
     ns->mat_idx = 1;
-    ns->translate(point4(-1.f, 0.f, -1.f, 0.4f));
+    ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     nsphere* floor = new nsphere;

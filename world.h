@@ -5,6 +5,7 @@
 #include "camera.h"
 #include "direction_light.h"
 #include "lambertian.h"
+#include "specular.h"
 
 struct shape_params {
     shape_type type;
@@ -27,7 +28,7 @@ struct light_params {
 
 struct material_params {
     material_type type;
-    color lambertian_albedo;
+    color albedo;
 };
 
 namespace world {
@@ -119,8 +120,13 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
         if (params.type == material_type::LAMBERTIAN) {
             lambertian* l = new(cur_material_data) lambertian;
             cur_material_data += l->size();
-            l->albedo = params.lambertian_albedo;
+            l->albedo = params.albedo;
             d_materials[i] = l;
+        } else if (params.type == material_type::SPECULAR) {
+            specular* s = new(cur_material_data) specular;
+            cur_material_data += s->size();
+            s->albedo = params.albedo;
+            d_materials[i] = s;
         }
     }
 
@@ -287,12 +293,16 @@ void initialize() {
 
     for (size_t i = 0; i < materials_len; i++) {
         lambertian* lambertian_ptr = dynamic_cast<lambertian*>(materials[i]);
+        specular* specular_ptr = dynamic_cast<specular*>(materials[i]);
 
         material_params& params = materials_params_list[i];
         
         if (lambertian_ptr) {
             params.type = material_type::LAMBERTIAN;
-            params.lambertian_albedo = lambertian_ptr->albedo;
+            params.albedo = lambertian_ptr->albedo;
+        } else if (specular_ptr) {
+            params.type = material_type::SPECULAR;
+            params.albedo = specular_ptr->albedo;
         }
     }
 

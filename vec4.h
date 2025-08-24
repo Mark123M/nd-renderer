@@ -115,8 +115,8 @@ struct vec4 {
 		return v / v.length();
 	}
 
-	__host__ __device__ static vec4 reflect(const vec4& v, const vec4& n) {
-		return v - 2.f * dot(v, n) * n;
+	__host__ __device__ static vec4 reflect(const vec4& wo) {
+		return vec4(-wo.x, wo.y, -wo.z, -wo.w);
 	}
 
 	__host__ __device__ static vec4 refract(const vec4& v, const vec4& n, float eta) {
