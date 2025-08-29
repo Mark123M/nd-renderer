@@ -13,8 +13,8 @@ struct light {
 	color col;
 
 	__host__ __device__ light() : col{1.f, 1.f, 1.f} {}
-	__host__ virtual color Le(point4 p, vec4 normal) = 0;
-	__device__ virtual color Le_cuda(point4 p, vec4 normal, shape** shared_scene, light** shared_lights) = 0;
+	__host__ virtual color Le(const point4& p, const vec4& normal) = 0;
+	__device__ virtual color Le_cuda(const point4& p, const vec4& normal, shape** shared_scene, light** shared_lights) = 0;
 
 	__host__ __device__ virtual size_t size() const = 0;
 	__device__ virtual void print_gpu() const = 0;

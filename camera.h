@@ -102,7 +102,7 @@ __device__ float scene_sdf_mod_cuda(const point4& p, shape** shared_scene, light
     return scene_sdf_cuda(p, shared_scene, shared_lights, target_ptr);
 }
 
-__device__ vec4 get_normal_cuda(const vec4& p, shape** shared_scene, light** shared_lights) {
+__device__ vec4 get_normal_cuda(const point4& p, shape** shared_scene, light** shared_lights) {
     float sdf_diff_x = scene_sdf_mod_cuda(p + d_delta_x, shared_scene, shared_lights) - scene_sdf_mod_cuda(p - d_delta_x, shared_scene, shared_lights);
     float sdf_diff_y = scene_sdf_mod_cuda(p + d_delta_y, shared_scene, shared_lights) - scene_sdf_mod_cuda(p - d_delta_y, shared_scene, shared_lights);
     float sdf_diff_z = scene_sdf_mod_cuda(p + d_delta_z, shared_scene, shared_lights) - scene_sdf_mod_cuda(p - d_delta_z, shared_scene, shared_lights);
@@ -285,7 +285,7 @@ float scene_sdf(const point4& p) {
     return sdf;
 }
 
-vec4 get_normal(const vec4& p) {
+vec4 get_normal(const point4& p) {
     float sdf_diff_x = scene_sdf(p + delta_x) - scene_sdf(p - delta_x);
     float sdf_diff_y = scene_sdf(p + delta_y) - scene_sdf(p - delta_y);
     float sdf_diff_z = scene_sdf(p + delta_z) - scene_sdf(p - delta_z);

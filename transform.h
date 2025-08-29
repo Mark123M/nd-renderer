@@ -80,9 +80,10 @@ struct transform {
 	}
 
 	__host__ __device__ void rotate_around_point(float angle, const point4& p, uint a, uint b) {
-		translate(-p);
+		vec4 vecp = p - origin;
+		translate(-vecp);
 		rotate(angle, a, b);
-		translate(p);
+		translate(vecp);
 	}
 
 	__host__ __device__ void rotate_xy_around_point(float angle, const point4& p) {
@@ -113,8 +114,17 @@ struct transform {
 		return linear.vecmul(v);
 	}
 
+	__host__ __device__ point4 local_to_world(const point4& p) const {
+		return linear.pointmul(p);
+	}
+
+
 	__host__ __device__ vec4 world_to_local(const vec4& w) const {
 		return inv_linear.vecmul(w);
+	}
+
+	__host__ __device__ point4 world_to_local(const point4& p) const {
+		return inv_linear.pointmul(p);
 	}
 
 	__host__ __device__ static affine rotate_mat(float angle, uint a, uint b) {

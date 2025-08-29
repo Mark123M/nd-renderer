@@ -8,8 +8,6 @@
 struct vec4;
 __host__ __device__ vec4 operator*(float k, const vec4& v);
 
-using point4 = vec4;
-
 struct vec4 {
 	float x, y, z, w;
 
@@ -19,11 +17,11 @@ struct vec4 {
 
 	__host__ __device__ vec4 operator-(const vec4& v) const { return { x - v.x, y - v.y, z - v.z, w - v.w }; }
 
-	__host__ __device__ vec4 operator*(const vec4& v) const { return { x * v.x, y * v.y, z * v.z, w * v.w }; }
+	__host__ __device__ vec4 operator*(float k) const { return { k * x, k * y, k * z, k * w }; }
 
 	__host__ __device__ vec4 operator/(float k) const {
 		assert(k != 0.f);
-		return (1 / k) * (*this);
+		return this->operator*(1.f / k);
 	}
 
 	__host__ __device__ vec4& operator+=(const vec4& v) {
@@ -42,14 +40,6 @@ struct vec4 {
 		return *this;
 	}
 
-	__host__ __device__ vec4& operator *=(const vec4& v) {
-		x *= v.x;
-		y *= v.y;
-		z *= v.z;
-		w *= v.w;
-		return *this;
-	}
-
 	__host__ __device__ vec4& operator*=(float k) {
 		x *= k;
 		y *= k;
@@ -60,11 +50,7 @@ struct vec4 {
 
 	__host__ __device__ vec4& operator/=(float k) {
 		assert(k != 0.f);
-		x /= k;
-		y /= k;
-		z /= k;
-		w /= k;
-		return *this;
+		return this->operator*=(1.f / k);
 	}
 
 	__host__ __device__ float get(uint idx) const {
@@ -173,9 +159,7 @@ struct vec4 {
 	}
 };
 
-__host__ __device__ vec4 operator*(float k, const vec4& v) { return { k * v.x, k * v.y, k * v.z, k * v.w }; }
-
-__host__ __device__ vec4 operator*(const vec4& v, float k) { return k * v; }
+__host__ __device__ vec4 operator*(float k, const vec4& v) { return v * k; }
 
 // host constants
 constexpr vec4 delta_x{EPSILON, 0.f, 0.f, 0.f};
@@ -191,5 +175,70 @@ constexpr vec4 standard_x{1.f, 0.f, 0.f, 0.f};
 constexpr vec4 standard_y{0.f, 1.f, 0.f, 0.f};
 constexpr vec4 standard_z{0.f, 0.f, 1.f, 0.f};
 constexpr vec4 standard_w{0.f, 0.f, 0.f, 1.f};
+
+struct point4 {
+	float x, y, z, w;
+	
+	__host__ __device__ point4 operator+(const vec4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
+
+	__host__ __device__ point4 operator-(const vec4& v) const { return { x - v.x, y - v.y, z - v.z, w - v.w }; }
+
+	__host__ __device__ vec4 operator-(const point4& p) const { return { x - p.x, y - p.y, z - p.z, w - p.w }; }
+
+	__host__ __device__ point4 operator/(float k) const {
+		assert(k != 0.f);
+		return { x / k, y / k, z / k, w / k };
+	}
+
+	__host__ __device__ point4& operator+=(const vec4& v) {
+		x += v.x;
+		y += v.y;
+		z += v.z;
+		w += v.w;
+		return *this;
+	}
+
+	__host__ __device__ point4& operator-=(const vec4& v) {
+		x -= v.x;
+		y -= v.y;
+		z -= v.z;
+		w -= v.w;
+		return *this;
+	}
+
+	__host__ __device__ float get(uint idx) const {
+		switch (idx) {
+		case 0:
+			return x;
+		case 1:
+			return y;
+		case 2:
+			return z;
+		case 3:
+			return w;
+		}
+
+		return 0.f;
+	}
+
+	__host__ __device__ void set(uint idx, float val) {
+		switch (idx) {
+		case 0:
+			x = val;
+			break;
+		case 1:
+			y = val;
+			break;
+		case 2:
+			z = val;
+			break;
+		case 3:
+			w = val;
+			break;
+		}
+	}
+};
+
+__managed__ point4 origin{0.f, 0.f, 0.f, 0.f};
 
 #endif

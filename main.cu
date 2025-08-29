@@ -431,7 +431,7 @@ void tesseract_lines_reflector() {
     ns->center = point4(0.f, 0.f, 0.f, 0.f);
     ns->radius = 0.25f;
     ns->mat_idx = 1;
-    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     /*std::unique_ptr<ncube> nc = std::make_unique<ncube>();
@@ -474,13 +474,13 @@ void tesseract() {
     ns->center = point4(-1.f, 0.f, -1.f, 0.f);
     ns->radius = 0.5f;
     ns->mat_idx = 1;
-    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     nsphere* floor = new nsphere;
     floor->radius = 100.f;
     floor->mat_idx = 2;
-    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
@@ -513,13 +513,13 @@ void tesseract_one() {
     ns->center = point4(-1.f, 0.f, -1.f, 0.f);
     ns->radius = 0.5f;
     ns->mat_idx = 1;
-    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     nsphere* floor = new nsphere;
     floor->radius = 100.f;
     floor->mat_idx = 2;
-    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
@@ -552,13 +552,13 @@ void tesseract_reflector() {
     ns->center = point4(-1.f, 0.f, -1.f, 0.f);
     ns->radius = 0.5f;
     ns->mat_idx = 1;
-    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     nsphere* floor = new nsphere;
     floor->radius = 100.f;
     floor->mat_idx = 2;
-    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
@@ -584,7 +584,7 @@ void spheres() {
     ns->center = point4(-1.f, 0.f, -1.f, 0.f);
     ns->radius = 0.5f;
     ns->mat_idx = 0;
-    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     nsphere* ns2 = new nsphere;
@@ -596,7 +596,7 @@ void spheres() {
     nsphere* floor = new nsphere;
     floor->radius = 100.f;
     floor->mat_idx = 2;
-    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
@@ -692,9 +692,9 @@ int main() {
     //tesseract_lines();
     //tesseract();
     //spheres();
-    //tesseract_reflector();
+    tesseract_reflector();
     //tesseract_lines_reflector();
-    tesseract_one();
+    //tesseract_one();
     //shape_axes();
     
 

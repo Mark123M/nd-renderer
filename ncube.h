@@ -13,7 +13,7 @@ struct ncube : public shape {
 	__host__ __device__ float sdf(const point4& p) const override {
 		point4 pp = basis.world_to_local(p); //multiply_matrix_vec4(example_matrix, p);
 		
-		vec4 q = vec4::abs(pp) - corner;
+		vec4 q = vec4::abs(pp - origin) - (corner - origin);
 		float d = vec4::max(q, 0.f).length() + fminf(vec4::max_comp(q), 0.f);
 		return d;
 	}
