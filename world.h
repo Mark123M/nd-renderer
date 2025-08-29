@@ -4,11 +4,14 @@
 #include <cuda_runtime.h>
 #include "camera.h"
 #include "direction_light.h"
+#include "lambertian.h"
+#include "specular.h"
 
 struct shape_params {
     shape_type type;
     transform basis;
     color albedo;
+    size_t mat_idx;
     
     point4 sphere_center;
     point4 cube_corner;
@@ -23,9 +26,14 @@ struct light_params {
 	color col;
 };
 
+struct material_params {
+    material_type type;
+    color albedo;
+};
+
 namespace world {
 
-__global__ void construct(shape_params* d_scene_params_list, light_params* d_lights_params_list, size_t h_total_scene_bytes, size_t h_total_lights_bytes) {
+__global__ void construct(shape_params* d_scene_params_list, light_params* d_lights_params_list, material_params* d_materials_params_list, size_t h_total_scene_bytes, size_t h_total_lights_bytes, size_t h_total_materials_bytes) {
     d_scene_data = new char[h_total_scene_bytes];
     char* cur_shape_data = d_scene_data;
     d_scene = new shape*[d_scene_len];
@@ -39,6 +47,7 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             cur_shape_data += c->size();
             c->basis = params.basis;
             c->albedo = params.albedo;
+            c->mat_idx = params.mat_idx;
 
             c->start0 = params.cylinder_start0;
             c->end0 = params.cylinder_end0;
@@ -49,6 +58,7 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             cur_shape_data += pc->size();
             pc->basis = params.basis;
             pc->albedo = params.albedo;
+            pc->mat_idx = params.mat_idx;
 
             pc->start0 = params.cylinder_start0;
             pc->end0 = params.cylinder_end0;
@@ -59,6 +69,7 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             cur_shape_data += nc->size();
             nc->basis = params.basis;
             nc->albedo = params.albedo;
+            nc->mat_idx = params.mat_idx;
 
             nc->corner = params.cube_corner;
             d_scene[i] = nc;
@@ -67,6 +78,7 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             cur_shape_data += ns->size();
             ns->basis = params.basis;
             ns->albedo = params.albedo;
+            ns->mat_idx = params.mat_idx;
 
             ns->center = params.sphere_center;
             ns->radius = params.radius;
@@ -97,6 +109,30 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
     for (size_t i = 0; i < d_lights_len; i++) {
         d_lights[i]->print_gpu();
     }
+
+    d_materials_data = new char[h_total_materials_bytes];
+    char* cur_material_data = d_materials_data;
+    d_materials = new material*[d_materials_len];
+
+    for (size_t i = 0; i < d_materials_len; i++) {
+        material_params& params = d_materials_params_list[i];
+
+        if (params.type == material_type::LAMBERTIAN) {
+            lambertian* l = new(cur_material_data) lambertian;
+            cur_material_data += l->size();
+            l->albedo = params.albedo;
+            d_materials[i] = l;
+        } else if (params.type == material_type::SPECULAR) {
+            specular* s = new(cur_material_data) specular;
+            cur_material_data += s->size();
+            s->albedo = params.albedo;
+            d_materials[i] = s;
+        }
+    }
+
+    for (size_t i = 0; i < d_materials_len; i++) {
+        d_materials[i]->print_gpu();
+    }
 }
 
 __global__ void destruct() {
@@ -105,6 +141,9 @@ __global__ void destruct() {
 
     delete [] d_lights_data;
     delete [] d_lights;
+
+    delete [] d_materials_data;
+    delete [] d_materials;
 }
 
 __global__ void translate_kernel(vec4 t) {
@@ -191,14 +230,16 @@ void initialize() {
     size_t scene_size = scene_len * sizeof(shape_params);
 
     for (size_t i = 0; i < scene_len; i++) {
-        cylinder* cylinder_ptr = dynamic_cast<cylinder*>(scene[i]);
-        projected_cylinder* projected_cylinder_ptr = dynamic_cast<projected_cylinder*>(scene[i]);
-        nsphere* nsphere_ptr = dynamic_cast<nsphere*>(scene[i]);
-        ncube* ncube_ptr = dynamic_cast<ncube*>(scene[i]);
+        shape* shape_ptr = scene[i];
+        cylinder* cylinder_ptr = dynamic_cast<cylinder*>(shape_ptr);
+        projected_cylinder* projected_cylinder_ptr = dynamic_cast<projected_cylinder*>(shape_ptr);
+        nsphere* nsphere_ptr = dynamic_cast<nsphere*>(shape_ptr);
+        ncube* ncube_ptr = dynamic_cast<ncube*>(shape_ptr);
 
         shape_params& params = scene_params_list[i];
-        params.basis = scene[i]->basis;
-        params.albedo = scene[i]->albedo;
+        params.basis = shape_ptr->basis;
+        params.albedo = shape_ptr->albedo;
+        params.mat_idx = shape_ptr->mat_idx;
 
         if (cylinder_ptr) {
             params.type = shape_type::CYLINDER;
@@ -244,11 +285,38 @@ void initialize() {
     gpuErrchk(cudaMalloc(&d_lights_params_list, lights_size));
     gpuErrchk(cudaMemcpy(d_lights_params_list, lights_params_list, lights_size, cudaMemcpyHostToDevice));
 
-    construct<<<1, 1>>>(d_scene_params_list, d_lights_params_list, total_scene_bytes, total_lights_bytes);
+    size_t materials_len = materials.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_materials_len, &materials_len, sizeof(size_t)));
+    material_params* materials_params_list = new material_params[materials_len];
+    material_params* d_materials_params_list;
+    size_t materials_size = materials_len * sizeof(material_params);
+
+    for (size_t i = 0; i < materials_len; i++) {
+        lambertian* lambertian_ptr = dynamic_cast<lambertian*>(materials[i]);
+        specular* specular_ptr = dynamic_cast<specular*>(materials[i]);
+
+        material_params& params = materials_params_list[i];
+        
+        if (lambertian_ptr) {
+            params.type = material_type::LAMBERTIAN;
+            params.albedo = lambertian_ptr->albedo;
+        } else if (specular_ptr) {
+            params.type = material_type::SPECULAR;
+            params.albedo = specular_ptr->albedo;
+        }
+    }
+
+    gpuErrchk(cudaMalloc(&d_materials_params_list, materials_size));
+    gpuErrchk(cudaMemcpy(d_materials_params_list, materials_params_list, materials_size, cudaMemcpyHostToDevice));
+
+    construct<<<1, 1>>>(d_scene_params_list, d_lights_params_list, d_materials_params_list, total_scene_bytes, total_lights_bytes, total_materials_bytes);
+    
     delete [] scene_params_list;
     gpuErrchk(cudaFree(d_scene_params_list));
     delete [] lights_params_list;
     gpuErrchk(cudaFree(d_lights_params_list));
+    delete [] materials_params_list;
+    gpuErrchk(cudaFree(d_materials_params_list));
     //light_params* 
 
    /* std::vector<shape*> scene;

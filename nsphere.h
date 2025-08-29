@@ -12,7 +12,8 @@ struct nsphere : public shape {
 	__host__ __device__ nsphere() : shape{}, center { 0.f, 0.f, 0.f, 0.f }, radius{ 0.25f } {}
 
 	__host__ __device__ float sdf(const point4& p) const {
-		return (center - p).length() - radius;
+		point4 pp = basis.world_to_local(p);
+		return (center - pp).length() - radius;
 	}
 
 	__host__ __device__ size_t size() const override {

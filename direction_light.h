@@ -12,7 +12,7 @@ struct direction_light : public light {
 
 	__host__ color Le(point4 p, vec4 normal) override {
 		float diffuse = fmaxf(0.f, vec4::dot(normal, dir));
-        point4 shadow_ray_origin = p + normal * 0.01f; // slight offset
+        point4 shadow_ray_origin = p + normal * EPSILON; // slight offset
         ray shadow_ray(shadow_ray_origin, dir);
         shape* shadow_target = nullptr;
         camera::ray_march(shadow_ray, &shadow_target);
@@ -23,7 +23,7 @@ struct direction_light : public light {
 
 	__device__ color Le_cuda(point4 p, vec4 normal, shape** shared_scene, light** shared_lights) override {
 		float diffuse = fmaxf(0.f, vec4::dot(normal, dir));
-        point4 shadow_ray_origin = p + normal * 0.01f; // slight offset
+        point4 shadow_ray_origin = p + normal * EPSILON; // slight offset
         ray shadow_ray(shadow_ray_origin, dir);
         shape* shadow_target = nullptr;
         camera::ray_march_cuda(shadow_ray, &shadow_target, shared_scene, shared_lights);

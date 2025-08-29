@@ -4,14 +4,16 @@
 #include "vec4.h"
 #include "color.h"
 #include "transform.h"
+#include "material.h"
 
 enum shape_type {
-    NONE, CYLINDER, PROJECTED_CYLINDER, HYPERSPHERE, HYPERCUBE
+    CYLINDER, PROJECTED_CYLINDER, HYPERSPHERE, HYPERCUBE
 };
 
 struct shape {
 	transform basis;
 	color albedo;
+	size_t mat_idx;
 
 	__host__ __device__ shape() : basis{identity_affine, identity_affine}, albedo{ 1.f, 1.f, 1.f } {}
 

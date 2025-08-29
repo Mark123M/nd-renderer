@@ -13,10 +13,6 @@ using point4 = vec4;
 struct vec4 {
 	float x, y, z, w;
 
-	__host__ __device__ vec4() {}
-
-	__host__ __device__ vec4(float x0, float y0, float z0, float w0) : x{ x0 }, y{ y0 }, z{ z0 }, w{ w0 } {}
-
 	__host__ __device__ vec4 operator-() const { return { -x, -y, -z, -w }; }
 
 	__host__ __device__ vec4 operator+(const vec4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
@@ -119,8 +115,8 @@ struct vec4 {
 		return v / v.length();
 	}
 
-	__host__ __device__ static vec4 reflect(const vec4& v, const vec4& n) {
-		return v - 2.f * dot(v, n) * n;
+	__host__ __device__ static vec4 reflect(const vec4& wo) {
+		return vec4(-wo.x, wo.y, -wo.z, -wo.w);
 	}
 
 	__host__ __device__ static vec4 refract(const vec4& v, const vec4& n, float eta) {
@@ -149,6 +145,32 @@ struct vec4 {
 	__host__ __device__ static float length(const vec4& v) {
 		return v.length();
 	}
+
+	// random vector in unit 3-sphere (naive)
+	__host__ __device__ static vec4 rand_unit_vector(uint64_t& pcg_state) {
+		while (true) {
+			vec4 p = vec4{ randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state)};
+			float lensq = p.length_squared();
+			if (EPSILON < lensq && lensq <= 1) {
+				return p / sqrtf(lensq);
+			}
+		}
+	}
+
+	// random vector in unit 3-half-sphere (naive)
+	__host__ __device__ static vec4 rand_halfsphere_vector(uint64_t& pcg_state) {
+		vec4 unit = rand_unit_vector(pcg_state);
+
+		if (unit.y > 0) {
+			return unit;
+		} else {
+			return -unit;
+		}
+	}
+
+	__host__ __device__ void print() {
+		printf("vec4(%.3f, %.3f, %.3f, %.3f)\n", x, y, z, w);
+	}
 };
 
 __host__ __device__ vec4 operator*(float k, const vec4& v) { return { k * v.x, k * v.y, k * v.z, k * v.w }; }
@@ -156,13 +178,18 @@ __host__ __device__ vec4 operator*(float k, const vec4& v) { return { k * v.x, k
 __host__ __device__ vec4 operator*(const vec4& v, float k) { return k * v; }
 
 // host constants
-const vec4 delta_x(EPSILON, 0.f, 0.f, 0.f);
+constexpr vec4 delta_x{EPSILON, 0.f, 0.f, 0.f};
 __constant__ vec4 d_delta_x;
-const vec4 delta_y(0.f, EPSILON, 0.f, 0.f);
+constexpr vec4 delta_y{0.f, EPSILON, 0.f, 0.f};
 __constant__ vec4 d_delta_y;
-const vec4 delta_z(0.f, 0.f, EPSILON, 0.f);
+constexpr vec4 delta_z{0.f, 0.f, EPSILON, 0.f};
 __constant__ vec4 d_delta_z;
-const vec4 delta_w(0.f, 0.f, 0.f, EPSILON);
+constexpr vec4 delta_w{0.f, 0.f, 0.f, EPSILON};
 __constant__ vec4 d_delta_w;
+
+constexpr vec4 standard_x{1.f, 0.f, 0.f, 0.f};
+constexpr vec4 standard_y{0.f, 1.f, 0.f, 0.f};
+constexpr vec4 standard_z{0.f, 0.f, 1.f, 0.f};
+constexpr vec4 standard_w{0.f, 0.f, 0.f, 1.f};
 
 #endif

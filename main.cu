@@ -17,6 +17,7 @@
 #include "camera.h"
 #include "world.h"
 #include "direction_light.h"
+#include "lambertian.h"
 #include "util.h"
 
 #include <cuda_runtime.h>
@@ -73,13 +74,13 @@ static bool handle_inputs_cuda() {
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 mouse_delta = io.MouseDelta;
     
-    if (mouse_delta.x != 0.0f) {
+    if (ImGui::IsKeyDown(ImGuiKey_Space) && mouse_delta.x != 0.0f) {
         world::rotate_camera_horizontal_kernel<<<1, 1>>>(mouse_delta.x * CAMERA_ROTATE_RATE * fixed_delta_time);
         did_input = true;
     }
 
     if (mouse_delta.y != 0.0f) {
-        world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
+        //world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
         did_input = true;
     }
 
@@ -189,55 +190,21 @@ static float handle_inputs() {
     return did_input;
 }
 
-int main() {
-    cudaDeviceProp deviceProp;
-    cudaGetDeviceProperties(&deviceProp, 0);
-    g_sm_count = deviceProp.multiProcessorCount;
-    g_sm_max_threads = deviceProp.maxThreadsPerMultiProcessor;
-    uint stride_threads_per_block = 256;
-    uint stride_num_blocks = (g_sm_max_threads / stride_threads_per_block) * g_sm_count;
-    printf("SM count %d | Max threads per SM %d | Stride block count %d\n", g_sm_count, g_sm_max_threads, stride_num_blocks);
 
-    glfwSetErrorCallback(glfw_error_callback);
+__global__ void math_test() {
+    vec4 N(-1.4f, 0.5f, -3.f, 2.f);
+    transform t = transform::get_shading_transform(N);
+    vec4 vx = t.get_vec_x(), vy = t.get_vec_y(), vz = t.get_vec_z(), vw = t.get_vec_w();
+    printf("%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", vec4::dot(vx, vy), vec4::dot(vx, vz), vec4::dot(vx, vw), vec4::dot(vy, vz), vec4::dot(vy, vw), vec4::dot(vz, vw), vec4::length(vx), vec4::length(vy), vec4::length(vz), vec4::length(vw));
+    t.linear.print();
 
-    if (!glfwInit()) {
-        return 1;
-    }
+    vec4 N2(1.f, 0.f, 0.f, 0.f);
+    transform t2 = transform::get_shading_transform(N2);
+    t2.linear.print();
+}
 
-    // GL 3.0 + GLSL 130
-    const char* glsl_version = "#version 130";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-
-    float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor()); // Valid on GLFW 3.3+ only
-    GLFWwindow* window = glfwCreateWindow((int)(1280 * main_scale), (int)(800 * main_scale), "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
-    if (window == nullptr)
-        return 1;
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
-
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
-     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
-
-    // Setup scaling
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(main_scale);        // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this requires resetting Style + calling this again)
-    style.FontScaleDpi = main_scale;        // Set initial font scale. (using io.ConfigDpiScaleFonts=true makes this unnecessary. We leave both here for documentation purpose)
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-    // Tesseract Scene
+void tesseract_lines() {
+        // Tesseract Scene
     float L = 0.5f;
 
     point4 vertices[16] = {
@@ -323,18 +290,19 @@ int main() {
     };
 
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    std::vector<std::unique_ptr<projected_cylinder>> unique_scene;
+    material* edge_mat = new lambertian(edge_color);
+    materials.push_back(edge_mat);
 
     for (int i = 0; i < 32; ++i) {
         int idx1 = edges[i][0];
         int idx2 = edges[i][1];
 
         vec4 move(L / 2, L / 2, L / 2, L / 2);
-        unique_scene.push_back(std::make_unique<projected_cylinder>());
-        unique_scene.back()->start0 = vertices[idx1] - move;
-        unique_scene.back()->end0 = vertices[idx2] - move;
-        unique_scene.back()->albedo = edge_color;
-        scene.push_back(unique_scene.back().get());
+        projected_cylinder* pc = new projected_cylinder;
+        pc->start0 = vertices[idx1] - move;
+        pc->end0 = vertices[idx2] - move;
+        pc->mat_idx = 0;
+        scene.push_back(pc);
     }
 
     /*std::unique_ptr<ncube> nc = std::make_unique<ncube>();
@@ -347,36 +315,399 @@ int main() {
     ball->radius = 0.5f;
     ball->albedo = color(1.f, 0.f, 0.f);
     scene.push_back(ball.get());*/
-
-    std::unique_ptr<projected_cylinder> x_axis = std::make_unique<projected_cylinder>();
-    x_axis->end0 = point4(AXIS_LEN, 0, 0, 0);
-    x_axis->radius = AXIS_RADIUS;
-    x_axis->albedo = color(1, 0, 0);
-    std::unique_ptr<projected_cylinder> y_axis = std::make_unique<projected_cylinder>();
-    y_axis->end0 = point4(0, AXIS_LEN, 0, 0);
-    y_axis->radius = AXIS_RADIUS;
-    y_axis->albedo = color(0, 1, 0);
-    std::unique_ptr<projected_cylinder> z_axis = std::make_unique<projected_cylinder>();
-    z_axis->end0 = point4(0, 0, AXIS_LEN, 0);
-    z_axis->radius = AXIS_RADIUS;
-    z_axis->albedo = color(0, 0, 1);
-    std::unique_ptr<projected_cylinder> w_axis = std::make_unique<projected_cylinder>();
-    w_axis->end0 = point4(0, 0, 0, AXIS_LEN);
-    w_axis->radius = AXIS_RADIUS;
-    w_axis->albedo = color(0.73f, 0.33f, 0.827f);
-
-    scene.push_back(x_axis.get());
-    scene.push_back(y_axis.get());
-    scene.push_back(z_axis.get());
-    scene.push_back(w_axis.get());
-
-    std::unique_ptr<direction_light> lig1 = std::make_unique<direction_light>();
+    direction_light* lig1 = new direction_light;
     lig1->col = color(1.0f, 1.0f, 0.9f);
     lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
-    lights.push_back(lig1.get());
+    lights.push_back(lig1);
+}
+
+void tesseract_lines_reflector() {
+        // Tesseract Scene
+    float L = 0.5f;
+
+    point4 vertices[16] = {
+        // Vertex Index corresponds to binary (WZYX) -> e.g., 0000 for (0,0,0,0), 1111 for (L,L,L,L)
+
+        // --- Vertices where W = 0.0f ---
+        // Z = 0.0f
+        point4(0.0f, 0.0f, 0.0f, 0.0f), // 0: (0,0,0,0)
+        point4(L,    0.0f, 0.0f, 0.0f), // 1: (L,0,0,0)
+        point4(0.0f, L,    0.0f, 0.0f), // 2: (0,L,0,0)
+        point4(L,    L,    0.0f, 0.0f), // 3: (L,L,0,0)
+        // Z = L
+        point4(0.0f, 0.0f, L,    0.0f), // 4: (0,0,L,0)
+        point4(L,    0.0f, L,    0.0f), // 5: (L,0,L,0)
+        point4(0.0f, L,    L,    0.0f), // 6: (0,L,L,0)
+        point4(L,    L,    L,    0.0f), // 7: (L,L,L,0)
+
+        // --- Vertices where W = L (0.5f) ---
+        // Z = 0.0f
+        point4(0.0f, 0.0f, 0.0f, L),    // 8: (0,0,0,L)
+        point4(L,    0.0f, 0.0f, L),    // 9: (L,0,0,L)
+        point4(0.0f, L,    0.0f, L),    // 10: (0,L,0,L)
+        point4(L,    L,    0.0f, L),    // 11: (L,L,0,L)
+        // Z = L
+        point4(0.0f, 0.0f, L,    L),    // 12: (0,0,L,L)
+        point4(L,    0.0f, L,    L),    // 13: (L,0,L,L)
+        point4(0.0f, L,    L,    L),    // 14: (0,L,L,L)
+        point4(L,    L,    L,    L)     // 15: (L,L,L,L)
+    };
+    
+    //point4 center(L / 2, L / 2, L / 2, L / 2);
+
+    uint edges[32][2] = {
+        // --- Edges within the W=0.0f 'cube' (indices 0-7) ---
+        {0, 1}, // (0,0,0,0) to (L,0,0,0) - X-axis
+        {0, 2}, // (0,0,0,0) to (0,L,0,0) - Y-axis
+        {0, 4}, // (0,0,0,0) to (0,0,L,0) - Z-axis
+
+        {1, 3},
+        {1, 5},
+
+        {2, 3},
+        {2, 6},
+
+        {3, 7},
+
+        {4, 5},
+        {4, 6},
+
+        {5, 7},
+
+        {6, 7},
+
+        // --- Edges within the W=L 'cube' (indices 8-15) ---
+        {8, 9}, // (0,0,0,L) to (L,0,0,L) - X-axis
+        {8, 10}, // (0,0,0,L) to (0,L,0,L) - Y-axis
+        {8, 12}, // (0,0,0,L) to (0,0,L,L) - Z-axis
+
+        {9, 11},
+        {9, 13},
+
+        {10, 11},
+        {10, 14},
+
+        {11, 15},
+
+        {12, 13},
+        {12, 14},
+
+        {13, 15},
+
+        {14, 15},
+
+        // --- Edges connecting the W=0.0f 'cube' to the W=L 'cube' (W-axis edges) ---
+        {0, 8},  // (0,0,0,0) to (0,0,0,L)
+        {1, 9},  // (L,0,0,0) to (L,0,0,L)
+        {2, 10}, // (0,L,0,0) to (0,L,0,L)
+        {3, 11}, // (L,L,0,0) to (L,L,0,L)
+        {4, 12}, // (0,0,L,0) to (0,0,L,L)
+        {5, 13}, // (L,0,L,0) to (L,0,L,L)
+        {6, 14}, // (0,L,L,0) to (0,L,L,L)
+        {7, 15}  // (L,L,L,0) to (L,L,L,L)
+    };
+
+    color edge_color(1.0f, 0.647f, 0.0f); // Orange
+    material* edge_mat = new lambertian(edge_color);
+    materials.push_back(edge_mat);
+
+    for (int i = 0; i < 32; ++i) {
+        int idx1 = edges[i][0];
+        int idx2 = edges[i][1];
+
+        vec4 move(L / 2, L / 2, L / 2, L / 2);
+        projected_cylinder* pc = new projected_cylinder;
+        pc->start0 = vertices[idx1] - move;
+        pc->end0 = vertices[idx2] - move;
+        pc->mat_idx = 0;
+        scene.push_back(pc);
+    }
+
+    color sphere_color(0.f, 1.f, 0.f);
+    material* sphere_mat = new specular(sphere_color);
+    materials.push_back(sphere_mat);
+
+    nsphere* ns = new nsphere;
+    ns->center = point4(0.f, 0.f, 0.f, 0.f);
+    ns->radius = 0.25f;
+    ns->mat_idx = 1;
+    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns);
+
+    /*std::unique_ptr<ncube> nc = std::make_unique<ncube>();
+    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    nc->corner = cor;
+    nc->albedo = edge_color;
+    scene.push_back(nc.get()); */
+
+    /*std::unique_ptr<nsphere> ball = std::make_unique<nsphere>();
+    ball->radius = 0.5f;
+    ball->albedo = color(1.f, 0.f, 0.f);
+    scene.push_back(ball.get());*/
+    direction_light* lig1 = new direction_light;
+    lig1->col = color(1.0f, 1.0f, 0.9f);
+    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    lights.push_back(lig1);
+}
+
+void tesseract() {
+    color edge_color(1.0f, 0.647f, 0.0f); // Orange
+    material* edge_mat = new lambertian(edge_color);
+    materials.push_back(edge_mat);
+
+    color sphere_color(0.f, 1.f, 0.f);
+    material* sphere_mat = new specular(sphere_color);
+    materials.push_back(sphere_mat);
+
+    color floor_color(0.5f, 0.5f, 0.5f);
+    material* floor_mat = new lambertian(floor_color);
+    materials.push_back(floor_mat);
+
+    ncube* nc = new ncube;
+    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    nc->corner = cor;
+    nc->albedo = edge_color;
+    nc->mat_idx = 0;
+    scene.push_back(nc);
+
+    nsphere* ns = new nsphere;
+    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
+    ns->radius = 0.5f;
+    ns->mat_idx = 1;
+    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns);
+
+    nsphere* floor = new nsphere;
+    floor->radius = 100.f;
+    floor->mat_idx = 2;
+    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    scene.push_back(floor);
+
+    direction_light* lig1 = new direction_light;
+    lig1->col = color(1.0f, 1.0f, 0.9f);
+    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    lights.push_back(lig1);
+}
+
+void tesseract_one() {
+    color edge_color(1.f, 1.f, 1.f); // Orange
+    material* edge_mat = new lambertian(edge_color);
+    materials.push_back(edge_mat);
+
+    color sphere_color(1.f, 1.f, 1.f);
+    material* sphere_mat = new specular(sphere_color);
+    materials.push_back(sphere_mat);
+
+    color floor_color(1.f, 1.f, 1.f);
+    material* floor_mat = new lambertian(floor_color);
+    materials.push_back(floor_mat);
+
+    ncube* nc = new ncube;
+    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    nc->corner = cor;
+    nc->albedo = edge_color;
+    nc->mat_idx = 0;
+    scene.push_back(nc);
+
+    nsphere* ns = new nsphere;
+    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
+    ns->radius = 0.5f;
+    ns->mat_idx = 1;
+    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns);
+
+    nsphere* floor = new nsphere;
+    floor->radius = 100.f;
+    floor->mat_idx = 2;
+    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    scene.push_back(floor);
+
+    direction_light* lig1 = new direction_light;
+    lig1->col = color(1.0f, 1.0f, 0.9f);
+    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    lights.push_back(lig1);
+}
+
+void tesseract_reflector() {
+    color edge_color(1.0f, 0.647f, 0.0f); // Orange
+    material* edge_mat = new specular(edge_color);
+    materials.push_back(edge_mat);
+
+    color sphere_color(0.f, 1.f, 0.f);
+    material* sphere_mat = new specular(sphere_color);
+    materials.push_back(sphere_mat);
+
+    color floor_color(0.5f, 0.5f, 0.5f);
+    material* floor_mat = new lambertian(floor_color);
+    materials.push_back(floor_mat);
+
+    ncube* nc = new ncube;
+    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    nc->corner = cor;
+    nc->albedo = edge_color;
+    nc->mat_idx = 0;
+    scene.push_back(nc);
+
+    nsphere* ns = new nsphere;
+    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
+    ns->radius = 0.5f;
+    ns->mat_idx = 1;
+    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns);
+
+    nsphere* floor = new nsphere;
+    floor->radius = 100.f;
+    floor->mat_idx = 2;
+    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    scene.push_back(floor);
+
+    direction_light* lig1 = new direction_light;
+    lig1->col = color(1.0f, 1.0f, 0.9f);
+    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    lights.push_back(lig1);
+}
+
+void spheres() {
+    color sphere_color(0.9f, 0.9f, 0.9f);
+    material* sphere_mat = new specular(sphere_color);
+    materials.push_back(sphere_mat);
+
+    color sphere2_color(0.f, 1.f, 1.f);
+    material* sphere2_mat = new specular(sphere2_color);
+    materials.push_back(sphere2_mat);
+
+    color floor_color(0.5f, 0.5f, 0.5f);
+    material* floor_mat = new lambertian(floor_color);
+    materials.push_back(floor_mat);
+
+    nsphere* ns = new nsphere;
+    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
+    ns->radius = 0.5f;
+    ns->mat_idx = 0;
+    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns);
+
+    nsphere* ns2 = new nsphere;
+    ns2->center = point4(0.f, 0.f, -1.f, 0.f);
+    ns2->radius = 0.5f;
+    ns2->mat_idx = 1;
+    scene.push_back(ns2);
+
+    nsphere* floor = new nsphere;
+    floor->radius = 100.f;
+    floor->mat_idx = 2;
+    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    scene.push_back(floor);
+
+    direction_light* lig1 = new direction_light;
+    lig1->col = color(1.0f, 1.0f, 0.9f);
+    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    lights.push_back(lig1);
+}
+
+void shape_axes() {
+    projected_cylinder* x_axis = new projected_cylinder;
+    x_axis->end0 = point4(AXIS_LEN, 0.f, 0.f, 0.f);
+    x_axis->radius = AXIS_RADIUS;
+    material* x_mat = new lambertian(color(1.f, 0.f, 0.f));
+    x_axis->mat_idx = materials.size();
+    materials.push_back(x_mat);
+    scene.push_back(x_axis);
+
+    projected_cylinder* y_axis = new projected_cylinder;
+    y_axis->end0 = point4(0.f, AXIS_LEN, 0.f, 0.f);
+    y_axis->radius = AXIS_RADIUS;
+    material* y_mat = new lambertian(color(0.f, 1.f, 0.f));
+    y_axis->mat_idx = materials.size();
+    materials.push_back(y_mat);
+    scene.push_back(y_axis);
+
+    projected_cylinder* z_axis = new projected_cylinder;
+    z_axis->end0 = point4(0.f, 0.f, AXIS_LEN, 0.f);
+    z_axis->radius = AXIS_RADIUS;
+    material* z_mat = new lambertian(color(0.f, 0.f, 1.f));
+    z_axis->mat_idx = materials.size();
+    materials.push_back(z_mat);
+    scene.push_back(z_axis);
+
+    projected_cylinder* w_axis = new projected_cylinder;
+    w_axis->end0 = point4(0.f, 0.f, 0.f, AXIS_LEN);
+    w_axis->radius = AXIS_RADIUS;
+    material* w_mat = new lambertian(color(0.73f, 0.33f, 0.827f));
+    w_axis->mat_idx = materials.size();
+    materials.push_back(w_mat);
+    scene.push_back(w_axis);
+}
+
+int main() {
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+    g_sm_count = deviceProp.multiProcessorCount;
+    g_sm_max_threads = deviceProp.maxThreadsPerMultiProcessor;
+    uint stride_threads_per_block = 256;
+    uint stride_num_blocks = (g_sm_max_threads / stride_threads_per_block) * g_sm_count;
+    printf("SM count %d | Max threads per SM %d | Stride block count %d\n", g_sm_count, g_sm_max_threads, stride_num_blocks);
+
+    math_test<<<1, 1>>>();
+
+    glfwSetErrorCallback(glfw_error_callback);
+
+    if (!glfwInit()) {
+        return 1;
+    }
+
+    // GL 3.0 + GLSL 130
+    const char* glsl_version = "#version 130";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+
+    float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor()); // Valid on GLFW 3.3+ only
+    GLFWwindow* window = glfwCreateWindow((int)(1280 * main_scale), (int)(800 * main_scale), "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    if (window == nullptr)
+        return 1;
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // Enable vsync
+
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+     // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsLight();
+
+    // Setup scaling
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.ScaleAllSizes(main_scale);        // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this requires resetting Style + calling this again)
+    style.FontScaleDpi = main_scale;        // Set initial font scale. (using io.ConfigDpiScaleFonts=true makes this unnecessary. We leave both here for documentation purpose)
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    //tesseract_lines();
+    //tesseract();
+    //spheres();
+    //tesseract_reflector();
+    //tesseract_lines_reflector();
+    tesseract_one();
+    //shape_axes();
+    
+
+    // can try space distortion too
+    // tesseract lines with a sphere in the middle?
+    // tesseract solid reflectors?
 
     for (shape* s : scene) {
         total_scene_bytes += s->size();
+    }
+
+    for (material* mat : materials) {
+        total_materials_bytes += mat->size();
     }
     
     for (light* l : lights) {
@@ -409,8 +740,6 @@ int main() {
 
     float prev_frame = 0.f;
     float current_frame = 0.f;
-    int rt_latency = 0;
-    int full_latency = 0;
 
     std::vector<std::thread> threads(NUM_CPU_THREADS);
     bool is_rendering = true; //std::atomic<bool> is_rendering = true;
@@ -481,8 +810,8 @@ int main() {
             dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
             (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
 
-            camera::render_kernel<<<num_blocks, threads_per_block, total_scene_bytes + total_lights_bytes + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*)>>>
-            (d_image_data, camera::image_width, camera::image_height, total_scene_bytes, total_lights_bytes);
+            camera::render_kernel<<<num_blocks, threads_per_block, total_scene_bytes + total_lights_bytes + total_materials_bytes + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
+            (d_image_data, camera::image_width, camera::image_height, total_scene_bytes, total_lights_bytes, total_materials_bytes);
 
             //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
@@ -526,7 +855,6 @@ int main() {
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(camera::image_width, camera::image_height));
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        ImGui::Text("Raytracer latency: %dms   Transfer latency: %dms", rt_latency, full_latency - rt_latency);
         //ImGui::Text("Tesseract Center: (%.3f, %.3f, %.3f, %.3f)", center.x, center.y, center.z, center.w);
         ImGui::End();
 
@@ -543,6 +871,19 @@ int main() {
     }
 
     world::destruct<<<1,1>>>();
+    
+    for (shape* s : scene) {
+        delete s;
+    }
+
+    for (light* l : lights) {
+        delete l;
+    }
+
+    for (material* m : materials) {
+        delete m;
+    }
+
     gpuErrchk(cudaGraphicsUnregisterResource(render_texture_CUDA));
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaFree(d_image_data));
