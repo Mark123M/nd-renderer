@@ -463,8 +463,8 @@ void tesseract() {
     materials.push_back(floor_mat);
 
     ncube* nc = new ncube;
-    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    nc->corner = cor;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
     nc->albedo = edge_color;
     nc->mat_idx = 0;
     scene.push_back(nc);
@@ -501,8 +501,8 @@ void tesseract_one() {
     materials.push_back(floor_mat);
 
     ncube* nc = new ncube;
-    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    nc->corner = cor;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
     nc->albedo = edge_color;
     nc->mat_idx = 0;
     scene.push_back(nc);
@@ -539,8 +539,8 @@ void tesseract_reflector() {
     materials.push_back(floor_mat);
 
     ncube* nc = new ncube;
-    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    nc->corner = cor;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
     nc->albedo = edge_color;
     nc->mat_idx = 0;
     scene.push_back(nc);
@@ -676,8 +676,8 @@ int main() {
 
     //tesseract_lines();
     //tesseract();
-    spheres();
-    //tesseract_reflector();
+    //spheres();
+    tesseract_reflector();
     //tesseract_lines_reflector();
     //tesseract_one();
     //shape_axes();

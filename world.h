@@ -14,6 +14,7 @@ struct shape_params {
     size_t mat_idx;
     
     point4 cube_corner;
+    float cube_half_len;
     point4 cylinder_start0;
     point4 cylinder_end0;
     float radius;
@@ -71,6 +72,7 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             nc->mat_idx = params.mat_idx;
 
             nc->corner = params.cube_corner;
+            nc->half_len = params.cube_half_len;
             d_scene[i] = nc;
         } else if (params.type == shape_type::HYPERSPHERE) {
             nsphere* ns = new(cur_shape_data) nsphere;
@@ -255,6 +257,7 @@ void initialize() {
         } else if (ncube_ptr) {
             params.type = shape_type::HYPERCUBE;
             params.cube_corner = ncube_ptr->corner;
+            params.cube_half_len = ncube_ptr->half_len;
         }
     }
 
