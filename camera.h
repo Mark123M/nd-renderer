@@ -129,30 +129,34 @@ __device__ void ray_march_cuda(ray& r, shape** target_ptr, shape** shared_scene,
 }
 
 __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
-    shape* target = nullptr;
     color col(1.f, 1.f, 1.f);
 
     for (uint k = 0; k < MAX_RAY_BOUNCES; k++) {
-        ray_march_cuda(r, &target, shared_scene, shared_lights);
+        hit_result res; // res is initialized with MAX_RAY_DIST
+        // ray_march_cuda(r, &target, shared_scene, shared_lights);
+        bool hit = false;
+        
+        // TODO: replace with BVH
+        for (size_t i = 0; i < d_scene_len; i++) {
+            hit = shared_scene[i]->intersect(r, res) || hit; // always evaluate intersect to find closer shapes
+        }
 
-        if (target == nullptr) {
+        if (!hit) {
             float a = 0.5f * (r.dir.y + 1.f);
             return col; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
         }
 
-        vec4 normal = get_normal_cuda(r.pos, shared_scene, shared_lights);
+        const vec4& normal = res.normal;
 
         if (d_render_normals) {
             return 0.5f * color(normal.x + 1.f, normal.y + 1.f, normal.z + 1.f);
         }
         
-        material* mat = shared_materials[target->mat_idx];
-        transform t = transform::get_shading_transform(normal);
         bsdf_sample bs;
-
-        mat->sample_f(-r.dir, t, bs, pcg_state);
+        material* mat = shared_materials[res.target->mat_idx];
+        mat->sample_f(-r.dir, res.m, bs, pcg_state);
         col *= bs.f;
-        r = ray(r.pos + EPSILON * bs.wi, bs.wi);
+        r = ray(res.p + EPSILON * bs.wi, bs.wi);
         
         /* color total_lighting(0.f, 0.f, 0.f);
         for (size_t i = 0; i < d_lights_len; i++) {
@@ -219,6 +223,7 @@ __global__ void render_kernel(uchar4* d_image_data, uint width, uint height, siz
         point4 camera_pos = d_camera_transform.get_pos();
         color c(0.f, 0.f, 0.f);
 
+        // TODO: progressive renderer that draws k SPP every frame until total is reached (improve frame rates and interactions)
         for (uint s = 0; s < SAMPLES_PER_PIXEL; s++) {
             float row_offset = randf_pcg32(-0.5f, 0.5f, pcg_state);
             float col_offset = randf_pcg32(-0.5f, 0.5f, pcg_state);

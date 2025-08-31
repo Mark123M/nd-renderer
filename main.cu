@@ -428,7 +428,6 @@ void tesseract_lines_reflector() {
     materials.push_back(sphere_mat);
 
     nsphere* ns = new nsphere;
-    ns->center = point4(0.f, 0.f, 0.f, 0.f);
     ns->radius = 0.25f;
     ns->mat_idx = 1;
     //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
@@ -471,10 +470,9 @@ void tesseract() {
     scene.push_back(nc);
 
     nsphere* ns = new nsphere;
-    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
     ns->radius = 0.5f;
     ns->mat_idx = 1;
-    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     nsphere* floor = new nsphere;
@@ -510,10 +508,9 @@ void tesseract_one() {
     scene.push_back(nc);
 
     nsphere* ns = new nsphere;
-    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
     ns->radius = 0.5f;
     ns->mat_idx = 1;
-    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     nsphere* floor = new nsphere;
@@ -549,10 +546,9 @@ void tesseract_reflector() {
     scene.push_back(nc);
 
     nsphere* ns = new nsphere;
-    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
     ns->radius = 0.5f;
     ns->mat_idx = 1;
-    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     nsphere* floor = new nsphere;
@@ -568,7 +564,7 @@ void tesseract_reflector() {
 }
 
 void spheres() {
-    color sphere_color(0.9f, 0.9f, 0.9f);
+    color sphere_color(0.9f, 0.5f, 0.9f);
     material* sphere_mat = new specular(sphere_color);
     materials.push_back(sphere_mat);
 
@@ -576,28 +572,17 @@ void spheres() {
     material* sphere2_mat = new specular(sphere2_color);
     materials.push_back(sphere2_mat);
 
-    color floor_color(0.5f, 0.5f, 0.5f);
-    material* floor_mat = new lambertian(floor_color);
-    materials.push_back(floor_mat);
-
     nsphere* ns = new nsphere;
-    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
     ns->radius = 0.5f;
     ns->mat_idx = 0;
-    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     nsphere* ns2 = new nsphere;
-    ns2->center = point4(0.f, 0.f, -1.f, 0.f);
     ns2->radius = 0.5f;
     ns2->mat_idx = 1;
+    ns2->translate(vec4(0.f, 0.f, -1.f, 0.f));
     scene.push_back(ns2);
-
-    nsphere* floor = new nsphere;
-    floor->radius = 100.f;
-    floor->mat_idx = 2;
-    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
-    scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
     lig1->col = color(1.0f, 1.0f, 0.9f);
@@ -691,8 +676,8 @@ int main() {
 
     //tesseract_lines();
     //tesseract();
-    //spheres();
-    tesseract_reflector();
+    spheres();
+    //tesseract_reflector();
     //tesseract_lines_reflector();
     //tesseract_one();
     //shape_axes();

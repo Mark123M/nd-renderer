@@ -13,7 +13,6 @@ struct shape_params {
     color albedo;
     size_t mat_idx;
     
-    point4 sphere_center;
     point4 cube_corner;
     point4 cylinder_start0;
     point4 cylinder_end0;
@@ -80,7 +79,6 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             ns->albedo = params.albedo;
             ns->mat_idx = params.mat_idx;
 
-            ns->center = params.sphere_center;
             ns->radius = params.radius;
             d_scene[i] = ns;
         }
@@ -253,7 +251,6 @@ void initialize() {
             params.radius = projected_cylinder_ptr->radius;
         } else if (nsphere_ptr) {
             params.type = shape_type::HYPERSPHERE;
-            params.sphere_center = nsphere_ptr->center;
             params.radius = nsphere_ptr->radius;
         } else if (ncube_ptr) {
             params.type = shape_type::HYPERCUBE;
