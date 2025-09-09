@@ -105,12 +105,6 @@ struct vec4 {
 		return vec4(-wo.x, wo.y, -wo.z, -wo.w);
 	}
 
-	__host__ __device__ static vec4 refract(const vec4& v, const vec4& n, float eta) {
-		float cos_theta = fminf(dot(-v, n), 1.f);
-		vec4 perp = eta * (v + cos_theta * n);
-		vec4 parallel = -sqrtf(fabsf(1.f - perp.length_squared())) * n;
-		return perp + parallel;
-	}
 
 	__host__ __device__ static float dot(const vec4& a, const vec4& b) {
 		return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;

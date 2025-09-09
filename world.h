@@ -6,6 +6,7 @@
 #include "direction_light.h"
 #include "lambertian.h"
 #include "specular.h"
+#include "dielectric.h"
 
 struct shape_params {
     shape_type type;
@@ -29,6 +30,7 @@ struct light_params {
 struct material_params {
     material_type type;
     color albedo;
+    float eta;
 };
 
 namespace world {
@@ -127,6 +129,11 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             cur_material_data += s->size();
             s->albedo = params.albedo;
             d_materials[i] = s;
+        } else if (params.type == material_type::DIELECTRIC) {
+            dielectric* d = new(cur_material_data) dielectric;
+            cur_material_data += d->size();
+            d->eta = params.eta;
+            d_materials[i] = d;
         }
     }
 
@@ -294,6 +301,7 @@ void initialize() {
     for (size_t i = 0; i < materials_len; i++) {
         lambertian* lambertian_ptr = dynamic_cast<lambertian*>(materials[i]);
         specular* specular_ptr = dynamic_cast<specular*>(materials[i]);
+        dielectric* dielectric_ptr = dynamic_cast<dielectric*>(materials[i]);
 
         material_params& params = materials_params_list[i];
         
@@ -303,6 +311,9 @@ void initialize() {
         } else if (specular_ptr) {
             params.type = material_type::SPECULAR;
             params.albedo = specular_ptr->albedo;
+        } else if (dielectric_ptr) {
+            params.type = material_type::DIELECTRIC;
+            params.eta = dielectric_ptr->eta;
         }
     }
 

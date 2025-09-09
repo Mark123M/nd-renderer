@@ -12,7 +12,7 @@ struct bsdf_sample {
 };
 
 enum material_type {
-    LAMBERTIAN, SPECULAR, GLASS
+    LAMBERTIAN, SPECULAR, DIELECTRIC
 };
 
 struct material {

@@ -18,6 +18,7 @@
 #include "world.h"
 #include "direction_light.h"
 #include "lambertian.h"
+#include "dielectric.h"
 #include "util.h"
 
 #include <cuda_runtime.h>
@@ -551,11 +552,11 @@ void tesseract_reflector() {
     ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    nsphere* floor = new nsphere;
+    /*nsphere* floor = new nsphere;
     floor->radius = 100.f;
     floor->mat_idx = 2;
     floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
-    scene.push_back(floor);
+    scene.push_back(floor); */
 
     direction_light* lig1 = new direction_light;
     lig1->col = color(1.0f, 1.0f, 0.9f);
@@ -572,6 +573,13 @@ void spheres() {
     material* sphere2_mat = new specular(sphere2_color);
     materials.push_back(sphere2_mat);
 
+    material* sphere3_mat = new dielectric(1.5f);
+    materials.push_back(sphere3_mat);
+
+    color floor_color(0.5f, 0.5f, 0.5f);
+    material* floor_mat = new lambertian(floor_color);
+    materials.push_back(floor_mat);
+
     nsphere* ns = new nsphere;
     ns->radius = 0.5f;
     ns->mat_idx = 0;
@@ -583,6 +591,18 @@ void spheres() {
     ns2->mat_idx = 1;
     ns2->translate(vec4(0.f, 0.f, -1.f, 0.f));
     scene.push_back(ns2);
+
+    nsphere* ns3 = new nsphere;
+    ns3->radius = 0.5f;
+    ns3->mat_idx = 2;
+    ns3->translate(vec4(1.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns3);
+
+    nsphere* floor = new nsphere;
+    floor->radius = 100.f;
+    floor->mat_idx = 3;
+    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
+    scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
     lig1->col = color(1.0f, 1.0f, 0.9f);
@@ -676,8 +696,8 @@ int main() {
 
     //tesseract_lines();
     //tesseract();
-    //spheres();
-    tesseract_reflector();
+    spheres();
+    //tesseract_reflector();
     //tesseract_lines_reflector();
     //tesseract_one();
     //shape_axes();
