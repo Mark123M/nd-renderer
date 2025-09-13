@@ -23,10 +23,9 @@ struct hit_result {
 
 struct shape {
 	transform basis;
-	color albedo;
 	size_t mat_idx;
 
-	__host__ __device__ shape() : basis{identity_affine, identity_affine}, albedo{ 1.f, 1.f, 1.f } {}
+	__host__ __device__ shape() : basis{identity_affine, identity_affine} {}
 
 	__host__ __device__ virtual float sdf(const point4& p) const = 0;
 

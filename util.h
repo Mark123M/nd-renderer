@@ -23,7 +23,7 @@ constexpr float EPSILON = 1e-3f; // should be < TOL to avoid z-fighting
 constexpr float MAX_RAY_DIST = 1000.f;
 constexpr float MAX_MARCH_DIST = 5.f;
 constexpr uint MAX_MARCH_STEPS = 50;
-constexpr uint SAMPLES_PER_PIXEL = 50;
+constexpr uint SAMPLES_PER_PIXEL = 20;
 constexpr uint MAX_RAY_BOUNCES = 10;
 
 // scene

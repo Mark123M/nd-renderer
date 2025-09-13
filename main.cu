@@ -466,7 +466,6 @@ void tesseract() {
     ncube* nc = new ncube;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
-    nc->albedo = edge_color;
     nc->mat_idx = 0;
     scene.push_back(nc);
 
@@ -488,7 +487,7 @@ void tesseract() {
     lights.push_back(lig1);
 }
 
-void tesseract_one() {
+void all_white() {
     color edge_color(1.f, 1.f, 1.f); // Orange
     material* edge_mat = new lambertian(edge_color);
     materials.push_back(edge_mat);
@@ -504,7 +503,6 @@ void tesseract_one() {
     ncube* nc = new ncube;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
-    nc->albedo = edge_color;
     nc->mat_idx = 0;
     scene.push_back(nc);
 
@@ -542,7 +540,6 @@ void tesseract_reflector() {
     ncube* nc = new ncube;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
-    nc->albedo = edge_color;
     nc->mat_idx = 0;
     scene.push_back(nc);
 
@@ -552,11 +549,47 @@ void tesseract_reflector() {
     ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    /*nsphere* floor = new nsphere;
+    nsphere* floor = new nsphere;
     floor->radius = 100.f;
     floor->mat_idx = 2;
     floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
-    scene.push_back(floor); */
+    scene.push_back(floor);
+
+    direction_light* lig1 = new direction_light;
+    lig1->col = color(1.0f, 1.0f, 0.9f);
+    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    lights.push_back(lig1);
+}
+
+void tesseract_glass() {
+    material* edge_mat = new dielectric(1.5f);
+    materials.push_back(edge_mat);
+
+    color sphere_color(0.f, 1.f, 0.f);
+    material* sphere_mat = new specular(sphere_color);
+    materials.push_back(sphere_mat);
+
+    color floor_color(1.f, 0.8f, 0.5f);
+    material* floor_mat = new lambertian(floor_color);
+    materials.push_back(floor_mat);
+
+    ncube* nc = new ncube;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
+    nc->mat_idx = 0;
+    scene.push_back(nc);
+
+    nsphere* ns = new nsphere;
+    ns->radius = 0.5f;
+    ns->mat_idx = 1;
+    ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns);
+
+    nsphere* floor = new nsphere;
+    floor->radius = 100.f;
+    floor->mat_idx = 2;
+    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
+    scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
     lig1->col = color(1.0f, 1.0f, 0.9f);
@@ -694,12 +727,13 @@ int main() {
     ImGui_ImplOpenGL3_Init(glsl_version);
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    //spheres();
     //tesseract_lines();
     //tesseract();
-    spheres();
     //tesseract_reflector();
     //tesseract_lines_reflector();
-    //tesseract_one();
+    tesseract_glass();
+    //all_white();
     //shape_axes();
     
 

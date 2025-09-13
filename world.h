@@ -48,7 +48,6 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             cylinder* c = new(cur_shape_data) cylinder;
             cur_shape_data += c->size();
             c->basis = params.basis;
-            c->albedo = params.albedo;
             c->mat_idx = params.mat_idx;
 
             c->start0 = params.cylinder_start0;
@@ -59,7 +58,6 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             projected_cylinder* pc = new(cur_shape_data) projected_cylinder;
             cur_shape_data += pc->size();
             pc->basis = params.basis;
-            pc->albedo = params.albedo;
             pc->mat_idx = params.mat_idx;
 
             pc->start0 = params.cylinder_start0;
@@ -70,7 +68,6 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             ncube* nc = new(cur_shape_data) ncube;
             cur_shape_data += nc->size();
             nc->basis = params.basis;
-            nc->albedo = params.albedo;
             nc->mat_idx = params.mat_idx;
 
             nc->corner = params.cube_corner;
@@ -80,7 +77,6 @@ __global__ void construct(shape_params* d_scene_params_list, light_params* d_lig
             nsphere* ns = new(cur_shape_data) nsphere;
             cur_shape_data += ns->size();
             ns->basis = params.basis;
-            ns->albedo = params.albedo;
             ns->mat_idx = params.mat_idx;
 
             ns->radius = params.radius;
@@ -245,7 +241,6 @@ void initialize() {
 
         shape_params& params = scene_params_list[i];
         params.basis = shape_ptr->basis;
-        params.albedo = shape_ptr->albedo;
         params.mat_idx = shape_ptr->mat_idx;
 
         if (cylinder_ptr) {

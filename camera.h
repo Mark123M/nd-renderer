@@ -340,9 +340,9 @@ color ray_color(ray& r) {
         //r.pos.x, r.pos.y, r.pos.z, r.pos.w, total_lighting.r, total_lighting.g, total_lighting.b);
     }
 
-    color final_col = target->albedo * total_lighting;
-
-    return final_col;
+    //color final_col = target->albedo * total_lighting;
+    //return final_col;
+    return total_lighting;
 }
 
 void refresh_view() {
