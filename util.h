@@ -1,6 +1,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 #include <cuda_runtime.h>
+#include <memory>
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
@@ -16,6 +17,128 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 constexpr uint NUM_CPU_THREADS = 20;
 constexpr float SIMULATION_RATE = 60.f;
 constexpr float MIN_DELTA_TIME = 1.f / SIMULATION_RATE;
+
+template <typename T>
+struct managed_allocator {
+   using value_type = T;
+
+   managed_allocator() = default;
+   template <class U>
+   constexpr managed_allocator(const managed_allocator <U>&) noexcept {}
+
+   T* allocate(std::size_t n) {
+      T* ptr = nullptr;
+      gpuErrchk(cudaMallocManaged(&ptr, n * sizeof(T)));
+
+      if (!ptr) {
+         throw std::bad_alloc();
+      }
+
+      return ptr;
+   }
+
+   void deallocate(T* p, std::size_t n) noexcept {
+      gpuErrchk(cudaFree(p));
+   }
+};
+
+template <typename T>
+using managed_vector = std::vector<T, managed_allocator<T>>;
+
+template<class T, class U>
+bool operator==(const managed_allocator <T>&, const managed_allocator <U>&) { return true; }
+ 
+template<class T, class U>
+bool operator!=(const managed_allocator <T>&, const managed_allocator <U>&) { return false; }
+
+struct managed_dtor {
+   void operator()(void* ptr) const {
+      if (ptr) {
+         gpuErrchk(cudaFree(ptr));
+      }
+   }
+};
+
+template <typename T>
+using managed_ptr = std::unique_ptr<T, managed_dtor>;
+
+template <typename T>
+managed_ptr<T> make_managed() {
+   T* ptr = nullptr;
+   gpuErrchk(cudaMallocManaged(&ptr, sizeof(T)));
+   new (ptr) T;
+   return managed_ptr<T>(ptr);
+}
+
+template <typename T, typename U>
+__global__ void push_back_kernel(char* d_data, size_t size, T** d_list, size_t len, U object) {
+   char* cur_object_data = d_data;
+   for (size_t i = 0; i < len; i++) {
+      T* cur_object_ptr = (T*)cur_object_data;
+      d_list[i] = cur_object_ptr;
+      cur_object_data += cur_object_ptr->size(); 
+   }
+
+   U* new_object_ptr = (U*)cur_object_data;
+   new (new_object_ptr) U(object);
+   d_list[len] = (T*)(new_object_ptr);
+}
+
+template <typename T>
+__global__ void free_list_kernel(char* d_data, size_t len) {
+   T* cur_object = (T*)d_data;
+   for (size_t i = 0; i < len; i++) {
+      cur_object->~T();
+      cur_object += cur_object->size();
+   }
+}
+
+// dynamic polymorphic list on device memory
+// contiguous data buffer for better memory coalescing
+template <typename T>
+struct device_list {
+   T** d_list;
+   char* d_data;
+   size_t len; // use doubling trick when scenes get much larger
+   size_t data_size; 
+   // use placement new for intrusive pointer, data, pointer, data layout? 
+   device_list(): d_list{nullptr}, d_data{nullptr}, len{0}, data_size{0} {}
+
+   template <typename U>
+   void push_back(U object) {
+      T** d_new_list;
+      gpuErrchk(cudaMalloc(&d_new_list, (len + 1) * sizeof(T*)));
+      gpuErrchk(cudaFree(d_list));
+      d_list = d_new_list;
+
+      char* d_new_data;
+      gpuErrchk(cudaMalloc(&d_new_data, (data_size + sizeof(U)) * sizeof(char)));
+      gpuErrchk(cudaMemcpy(d_new_data, d_data, data_size * sizeof(char), cudaMemcpyDeviceToDevice));
+      gpuErrchk(cudaFree(d_data));
+      d_data = d_new_data;
+
+      push_back_kernel<T, U><<<1, 1>>>(d_data, data_size, d_list, len, object);
+      gpuErrchk(cudaDeviceSynchronize());
+      len++;
+      data_size += sizeof(U);
+   }
+
+   __host__ __device__ T* operator[](int i) const {
+      return d_list[i];
+   }
+
+   // used for stl container compatibilility
+   size_t size() const {
+      return len;
+   }
+
+   ~device_list() {
+      free_list_kernel<T><<<1, 1>>>(d_data, len);
+      gpuErrchk(cudaDeviceSynchronize());
+      gpuErrchk(cudaFree(d_list));
+      gpuErrchk(cudaFree(d_data));
+   }
+};
 
 // rendering
 constexpr float TOL = 1e-4f;

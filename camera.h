@@ -33,11 +33,13 @@ static inline std::string time_stamp(const std::string& fmt = "%F__%H-%M-%S") {
     return { buf, std::strftime(buf, sizeof(buf), fmt.c_str(), &bt) };
 }
 
-std::vector<shape*> scene;
-__device__ shape** d_scene;
-__device__ char* d_scene_data;
-__constant__ size_t d_scene_len;
-size_t total_scene_bytes = 0;
+//__managed__ managed_list<shape> scene;
+//managed_vector<managed_ptr<shape>> scene;
+device_list<shape> scene;
+//std::vector<shape*> scene;
+//__managed__ shape** m_scene;
+//__device__ char* d_scene_data;
+__constant__ size_t d_scene_len; // static scenes for now
 
 std::vector<light*> lights;
 __device__ light** d_lights;
@@ -172,7 +174,7 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
     return color(0.f, 0.f, 0.f);
 }
 
-__global__ void render_kernel(uchar4* d_image_data, uint width, uint height, size_t h_total_scene_bytes, size_t h_total_lights_bytes, size_t h_total_materials_bytes) {
+__global__ void render_kernel(uchar4* d_image_data, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, size_t h_total_lights_bytes, size_t h_total_materials_bytes) {
     extern __shared__ char buffer[];
 
     // buffer layout for shared memory
@@ -262,7 +264,8 @@ __global__ void render_stride_kernel(uchar4* d_image_data, uint width, uint num_
 float scene_sdf(const point4& p, shape** target_ptr) {
     float sdf = MAX_MARCH_DIST + 5.f;
     
-    for (shape* obj : scene) {
+    for (size_t i = 0; i < scene.size(); i++) {
+        shape* obj = scene[i];
         float obj_sdf = obj->sdf(p);
 
         if (obj_sdf < sdf) {
@@ -278,7 +281,8 @@ float scene_sdf(const point4& p, shape** target_ptr) {
 float scene_sdf(const point4& p) {
     float sdf = MAX_MARCH_DIST + 5.f;
 
-    for (shape* obj : scene) {
+    for (size_t i = 0; i < scene.size(); i++) {
+        shape* obj = scene[i];
         float obj_sdf = obj->sdf(p);
 
         if (obj_sdf < sdf) {

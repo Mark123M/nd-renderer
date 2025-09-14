@@ -13,6 +13,7 @@
 #include "nsphere.h"
 #include "ncube.h"
 #include "cylinder.h"
+#include "quad.h"
 #include "projected_cylinder.h"
 #include "camera.h"
 #include "world.h"
@@ -110,18 +111,18 @@ static bool handle_inputs_cuda() {
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_UpArrow)) {
-        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
-        world::rotate_yw_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
+        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
+        world::rotate_yw_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
         did_input = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_DownArrow)) {
-        world::rotate_yz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
+        world::rotate_yz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
         did_input = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_LeftArrow)) {
-        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
+        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
         did_input = true;
     }
 
@@ -132,7 +133,8 @@ static float handle_inputs() {
     bool did_input = false;
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->translate(vec4(-CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
         }
 
@@ -140,7 +142,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->translate(vec4(CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
         }
 
@@ -148,7 +151,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->translate(vec4(0.f, CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         }
 
@@ -156,7 +160,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->translate(vec4(0.f, -CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         }
         
@@ -164,7 +169,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->rotate_xz(ROTATE_RATE * fixed_delta_time);
             c->rotate_yw(ROTATE_RATE * fixed_delta_time);
         }
@@ -173,7 +179,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->rotate_yz(ROTATE_RATE * fixed_delta_time);
         }
 
@@ -181,7 +188,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->rotate_xz(ROTATE_RATE * fixed_delta_time);
         }
 
@@ -299,10 +307,10 @@ void tesseract_lines() {
         int idx2 = edges[i][1];
 
         vec4 move(L / 2, L / 2, L / 2, L / 2);
-        projected_cylinder* pc = new projected_cylinder;
-        pc->start0 = vertices[idx1] - move;
-        pc->end0 = vertices[idx2] - move;
-        pc->mat_idx = 0;
+        projected_cylinder pc;
+        pc.start0 = vertices[idx1] - move;
+        pc.end0 = vertices[idx2] - move;
+        pc.mat_idx = 0;
         scene.push_back(pc);
     }
 
@@ -417,10 +425,10 @@ void tesseract_lines_reflector() {
         int idx2 = edges[i][1];
 
         vec4 move(L / 2, L / 2, L / 2, L / 2);
-        projected_cylinder* pc = new projected_cylinder;
-        pc->start0 = vertices[idx1] - move;
-        pc->end0 = vertices[idx2] - move;
-        pc->mat_idx = 0;
+        projected_cylinder pc;
+        pc.start0 = vertices[idx1] - move;
+        pc.end0 = vertices[idx2] - move;
+        pc.mat_idx = 0;
         scene.push_back(pc);
     }
 
@@ -428,9 +436,9 @@ void tesseract_lines_reflector() {
     material* sphere_mat = new specular(sphere_color);
     materials.push_back(sphere_mat);
 
-    nsphere* ns = new nsphere;
-    ns->radius = 0.25f;
-    ns->mat_idx = 1;
+    nsphere ns;
+    ns.radius = 0.25f;
+    ns.mat_idx = 1;
     //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
@@ -463,22 +471,22 @@ void tesseract() {
     material* floor_mat = new lambertian(floor_color);
     materials.push_back(floor_mat);
 
-    ncube* nc = new ncube;
+    ncube nc;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
-    nc->mat_idx = 0;
+    nc.mat_idx = 0;
     scene.push_back(nc);
 
-    nsphere* ns = new nsphere;
-    ns->radius = 0.5f;
-    ns->mat_idx = 1;
-    ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    nsphere ns;
+    ns.radius = 0.5f;
+    ns.mat_idx = 1;
+    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    nsphere* floor = new nsphere;
-    floor->radius = 100.f;
-    floor->mat_idx = 2;
-    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
+    nsphere floor;
+    floor.radius = 100.f;
+    floor.mat_idx = 2;
+    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
@@ -500,22 +508,22 @@ void all_white() {
     material* floor_mat = new lambertian(floor_color);
     materials.push_back(floor_mat);
 
-    ncube* nc = new ncube;
+    ncube nc;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
-    nc->mat_idx = 0;
+    nc.mat_idx = 0;
     scene.push_back(nc);
 
-    nsphere* ns = new nsphere;
-    ns->radius = 0.5f;
-    ns->mat_idx = 1;
-    ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    nsphere ns;
+    ns.radius = 0.5f;
+    ns.mat_idx = 1;
+    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    nsphere* floor = new nsphere;
-    floor->radius = 100.f;
-    floor->mat_idx = 2;
-    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
+    nsphere floor;
+    floor.radius = 100.f;
+    floor.mat_idx = 2;
+    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
@@ -537,22 +545,22 @@ void tesseract_reflector() {
     material* floor_mat = new lambertian(floor_color);
     materials.push_back(floor_mat);
 
-    ncube* nc = new ncube;
+    ncube nc;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
-    nc->mat_idx = 0;
+    nc.mat_idx = 0;
     scene.push_back(nc);
 
-    nsphere* ns = new nsphere;
-    ns->radius = 0.5f;
-    ns->mat_idx = 1;
-    ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    nsphere ns;
+    ns.radius = 0.5f;
+    ns.mat_idx = 1;
+    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    nsphere* floor = new nsphere;
-    floor->radius = 100.f;
-    floor->mat_idx = 2;
-    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
+    nsphere floor;
+    floor.radius = 100.f;
+    floor.mat_idx = 2;
+    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
@@ -573,22 +581,22 @@ void tesseract_glass() {
     material* floor_mat = new lambertian(floor_color);
     materials.push_back(floor_mat);
 
-    ncube* nc = new ncube;
+    ncube nc;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
-    nc->mat_idx = 0;
+    nc.mat_idx = 0;
     scene.push_back(nc);
 
-    nsphere* ns = new nsphere;
-    ns->radius = 0.5f;
-    ns->mat_idx = 1;
-    ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    nsphere ns;
+    ns.radius = 0.5f;
+    ns.mat_idx = 1;
+    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    nsphere* floor = new nsphere;
-    floor->radius = 100.f;
-    floor->mat_idx = 2;
-    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
+    nsphere floor;
+    floor.radius = 100.f;
+    floor.mat_idx = 2;
+    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
@@ -613,28 +621,28 @@ void spheres() {
     material* floor_mat = new lambertian(floor_color);
     materials.push_back(floor_mat);
 
-    nsphere* ns = new nsphere;
-    ns->radius = 0.5f;
-    ns->mat_idx = 0;
-    ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    nsphere ns;
+    ns.radius = 0.5f;
+    ns.mat_idx = 0;
+    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    nsphere* ns2 = new nsphere;
-    ns2->radius = 0.5f;
-    ns2->mat_idx = 1;
-    ns2->translate(vec4(0.f, 0.f, -1.f, 0.f));
+    nsphere ns2;
+    ns2.radius = 0.5f;
+    ns2.mat_idx = 1;
+    ns2.translate(vec4(0.f, 0.f, -1.f, 0.f));
     scene.push_back(ns2);
 
-    nsphere* ns3 = new nsphere;
-    ns3->radius = 0.5f;
-    ns3->mat_idx = 2;
-    ns3->translate(vec4(1.f, 0.f, -1.f, 0.f));
+    nsphere ns3;
+    ns3.radius = 0.5f;
+    ns3.mat_idx = 2;
+    ns3.translate(vec4(1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns3);
 
-    nsphere* floor = new nsphere;
-    floor->radius = 100.f;
-    floor->mat_idx = 3;
-    floor->translate(vec4(0.f, -100.5f, -1.f, 0.f));
+    nsphere floor;
+    floor.radius = 100.f;
+    floor.mat_idx = 3;
+    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
     direction_light* lig1 = new direction_light;
@@ -643,36 +651,50 @@ void spheres() {
     lights.push_back(lig1);
 }
 
+// BSDFs are modelled with the unit half 3-sphere (if there is a 4-th spatial dimension it makes sense?)
+void cornell_box() {
+    material* red = new lambertian(color(0.65f, 0.05f, 0.05f));
+    materials.push_back(red);
+    material* white = new lambertian(color(0.73f, 0.73f, 0.73f));
+    materials.push_back(white);
+    material* green = new lambertian(color(0.12f, 0.45f, 0.15f));
+    materials.push_back(green);
+
+    /*managed_ptr<quad> q1 = make_managed<quad>();
+    q1->mat_idx = 0;
+    scene.push_back(std::move(std::move(q1))); */
+}
+
 void shape_axes() {
-    projected_cylinder* x_axis = new projected_cylinder;
-    x_axis->end0 = point4(AXIS_LEN, 0.f, 0.f, 0.f);
-    x_axis->radius = AXIS_RADIUS;
+    projected_cylinder x_axis;
+    x_axis.end0 = point4(AXIS_LEN, 0.f, 0.f, 0.f);
+    x_axis.radius = AXIS_RADIUS;
     material* x_mat = new lambertian(color(1.f, 0.f, 0.f));
-    x_axis->mat_idx = materials.size();
+    x_axis.mat_idx = materials.size();
     materials.push_back(x_mat);
     scene.push_back(x_axis);
 
-    projected_cylinder* y_axis = new projected_cylinder;
-    y_axis->end0 = point4(0.f, AXIS_LEN, 0.f, 0.f);
-    y_axis->radius = AXIS_RADIUS;
+    projected_cylinder y_axis;
+    y_axis.end0 = point4(0.f, AXIS_LEN, 0.f, 0.f);
+    y_axis.radius = AXIS_RADIUS;
     material* y_mat = new lambertian(color(0.f, 1.f, 0.f));
-    y_axis->mat_idx = materials.size();
+    y_axis.mat_idx = materials.size();
     materials.push_back(y_mat);
     scene.push_back(y_axis);
 
-    projected_cylinder* z_axis = new projected_cylinder;
-    z_axis->end0 = point4(0.f, 0.f, AXIS_LEN, 0.f);
-    z_axis->radius = AXIS_RADIUS;
+    projected_cylinder z_axis;
+    z_axis.end0 = point4(0.f, 0.f, AXIS_LEN, 0.f);
+    z_axis.radius = AXIS_RADIUS;
     material* z_mat = new lambertian(color(0.f, 0.f, 1.f));
-    z_axis->mat_idx = materials.size();
+    z_axis.mat_idx = materials.size();
     materials.push_back(z_mat);
     scene.push_back(z_axis);
 
-    projected_cylinder* w_axis = new projected_cylinder;
-    w_axis->end0 = point4(0.f, 0.f, 0.f, AXIS_LEN);
-    w_axis->radius = AXIS_RADIUS;
+    projected_cylinder w_axis;
+    w_axis.end0 = point4(0.f, 0.f, 0.f, AXIS_LEN);
+    w_axis.radius = AXIS_RADIUS;
     material* w_mat = new lambertian(color(0.73f, 0.33f, 0.827f));
-    w_axis->mat_idx = materials.size();
+    w_axis.mat_idx = materials.size();
     materials.push_back(w_mat);
     scene.push_back(w_axis);
 }
@@ -728,6 +750,7 @@ int main() {
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     //spheres();
+    //cornell_box();
     //tesseract_lines();
     //tesseract();
     //tesseract_reflector();
@@ -741,16 +764,12 @@ int main() {
     // tesseract lines with a sphere in the middle?
     // tesseract solid reflectors?
 
-    for (shape* s : scene) {
-        total_scene_bytes += s->size();
-    }
-
-    for (material* mat : materials) {
-        total_materials_bytes += mat->size();
+    for (size_t i = 0; i < materials.size(); i++) {
+        total_materials_bytes += materials[i]->size();
     }
     
-    for (light* l : lights) {
-        total_lights_bytes += l->size();
+    for (size_t i = 0; i < lights.size(); i++) {
+        total_lights_bytes += lights[i]->size();
     }
 
     world::initialize();
@@ -849,8 +868,8 @@ int main() {
             dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
             (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
 
-            camera::render_kernel<<<num_blocks, threads_per_block, total_scene_bytes + total_lights_bytes + total_materials_bytes + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-            (d_image_data, camera::image_width, camera::image_height, total_scene_bytes, total_lights_bytes, total_materials_bytes);
+            camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + total_lights_bytes + total_materials_bytes + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
+            (d_image_data, camera::image_width, camera::image_height, scene.d_data, scene.data_size, total_lights_bytes, total_materials_bytes);
 
             //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
@@ -910,10 +929,6 @@ int main() {
     }
 
     world::destruct<<<1,1>>>();
-    
-    for (shape* s : scene) {
-        delete s;
-    }
 
     for (light* l : lights) {
         delete l;

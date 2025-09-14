@@ -27,7 +27,9 @@ struct shape {
 
 	__host__ __device__ shape() : basis{identity_affine, identity_affine} {}
 
-	__host__ __device__ virtual float sdf(const point4& p) const = 0;
+	__host__ __device__ virtual float sdf(const point4& p) const {
+		return 0.f;
+	}
 
 	__host__ __device__ virtual bool intersect(const ray& r, hit_result& res) const {
 		return false;
