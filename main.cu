@@ -20,6 +20,7 @@
 #include "direction_light.h"
 #include "lambertian.h"
 #include "dielectric.h"
+#include "light_material.h"
 #include "util.h"
 
 #include <cuda_runtime.h>
@@ -652,17 +653,90 @@ void spheres() {
 }
 
 // BSDFs are modelled with the unit half 3-sphere (if there is a 4-th spatial dimension it makes sense?)
-void cornell_box() {
-    lambertian red(color(0.65f, 0.05f, 0.05f));
+void quad_light_test() {
+    lambertian red(color(1.f, 1.f, 0.05f));
     materials.push_back(red);
-    lambertian white(color(0.73f, 0.73f, 0.73f));
+    light_material white(color(4.f, 4.f, 4.f));
     materials.push_back(white);
     lambertian green(color(0.12f, 0.45f, 0.15f));
     materials.push_back(green);
 
-    /*managed_ptr<quad> q1 = make_managed<quad>();
-    q1->mat_idx = 0;
-    scene.push_back(std::move(std::move(q1))); */
+    quad q1(point4(-3.f, -2.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q1.mat_idx = 0;
+    scene.push_back(q1);
+
+    quad q2(point4(-2.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f), vec4(0.f, 1.f, 0.f, 0.f));
+    q2.mat_idx = 1;
+    scene.push_back(q2);
+}
+
+void cornell_box() {
+    lambertian red(color(0.65f, 0.05f, 0.05f));
+    lambertian white(color(0.73f, 0.73f, 0.73f));
+    lambertian green(color(0.12f, 0.45f, 0.15f));
+    light_material ceiling(color(15.f, 15.f, 15.f));
+    materials.push_back(red);
+    materials.push_back(white);
+    materials.push_back(green);
+    materials.push_back(ceiling);
+
+    quad q1(point4(555.f, 0.f, 0.f, 0.f), vec4(0.f, 555.f, 0.f, 0.f), vec4(0.f, 0.f, 555.f, 0.f));
+    q1.mat_idx = 2;
+    quad q2(point4(0.f, 0.f, 0.f, 0.f), vec4(0.f, 555.f, 0.f, 0.f), vec4(0.f, 0.f, 555.f, 0.f));
+    q2.mat_idx = 0;
+    quad q3(point4(343.f, 554.f, 332.f, 0.f), vec4(-130.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -105.f, 0.f));
+    q3.mat_idx = 3;
+    quad q4(point4(0.f, 0.f, 0.f, 0.f), vec4(555.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, 555.f, 0.f));
+    q4.mat_idx = 1;
+    quad q5(point4(555.f, 555.f, 555.f, 0.f), vec4(-555.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -555.f, 0.f));
+    q5.mat_idx = 1;
+    quad q6(point4(0.f, 0.f, 555.f, 0.f), vec4(555.f, 0.f, 0.f, 0.f), vec4(0.f, 555.f, 0.f, 0.f));
+    q6.mat_idx = 1;
+    scene.push_back(q1);
+    scene.push_back(q2);
+    scene.push_back(q3);
+    scene.push_back(q4);
+    scene.push_back(q5);
+    scene.push_back(q6);
+}
+
+void my_cornell_box() {
+    lambertian red(color(0.65f, 0.05f, 0.05f));
+    lambertian white(color(0.73f, 0.73f, 0.73f));
+    lambertian green(color(0.12f, 0.45f, 0.15f));
+    light_material ceiling(color(30.f, 30.f, 30.f));
+    materials.push_back(red);
+    materials.push_back(white);
+    materials.push_back(green);
+    materials.push_back(ceiling);
+
+    quad q1(point4(-2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q1.mat_idx = 2;
+    scene.push_back(q1);
+
+    quad q2(point4(2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q2.mat_idx = 0;
+    scene.push_back(q2);
+
+    quad q3(point4(-2.f, -2.f, -2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q3.mat_idx = 1;
+    scene.push_back(q3);
+
+    quad q4(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
+    q4.mat_idx = 1;
+    scene.push_back(q4);
+
+    quad q5(point4(-2.f, 2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
+    q5.mat_idx = 1;
+    scene.push_back(q5);
+
+    quad q6(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q6.mat_idx = 1;
+    scene.push_back(q6);
+
+    quad area_light(point4(-1.f, 1.99f, 1.f, 0.f), vec4(1.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f));
+    area_light.mat_idx = 3;
+    scene.push_back(area_light);
 }
 
 void shape_axes() {
@@ -750,12 +824,14 @@ int main() {
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     //spheres();
+    //quad_light_test();
+    my_cornell_box();
     //cornell_box();
     //tesseract_lines();
     //tesseract();
     //tesseract_reflector();
     //tesseract_lines_reflector();
-    tesseract_glass();
+    //tesseract_glass();
     //all_white();
     //shape_axes();
     

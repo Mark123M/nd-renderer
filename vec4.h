@@ -110,6 +110,18 @@ struct vec4 {
 		return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
 	}
 
+	// Cross product of the first three elements (w must be equal)
+	__host__ __device__ static vec4 cross(const vec4& a, const vec4& b) {
+		assert(a.w == b.w);
+
+		return vec4(
+			a.y * b.z - a.z * b.y,  // New X component
+			a.z * b.x - a.x * b.z,  // New Y component
+			a.x * b.y - a.y * b.x,  // New Z component
+			a.w                     // Preserve the w component
+    	);
+	}
+
 	__host__ __device__ static float max_comp(const vec4& v) {
 		return fmaxf(v.x, fmaxf(v.y, fmaxf(v.z, v.w)));
 	}
@@ -146,6 +158,24 @@ struct vec4 {
 		} else {
 			return -unit;
 		}
+	}
+
+	__host__ __device__ static vec4 rand_unit_disk_vector(uint64_t& pcg_state) {
+		while (true) {
+			auto p = vec4{ randf_pcg32(-1, 1, pcg_state), 0.f, randf_pcg32(-1, 1, pcg_state), 0.f};
+			if (p.length_squared() < 1)
+				return p;
+		}
+	}
+
+	__host__ __device__ static vec4 sample_wm(vec4 w, float alpha_x, float alpha_y, float alpha_z) {
+		vec4 wh = vec4::normalize(vec4(alpha_x * w.x, alpha_y * w.y, alpha_z * w.z, w.w));
+		if (wh.y < 0) {
+			wh = -wh;
+		}
+
+		//transform m = transform::get_shading_transform(wh);
+		return {0, 0, 0, 0};
 	}
 
 	__host__ __device__ void print() {

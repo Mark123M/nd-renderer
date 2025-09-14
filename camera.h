@@ -134,7 +134,7 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
 
         if (!hit) {
             float a = 0.5f * (r.dir.y + 1.f);
-            return col; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+            return color(0.f, 0.f, 0.f); //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
         }
 
         const vec4& normal = res.normal;
@@ -145,8 +145,11 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         
         bsdf_sample bs;
         material* mat = shared_materials[res.target->mat_idx];
-        mat->sample_f(-r.dir, res.m, bs, pcg_state);
-        col *= bs.f;
+        if (!mat->sample_f(-r.dir, res.m, bs, pcg_state)) { // material is not reflective, return
+            return col * bs.f;
+        } else {
+            col *= bs.f;
+        }
         r = ray(res.p + EPSILON * bs.wi, bs.wi);
         
         /* color total_lighting(0.f, 0.f, 0.f);
