@@ -299,7 +299,7 @@ void tesseract_lines() {
     };
 
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    material* edge_mat = new lambertian(edge_color);
+    lambertian edge_mat(edge_color);
     materials.push_back(edge_mat);
 
     for (int i = 0; i < 32; ++i) {
@@ -324,9 +324,9 @@ void tesseract_lines() {
     ball->radius = 0.5f;
     ball->albedo = color(1.f, 0.f, 0.f);
     scene.push_back(ball.get());*/
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
@@ -417,7 +417,7 @@ void tesseract_lines_reflector() {
     };
 
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    material* edge_mat = new lambertian(edge_color);
+    lambertian edge_mat(edge_color);
     materials.push_back(edge_mat);
 
     for (int i = 0; i < 32; ++i) {
@@ -433,7 +433,7 @@ void tesseract_lines_reflector() {
     }
 
     color sphere_color(0.f, 1.f, 0.f);
-    material* sphere_mat = new specular(sphere_color);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
     nsphere ns;
@@ -452,23 +452,23 @@ void tesseract_lines_reflector() {
     ball->radius = 0.5f;
     ball->albedo = color(1.f, 0.f, 0.f);
     scene.push_back(ball.get());*/
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
 void tesseract() {
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    material* edge_mat = new lambertian(edge_color);
+    lambertian edge_mat(edge_color);
     materials.push_back(edge_mat);
 
     color sphere_color(0.f, 1.f, 0.f);
-    material* sphere_mat = new specular(sphere_color);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
     color floor_color(0.5f, 0.5f, 0.5f);
-    material* floor_mat = new lambertian(floor_color);
+    lambertian floor_mat(floor_color);
     materials.push_back(floor_mat);
 
     ncube nc;
@@ -489,23 +489,23 @@ void tesseract() {
     floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
 void all_white() {
     color edge_color(1.f, 1.f, 1.f); // Orange
-    material* edge_mat = new lambertian(edge_color);
+    lambertian edge_mat(edge_color);
     materials.push_back(edge_mat);
 
     color sphere_color(1.f, 1.f, 1.f);
-    material* sphere_mat = new specular(sphere_color);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
     color floor_color(1.f, 1.f, 1.f);
-    material* floor_mat = new lambertian(floor_color);
+    lambertian floor_mat(floor_color);
     materials.push_back(floor_mat);
 
     ncube nc;
@@ -526,23 +526,23 @@ void all_white() {
     floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
 void tesseract_reflector() {
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    material* edge_mat = new specular(edge_color);
+    specular edge_mat(edge_color);
     materials.push_back(edge_mat);
 
     color sphere_color(0.f, 1.f, 0.f);
-    material* sphere_mat = new specular(sphere_color);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
     color floor_color(0.5f, 0.5f, 0.5f);
-    material* floor_mat = new lambertian(floor_color);
+    lambertian floor_mat(floor_color);
     materials.push_back(floor_mat);
 
     ncube nc;
@@ -563,22 +563,22 @@ void tesseract_reflector() {
     floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
 void tesseract_glass() {
-    material* edge_mat = new dielectric(1.5f);
+    dielectric edge_mat(1.5f);
     materials.push_back(edge_mat);
 
     color sphere_color(0.f, 1.f, 0.f);
-    material* sphere_mat = new specular(sphere_color);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
     color floor_color(1.f, 0.8f, 0.5f);
-    material* floor_mat = new lambertian(floor_color);
+    lambertian floor_mat(floor_color);
     materials.push_back(floor_mat);
 
     ncube nc;
@@ -599,26 +599,26 @@ void tesseract_glass() {
     floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
 void spheres() {
     color sphere_color(0.9f, 0.5f, 0.9f);
-    material* sphere_mat = new specular(sphere_color);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
     color sphere2_color(0.f, 1.f, 1.f);
-    material* sphere2_mat = new specular(sphere2_color);
+    specular sphere2_mat(sphere2_color);
     materials.push_back(sphere2_mat);
 
-    material* sphere3_mat = new dielectric(1.5f);
+    dielectric sphere3_mat(1.5f);
     materials.push_back(sphere3_mat);
 
     color floor_color(0.5f, 0.5f, 0.5f);
-    material* floor_mat = new lambertian(floor_color);
+    lambertian floor_mat(floor_color);
     materials.push_back(floor_mat);
 
     nsphere ns;
@@ -645,19 +645,19 @@ void spheres() {
     floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
 // BSDFs are modelled with the unit half 3-sphere (if there is a 4-th spatial dimension it makes sense?)
 void cornell_box() {
-    material* red = new lambertian(color(0.65f, 0.05f, 0.05f));
+    lambertian red(color(0.65f, 0.05f, 0.05f));
     materials.push_back(red);
-    material* white = new lambertian(color(0.73f, 0.73f, 0.73f));
+    lambertian white(color(0.73f, 0.73f, 0.73f));
     materials.push_back(white);
-    material* green = new lambertian(color(0.12f, 0.45f, 0.15f));
+    lambertian green(color(0.12f, 0.45f, 0.15f));
     materials.push_back(green);
 
     /*managed_ptr<quad> q1 = make_managed<quad>();
@@ -669,7 +669,7 @@ void shape_axes() {
     projected_cylinder x_axis;
     x_axis.end0 = point4(AXIS_LEN, 0.f, 0.f, 0.f);
     x_axis.radius = AXIS_RADIUS;
-    material* x_mat = new lambertian(color(1.f, 0.f, 0.f));
+    lambertian x_mat(color(1.f, 0.f, 0.f));
     x_axis.mat_idx = materials.size();
     materials.push_back(x_mat);
     scene.push_back(x_axis);
@@ -677,7 +677,7 @@ void shape_axes() {
     projected_cylinder y_axis;
     y_axis.end0 = point4(0.f, AXIS_LEN, 0.f, 0.f);
     y_axis.radius = AXIS_RADIUS;
-    material* y_mat = new lambertian(color(0.f, 1.f, 0.f));
+    lambertian y_mat(color(0.f, 1.f, 0.f));
     y_axis.mat_idx = materials.size();
     materials.push_back(y_mat);
     scene.push_back(y_axis);
@@ -685,7 +685,7 @@ void shape_axes() {
     projected_cylinder z_axis;
     z_axis.end0 = point4(0.f, 0.f, AXIS_LEN, 0.f);
     z_axis.radius = AXIS_RADIUS;
-    material* z_mat = new lambertian(color(0.f, 0.f, 1.f));
+    lambertian z_mat(color(0.f, 0.f, 1.f));
     z_axis.mat_idx = materials.size();
     materials.push_back(z_mat);
     scene.push_back(z_axis);
@@ -693,7 +693,7 @@ void shape_axes() {
     projected_cylinder w_axis;
     w_axis.end0 = point4(0.f, 0.f, 0.f, AXIS_LEN);
     w_axis.radius = AXIS_RADIUS;
-    material* w_mat = new lambertian(color(0.73f, 0.33f, 0.827f));
+    lambertian w_mat(color(0.73f, 0.33f, 0.827f));
     w_axis.mat_idx = materials.size();
     materials.push_back(w_mat);
     scene.push_back(w_axis);
@@ -759,20 +759,17 @@ int main() {
     //all_white();
     //shape_axes();
     
+    size_t scene_len = scene.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_scene_len, &scene_len, sizeof(size_t)));
+    size_t lights_len = lights.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_lights_len, &lights_len, sizeof(size_t)));    
+    size_t materials_len = materials.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_materials_len, &materials_len, sizeof(size_t)));
 
     // can try space distortion too
     // tesseract lines with a sphere in the middle?
     // tesseract solid reflectors?
 
-    for (size_t i = 0; i < materials.size(); i++) {
-        total_materials_bytes += materials[i]->size();
-    }
-    
-    for (size_t i = 0; i < lights.size(); i++) {
-        total_lights_bytes += lights[i]->size();
-    }
-
-    world::initialize();
     camera::aspect_ratio = 16.f / 9.f;
     camera::image_width = 1280;
     // camera::render_normals = true;
@@ -868,8 +865,8 @@ int main() {
             dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
             (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
 
-            camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + total_lights_bytes + total_materials_bytes + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-            (d_image_data, camera::image_width, camera::image_height, scene.d_data, scene.data_size, total_lights_bytes, total_materials_bytes);
+            camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
+            (d_image_data, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
 
             //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
@@ -926,16 +923,6 @@ int main() {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(window);
-    }
-
-    world::destruct<<<1,1>>>();
-
-    for (light* l : lights) {
-        delete l;
-    }
-
-    for (material* m : materials) {
-        delete m;
     }
 
     gpuErrchk(cudaGraphicsUnregisterResource(render_texture_CUDA));

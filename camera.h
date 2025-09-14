@@ -33,25 +33,14 @@ static inline std::string time_stamp(const std::string& fmt = "%F__%H-%M-%S") {
     return { buf, std::strftime(buf, sizeof(buf), fmt.c_str(), &bt) };
 }
 
-//__managed__ managed_list<shape> scene;
-//managed_vector<managed_ptr<shape>> scene;
 device_list<shape> scene;
-//std::vector<shape*> scene;
-//__managed__ shape** m_scene;
-//__device__ char* d_scene_data;
 __constant__ size_t d_scene_len; // static scenes for now
 
-std::vector<light*> lights;
-__device__ light** d_lights;
-__device__ char* d_lights_data;
+device_list<light> lights;
 __constant__ size_t d_lights_len;
-size_t total_lights_bytes = 0;
 
-std::vector<material*> materials;
-__device__ material** d_materials;
-__device__ char* d_materials_data;
+device_list<material> materials;
 __constant__ size_t d_materials_len;
-size_t total_materials_bytes = 0;
 
 std::vector<uchar4> image_data;
 
@@ -174,7 +163,7 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
     return color(0.f, 0.f, 0.f);
 }
 
-__global__ void render_kernel(uchar4* d_image_data, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, size_t h_total_lights_bytes, size_t h_total_materials_bytes) {
+__global__ void render_kernel(uchar4* d_image_data, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
     extern __shared__ char buffer[];
 
     // buffer layout for shared memory
@@ -338,7 +327,8 @@ color ray_color(ray& r) {
 
     color total_lighting(0.f, 0.f, 0.f);
 
-    for (light* lig : lights) {
+    for (size_t i = 0; i < lights.len; i++) {
+        light* lig = lights[i];
         total_lighting += lig->Le(r.pos, normal);
         //printf("[CPU] Hit pos (%.3f, %.3f, %.3f, %.3f) | Total lighting (%.3f, %.3f, %.3f)\n",
         //r.pos.x, r.pos.y, r.pos.z, r.pos.w, total_lighting.r, total_lighting.g, total_lighting.b);
