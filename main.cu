@@ -84,7 +84,7 @@ static bool handle_inputs_cuda() {
 
     if (mouse_delta.y != 0.0f) {
         //world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
-        did_input = true;
+        //did_input = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_A)) {
@@ -876,10 +876,25 @@ int main() {
     bool is_rendering = true; //std::atomic<bool> is_rendering = true;
     uint row_range = std::ceil((float)camera::image_height / NUM_CPU_THREADS); // range: ceil(height / N)
 
-    image_data = std::vector<uchar4>(camera::image_width * camera::image_height);
+    uint num_pixels = camera::image_width * camera::image_height;
+    image_data = std::vector<uchar4>(num_pixels);
+
+    color* d_color_buffer;
+    gpuErrchk(cudaMalloc(&d_color_buffer, num_pixels * sizeof(color)));
+
     uchar4* d_image_data;
-    uint numel = camera::image_width * camera::image_height;
-    gpuErrchk(cudaMalloc(&d_image_data, numel * sizeof(uchar4)));
+    gpuErrchk(cudaMalloc(&d_image_data, num_pixels * sizeof(uchar4)));
+
+    //nvtxRangePush("Processing Inputs");
+    dim3 threads_per_block(16, 16);
+    dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
+    (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
+
+    uint64_t* d_pcg_states;
+    gpuErrchk(cudaMalloc(&d_pcg_states, num_pixels * sizeof(uint64_t)));
+    camera::init_pcg_states_kernel<<<num_blocks, threads_per_block>>>(d_pcg_states, camera::image_width, camera::image_height);
+
+    int num_samples = 0;
 
     while (!glfwWindowShouldClose(window)) {
         current_frame = glfwGetTime();
@@ -908,9 +923,6 @@ int main() {
         ImGui::NewFrame();
 
         if (false) {
-            dim3 threads_per_block(16, 16);
-            dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
-            (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
             test_render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height, static_cast<float>(glfwGetTime()));
 
             cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
@@ -934,15 +946,16 @@ int main() {
         ImGui::Begin("Render Output");
         //bool input_changed = handle_inputs();
         bool input_changed_cuda = handle_inputs_cuda();
-
         if (input_changed_cuda) {
-            nvtxRangePush("Processing Inputs");
-            dim3 threads_per_block(16, 16);
-            dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
-            (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
+            num_samples = 0;
+            gpuErrchk(cudaMemset(d_color_buffer, 0, num_pixels * sizeof(color)));
+            gpuErrchk(cudaMemset(d_image_data, 0, num_pixels * sizeof(uchar4)));
+        }
 
+        if (true) {
             camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-            (d_image_data, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
+            (num_samples, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
+            num_samples++;
 
             //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
@@ -958,7 +971,7 @@ int main() {
                     camera::image_height, // Height of the copy (rows)
                     cudaMemcpyDeviceToDevice)); // Type of copy (Device to Array)
             gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
-            nvtxRangePop();
+            //nvtxRangePop();
         }
 
         if (false) {
@@ -1003,7 +1016,9 @@ int main() {
 
     gpuErrchk(cudaGraphicsUnregisterResource(render_texture_CUDA));
     gpuErrchk(cudaDeviceSynchronize());
+    gpuErrchk(cudaFree(d_color_buffer));
     gpuErrchk(cudaFree(d_image_data));
+    gpuErrchk(cudaFree(d_pcg_states));
 
     is_rendering = false;
     glDeleteTextures(1, &render_texture); // Clean up the texture
