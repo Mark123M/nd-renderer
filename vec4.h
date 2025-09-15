@@ -105,6 +105,10 @@ struct vec4 {
 		return vec4(-wo.x, wo.y, -wo.z, -wo.w);
 	}
 
+	__host__ __device__ static vec4 reflect(const vec4& wo, const vec4& n) {
+		return -wo + 2 * vec4::dot(wo, n) * n;
+	}
+
 
 	__host__ __device__ static float dot(const vec4& a, const vec4& b) {
 		return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
@@ -168,14 +172,27 @@ struct vec4 {
 		}
 	}
 
-	__host__ __device__ static vec4 sample_wm(vec4 w, float alpha_x, float alpha_y, float alpha_z) {
-		vec4 wh = vec4::normalize(vec4(alpha_x * w.x, alpha_y * w.y, alpha_z * w.z, w.w));
-		if (wh.y < 0) {
-			wh = -wh;
-		}
+	__host__ __device__ static float cos2_theta(const vec4& w) {
+		return w.y * w.y;
+	}
 
-		//transform m = transform::get_shading_transform(wh);
-		return {0, 0, 0, 0};
+	__host__ __device__ static float sin2_theta(const vec4& w) {
+		return fmaxf(0.f, 1.f - cos2_theta(w));
+	}
+
+	__host__ __device__ static float tan2_theta(const vec4& w) {
+		return sin2_theta(w) / cos2_theta(w);
+	}
+
+	// NOT CORRECT FOR 4D POLAR ANGLES
+	__host__ __device__ static float cos_phi(const vec4& w) {
+		float sin_theta = sqrtf(sin2_theta(w));
+		return (sin_theta == 0) ? 1 : clamp(w.x / sin_theta, -1.f, 1.f);
+	}
+
+	__host__ __device__ static float sin_phi(const vec4& w) {
+		float sin_theta = sqrtf(sin2_theta(w));
+		return (sin_theta == 0) ? 0 : clamp(w.z / sin_theta, -1.f, 1.f);
 	}
 
 	__host__ __device__ void print() {

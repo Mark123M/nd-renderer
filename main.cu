@@ -581,7 +581,7 @@ void tesseract_reflector() {
 }
 
 void tesseract_glass() {
-    dielectric edge_mat(1.5f);
+    smooth_dielectric edge_mat(1.5f);
     materials.push_back(edge_mat);
 
     color sphere_color(0.f, 1.f, 0.f);
@@ -625,7 +625,7 @@ void spheres() {
     specular sphere2_mat(sphere2_color);
     materials.push_back(sphere2_mat);
 
-    dielectric sphere3_mat(1.5f);
+    smooth_dielectric sphere3_mat(1.5f);
     materials.push_back(sphere3_mat);
 
     color floor_color(0.5f, 0.5f, 0.5f);
@@ -752,12 +752,15 @@ void my_cornell_box() {
     materials.push_back(lamb);
     specular spec(color(1.f, 1.f, 1.f));
     materials.push_back(spec);
-    dielectric glass(1.5f);
+    smooth_dielectric glass(1.5f);
     materials.push_back(glass);
+    rough_dielectric stained_glass(1.5f);
+    stained_glass.alpha = 0.01f;
+    materials.push_back(stained_glass);
 
     ncube nc;
     nc.half_len = 0.35f;
-    nc.mat_idx = 5;
+    nc.mat_idx = 7;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
     scene.push_back(nc);
@@ -770,7 +773,7 @@ void my_cornell_box() {
 
     nsphere ns3;
     ns3.radius = 0.7f;
-    ns3.mat_idx = 6;
+    ns3.mat_idx = 5;
     ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
     scene.push_back(ns3);
 

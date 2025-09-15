@@ -170,6 +170,10 @@ __host__ __device__ float deg2rad(float deg) {
 	return deg * pi / 180.f;
 }
 
+__host__ __device__ float clamp(float x, float min_x, float max_x) {
+   return fminf(max_x, fmaxf(min_x, x));
+}
+
 constexpr uint64_t multiplier = 6364136223846793005u;
 constexpr uint64_t increment  = 1442695040888963407u;	// Or an arbitrary odd constant
 

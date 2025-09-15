@@ -14,6 +14,8 @@ struct color {
 
     __host__ __device__ color(float r0, float g0, float b0): r{r0}, g{g0}, b{b0} {}
 
+    __host__ __device__ color(float k): r{k}, g{k}, b{k} {}
+
     __host__ __device__ color operator+(const color& other) {
         return { r + other.r, g + other.g, b + other.b };
     }
@@ -39,6 +41,17 @@ struct color {
 
     __host__ __device__ color operator*(float k) {
         return {r * k, g * k, b * k};
+    }
+
+    __host__ __device__ color operator/(float k) {
+        return { r / k, g / k, b / k };
+    }
+
+    __host__ __device__ color& operator/=(float k) {
+        r /= k;
+        g /= k;
+        b /= k;
+        return *this;
     }
 };
 
