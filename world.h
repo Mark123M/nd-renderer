@@ -28,6 +28,11 @@ __global__ void move_camera_z_kernel(float amount) {
     camera::refresh_view_cuda();
 }
 
+__global__ void move_camera_w_kernel(float amount) {
+    camera::d_camera_transform.translate(amount * camera::d_camera_transform.get_vec_w());
+    camera::refresh_view_cuda();
+}
+
 __global__ void rotate_camera_horizontal_kernel(float angle) {
     camera::d_camera_transform.rotate_xz(angle);
     camera::refresh_view_cuda();

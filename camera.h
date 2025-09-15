@@ -42,8 +42,6 @@ __constant__ size_t d_lights_len;
 device_list<material> materials;
 __constant__ size_t d_materials_len;
 
-std::vector<uchar4> image_data;
-
 namespace camera {
 
 float aspect_ratio = 1.f;
@@ -207,14 +205,9 @@ __global__ void render_kernel(int num_samples, color* d_color_buffer, uchar4* d_
     uint idx = row * width + col;
 
     if (row < height && col < width) {
-        // need device versions of these functions/structs
-        //point4 pixel_center = d_pixel00_center + (col * d_pixel_x) + (row * d_pixel_y);
-        //vec4 direction = vec4::normalize(pixel_center - d_camera_transform.get_pos());
-        //ray r(d_camera_transform.get_pos(), direction);
         point4 camera_pos = d_camera_transform.get_pos();
         float row_offset = randf_pcg32(-0.5f, 0.5f, d_pcg_states[idx]);
         float col_offset = randf_pcg32(-0.5f, 0.5f, d_pcg_states[idx]);
-        //vec4 offset{ randf_pcg32(-0.5f, 0.5f, pcg_state), randf_pcg32(-0.5f, 0.5f, pcg_state), 0.f, 0.f }; // Random point from center of unit square -0.5 <= x, y < 0.5
         
         point4 sample = d_pixel00_center + ((col + col_offset) * d_pixel_x) + ((row + row_offset) * d_pixel_y);
         vec4 direction = vec4::normalize(sample - camera_pos);
@@ -227,28 +220,6 @@ __global__ void render_kernel(int num_samples, color* d_color_buffer, uchar4* d_
         d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].g) * 255.999f);
         d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].b) * 255.999f);
         d_image_data[idx].w = 255;
-        // r / n => (r + x) / (n + 1) = r / (n + 1) + x / (n + 1) = (r / n) * (n / (n + 1)) + x / (n + 1)
-        
-        /*
-        point4 camera_pos = d_camera_transform.get_pos();
-        color c(0.f, 0.f, 0.f);
-
-        // TODO: progressive renderer that draws k SPP every frame until total is reached (improve frame rates and interactions)
-        for (uint s = 0; s < SAMPLES_PER_PIXEL; s++) {
-            float row_offset = randf_pcg32(-0.5f, 0.5f, pcg_state);
-            float col_offset = randf_pcg32(-0.5f, 0.5f, pcg_state);
-            //vec4 offset{ randf_pcg32(-0.5f, 0.5f, pcg_state), randf_pcg32(-0.5f, 0.5f, pcg_state), 0.f, 0.f }; // Random point from center of unit square -0.5 <= x, y < 0.5
-            point4 sample = d_pixel00_center + ((col + col_offset) * d_pixel_x) + ((row + row_offset) * d_pixel_y);
-            vec4 direction = vec4::normalize(sample - camera_pos);
-            ray r(camera_pos, direction);
-            c += ray_color_cuda(r, shared_scene, shared_lights, shared_materials, pcg_state);
-        }
-
-        d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, c.r / SAMPLES_PER_PIXEL) * 255.999f);
-        d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, c.g / SAMPLES_PER_PIXEL) * 255.999f);
-        d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, c.b / SAMPLES_PER_PIXEL) * 255.999f);
-        d_image_data[idx].w = 255; */
-
     }
 }
 
@@ -279,6 +250,24 @@ __global__ void render_stride_kernel(uchar4* d_image_data, uint width, uint num_
         d_image_data[i].w = 255; */
     
     }
+}
+
+void export_image(uchar4* d_image_data, uint num_pixels) {
+    std::vector<uchar4> image_data(num_pixels);
+    gpuErrchk(cudaMemcpy(image_data.data(), d_image_data, num_pixels * sizeof(uchar4), cudaMemcpyDeviceToHost));
+    std::ofstream file{ "renders/" + time_stamp() + ".ppm", std::ios::app };
+    file << "P3\n" << image_width << " " << image_height << "\n255\n";
+
+    for (uint row = 0; row < image_height; row++) {
+        std::clog << "\rScanlines remaining: " << (image_height - row) << "     " << std::flush;
+        for (uint col = 0; col < image_width; col++) {
+            uint idx = row * image_width + col;
+            file << (int)image_data[idx].x << " " << (int)image_data[idx].y << " " << (int)image_data[idx].z << " ";
+        }
+    }
+    
+    std::clog << "\rEXPORT COMPLETE                                                    \n";
+    file.close();
 }
 
 float scene_sdf(const point4& p, shape** target_ptr) {
@@ -324,8 +313,6 @@ vec4 get_normal(const point4& p) {
 }
 
 void ray_march(ray& r, shape** target_ptr) {
-    //float a = 0.5f * (r.dir.y + 1.f);
-    //return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
     do {
         float dist = scene_sdf(r.pos, target_ptr);
 
@@ -427,10 +414,10 @@ void render_rt(uint first_row, uint last_row) {
             ray r(camera_transform.get_pos(), direction);
             
             color color = ray_color(r);
-            image_data[idx].x = static_cast<unsigned char>(fminf(1.f, color.r) * 255.999f);
+            /*image_data[idx].x = static_cast<unsigned char>(fminf(1.f, color.r) * 255.999f);
             image_data[idx].y = static_cast<unsigned char>(fminf(1.f, color.g) * 255.999f);
             image_data[idx].z = static_cast<unsigned char>(fminf(1.f, color.b) * 255.999f);
-            image_data[idx].w = 255;
+            image_data[idx].w = 255;*/
         }
     }
 }

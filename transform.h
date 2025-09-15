@@ -34,8 +34,8 @@ struct transform {
 	// simple rotation over the a-b plane
 	__host__ __device__ void rotate(float angle, uint a, uint b) {
 		affine R = rotate_mat(angle, a, b);
-		linear = matmul(R, linear); // AR(R^-1A^-1)
-		inv_linear = matmul(inv_linear, R.transpose());
+		linear = matmul(linear, R); // AR(R^-1A^-1)
+		inv_linear = matmul(R.transpose(), inv_linear);
 	}
 
 	// R * T * R
@@ -45,14 +45,14 @@ struct transform {
 		T.m[1][4] = t.y;
 		T.m[2][4] = t.z;
 		T.m[3][4] = t.w;
-		linear = matmul(linear, T); // TA(A^-1T^-1)
+		linear = matmul(T, linear); // TA(A^-1T^-1)
 
 		affine T_inv = identity_affine;
 		T_inv.m[0][4] = -t.x;
 		T_inv.m[1][4] = -t.y;
 		T_inv.m[2][4] = -t.z;
 		T_inv.m[3][4] = -t.w;
-		inv_linear = matmul(T_inv, inv_linear);
+		inv_linear = matmul(inv_linear, T_inv);
 	}
 
 	__host__ __device__ void rotate_xy(float angle) {

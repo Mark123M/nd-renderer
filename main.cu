@@ -77,14 +77,14 @@ static bool handle_inputs_cuda() {
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 mouse_delta = io.MouseDelta;
     
-    if (ImGui::IsKeyDown(ImGuiKey_Space) && mouse_delta.x != 0.0f) {
-        world::rotate_camera_horizontal_kernel<<<1, 1>>>(mouse_delta.x * CAMERA_ROTATE_RATE * fixed_delta_time);
+    if (ImGui::IsKeyDown(ImGuiKey_Space)) {
+        if (mouse_delta.x != 0.0f) {
+            world::rotate_camera_horizontal_kernel<<<1, 1>>>(mouse_delta.x * CAMERA_ROTATE_RATE * fixed_delta_time);
+        }
+        if (mouse_delta.y != 0.0f) {
+            world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
+        }
         did_input = true;
-    }
-
-    if (mouse_delta.y != 0.0f) {
-        //world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
-        //did_input = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_A)) {
@@ -108,6 +108,16 @@ static bool handle_inputs_cuda() {
     if (ImGui::IsKeyDown(ImGuiKey_S)) {
         //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, -MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         world::move_camera_z_kernel<<<1, 1>>>(CAMERA_MOVE_RATE * fixed_delta_time);
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyDown(ImGuiKey_Q)) {
+        world::move_camera_w_kernel<<<1, 1>>>(CAMERA_MOVE_RATE * fixed_delta_time);
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyDown(ImGuiKey_E)) {
+        world::move_camera_w_kernel<<<1, 1>>>(-CAMERA_MOVE_RATE * fixed_delta_time);
         did_input = true;
     }
 
@@ -746,14 +756,15 @@ void my_cornell_box() {
     materials.push_back(glass);
 
     ncube nc;
-    nc.mat_idx = 4;
+    nc.half_len = 0.35f;
+    nc.mat_idx = 5;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
     scene.push_back(nc);
 
     nsphere ns2;
     ns2.radius = 0.7f;
-    ns2.mat_idx = 5;
+    ns2.mat_idx = 4;
     ns2.translate(vec4(-1.f, -1.f, -1.f, 0.f));
     scene.push_back(ns2);
 
@@ -763,6 +774,11 @@ void my_cornell_box() {
     ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
     scene.push_back(ns3);
 
+    ncube nc2;
+    nc2.half_len = 0.35f;
+    nc2.mat_idx = 6;
+    nc2.translate(vec4(1.f, -1.5f, 1.5f, 0.f));
+    scene.push_back(nc2);
 }
 
 void shape_axes() {
@@ -832,7 +848,7 @@ int main() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
      // Setup Dear ImGui style
@@ -903,8 +919,6 @@ int main() {
     uint row_range = std::ceil((float)camera::image_height / NUM_CPU_THREADS); // range: ceil(height / N)
 
     uint num_pixels = camera::image_width * camera::image_height;
-    image_data = std::vector<uchar4>(num_pixels);
-
     color* d_color_buffer;
     gpuErrchk(cudaMalloc(&d_color_buffer, num_pixels * sizeof(color)));
 
@@ -1017,15 +1031,17 @@ int main() {
                 threads[i].join();
             }
 
-            glBindTexture(GL_TEXTURE_2D, render_texture);
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, camera::image_width, camera::image_height, GL_RGBA, GL_UNSIGNED_BYTE, image_data.data());
-            glBindTexture(GL_TEXTURE_2D, 0); // Unbind
+            //glBindTexture(GL_TEXTURE_2D, render_texture);
+            //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, camera::image_width, camera::image_height, GL_RGBA, GL_UNSIGNED_BYTE, image_data.data());
+            //glBindTexture(GL_TEXTURE_2D, 0); // Unbind
         }
 
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(camera::image_width, camera::image_height));
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        //ImGui::Text("Tesseract Center: (%.3f, %.3f, %.3f, %.3f)", center.x, center.y, center.z, center.w);
+        if (ImGui::Button("EXPORT IMAGE")) {
+            camera::export_image(d_image_data, num_pixels);
+        }
         ImGui::End();
 
         // Rendering
