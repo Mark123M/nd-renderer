@@ -22,10 +22,28 @@ struct affine {
 				wi += m[i][k] * v.get(k);
 			}
 
-			w.set(i, wi + m[i][4]);
+			// vec4 multiplication shouldn't translate
+			w.set(i, wi);
 		}
 
 		return w;
+	}
+
+	__host__ __device__ point4 pointmul(const point4& p) const {
+		point4 q;
+
+		for (int i = 0; i < 4; i++) {
+			float qi = 0.f;
+
+			for (int k = 0; k < 4; k++) {
+				qi += m[i][k] * p.get(k);
+			}
+
+			// point4 multiplication should translate
+			q.set(i, qi + m[i][4]);
+		}
+
+		return q;
 	}
 
 	__host__ __device__ affine transpose() const {
@@ -54,11 +72,11 @@ struct affine {
 		return { m[0][3], m[1][3], m[2][3], m[3][3] };
 	}
 
-	__host__ __device__ vec4 get_b() const {
+	__host__ __device__ point4 get_b() const {
 		return { m[0][4], m[1][4], m[2][4], m[3][4] };
     }
 
-	__host__ __device__ void set_b(const vec4& b) {
+	__host__ __device__ void set_b(const point4& b) {
         m[0][4] = b.x;
         m[1][4] = b.y;
         m[2][4] = b.z;

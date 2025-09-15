@@ -10,14 +10,30 @@ enum shape_type {
     CYLINDER, PROJECTED_CYLINDER, HYPERSPHERE, HYPERCUBE
 };
 
+struct shape;
+
+struct hit_result {
+	point4 p;
+	vec4 wo; // negative direction of ray
+	vec4 normal; // always pointing outwards
+	transform m;
+	float t = MAX_RAY_DIST;
+	const shape* target;
+};
+
 struct shape {
 	transform basis;
-	color albedo;
 	size_t mat_idx;
 
-	__host__ __device__ shape() : basis{identity_affine, identity_affine}, albedo{ 1.f, 1.f, 1.f } {}
+	__host__ __device__ shape() : basis{identity_affine, identity_affine} {}
 
-	__host__ __device__ virtual float sdf(const point4& p) const = 0;
+	__host__ __device__ virtual float sdf(const point4& p) const {
+		return 0.f;
+	}
+
+	__host__ __device__ virtual bool intersect(const ray& r, hit_result& res) const {
+		return false;
+	}
 
 	__host__ __device__ virtual void rotate(float angle, uint a, uint b) {
 		basis.rotate(angle, a, b);

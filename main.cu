@@ -13,11 +13,14 @@
 #include "nsphere.h"
 #include "ncube.h"
 #include "cylinder.h"
+#include "quad.h"
 #include "projected_cylinder.h"
 #include "camera.h"
 #include "world.h"
 #include "direction_light.h"
 #include "lambertian.h"
+#include "dielectric.h"
+#include "light_material.h"
 #include "util.h"
 
 #include <cuda_runtime.h>
@@ -81,7 +84,7 @@ static bool handle_inputs_cuda() {
 
     if (mouse_delta.y != 0.0f) {
         //world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
-        did_input = true;
+        //did_input = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_A)) {
@@ -109,18 +112,18 @@ static bool handle_inputs_cuda() {
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_UpArrow)) {
-        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
-        world::rotate_yw_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
+        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
+        world::rotate_yw_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
         did_input = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_DownArrow)) {
-        world::rotate_yz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
+        world::rotate_yz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
         did_input = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_LeftArrow)) {
-        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time);
+        world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
         did_input = true;
     }
 
@@ -131,7 +134,8 @@ static float handle_inputs() {
     bool did_input = false;
 
     if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->translate(vec4(-CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
         }
 
@@ -139,7 +143,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->translate(vec4(CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
         }
 
@@ -147,7 +152,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_W)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->translate(vec4(0.f, CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         }
 
@@ -155,7 +161,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->translate(vec4(0.f, -CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         }
         
@@ -163,7 +170,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->rotate_xz(ROTATE_RATE * fixed_delta_time);
             c->rotate_yw(ROTATE_RATE * fixed_delta_time);
         }
@@ -172,7 +180,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->rotate_yz(ROTATE_RATE * fixed_delta_time);
         }
 
@@ -180,7 +189,8 @@ static float handle_inputs() {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
-        for (shape* c : scene) {
+        for (size_t i = 0; i < scene.size(); i++) {
+            shape* c = scene[i];
             c->rotate_xz(ROTATE_RATE * fixed_delta_time);
         }
 
@@ -290,7 +300,7 @@ void tesseract_lines() {
     };
 
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    material* edge_mat = new lambertian(edge_color);
+    lambertian edge_mat(edge_color);
     materials.push_back(edge_mat);
 
     for (int i = 0; i < 32; ++i) {
@@ -298,10 +308,10 @@ void tesseract_lines() {
         int idx2 = edges[i][1];
 
         vec4 move(L / 2, L / 2, L / 2, L / 2);
-        projected_cylinder* pc = new projected_cylinder;
-        pc->start0 = vertices[idx1] - move;
-        pc->end0 = vertices[idx2] - move;
-        pc->mat_idx = 0;
+        projected_cylinder pc;
+        pc.start0 = vertices[idx1] - move;
+        pc.end0 = vertices[idx2] - move;
+        pc.mat_idx = 0;
         scene.push_back(pc);
     }
 
@@ -315,9 +325,9 @@ void tesseract_lines() {
     ball->radius = 0.5f;
     ball->albedo = color(1.f, 0.f, 0.f);
     scene.push_back(ball.get());*/
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
@@ -408,7 +418,7 @@ void tesseract_lines_reflector() {
     };
 
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    material* edge_mat = new lambertian(edge_color);
+    lambertian edge_mat(edge_color);
     materials.push_back(edge_mat);
 
     for (int i = 0; i < 32; ++i) {
@@ -416,22 +426,21 @@ void tesseract_lines_reflector() {
         int idx2 = edges[i][1];
 
         vec4 move(L / 2, L / 2, L / 2, L / 2);
-        projected_cylinder* pc = new projected_cylinder;
-        pc->start0 = vertices[idx1] - move;
-        pc->end0 = vertices[idx2] - move;
-        pc->mat_idx = 0;
+        projected_cylinder pc;
+        pc.start0 = vertices[idx1] - move;
+        pc.end0 = vertices[idx2] - move;
+        pc.mat_idx = 0;
         scene.push_back(pc);
     }
 
     color sphere_color(0.f, 1.f, 0.f);
-    material* sphere_mat = new specular(sphere_color);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
-    nsphere* ns = new nsphere;
-    ns->center = point4(0.f, 0.f, 0.f, 0.f);
-    ns->radius = 0.25f;
-    ns->mat_idx = 1;
-    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    nsphere ns;
+    ns.radius = 0.25f;
+    ns.mat_idx = 1;
+    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
     /*std::unique_ptr<ncube> nc = std::make_unique<ncube>();
@@ -444,197 +453,322 @@ void tesseract_lines_reflector() {
     ball->radius = 0.5f;
     ball->albedo = color(1.f, 0.f, 0.f);
     scene.push_back(ball.get());*/
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
 void tesseract() {
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    material* edge_mat = new lambertian(edge_color);
+    lambertian edge_mat(edge_color);
     materials.push_back(edge_mat);
 
     color sphere_color(0.f, 1.f, 0.f);
-    material* sphere_mat = new specular(sphere_color);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
     color floor_color(0.5f, 0.5f, 0.5f);
-    material* floor_mat = new lambertian(floor_color);
+    lambertian floor_mat(floor_color);
     materials.push_back(floor_mat);
 
-    ncube* nc = new ncube;
-    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    nc->corner = cor;
-    nc->albedo = edge_color;
-    nc->mat_idx = 0;
+    ncube nc;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
+    nc.mat_idx = 0;
     scene.push_back(nc);
 
-    nsphere* ns = new nsphere;
-    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
-    ns->radius = 0.5f;
-    ns->mat_idx = 1;
-    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    nsphere ns;
+    ns.radius = 0.5f;
+    ns.mat_idx = 1;
+    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    nsphere* floor = new nsphere;
-    floor->radius = 100.f;
-    floor->mat_idx = 2;
-    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    nsphere floor;
+    floor.radius = 100.f;
+    floor.mat_idx = 2;
+    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
-void tesseract_one() {
+void all_white() {
     color edge_color(1.f, 1.f, 1.f); // Orange
-    material* edge_mat = new lambertian(edge_color);
+    lambertian edge_mat(edge_color);
     materials.push_back(edge_mat);
 
     color sphere_color(1.f, 1.f, 1.f);
-    material* sphere_mat = new specular(sphere_color);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
     color floor_color(1.f, 1.f, 1.f);
-    material* floor_mat = new lambertian(floor_color);
+    lambertian floor_mat(floor_color);
     materials.push_back(floor_mat);
 
-    ncube* nc = new ncube;
-    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    nc->corner = cor;
-    nc->albedo = edge_color;
-    nc->mat_idx = 0;
+    ncube nc;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
+    nc.mat_idx = 0;
     scene.push_back(nc);
 
-    nsphere* ns = new nsphere;
-    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
-    ns->radius = 0.5f;
-    ns->mat_idx = 1;
-    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    nsphere ns;
+    ns.radius = 0.5f;
+    ns.mat_idx = 1;
+    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    nsphere* floor = new nsphere;
-    floor->radius = 100.f;
-    floor->mat_idx = 2;
-    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    nsphere floor;
+    floor.radius = 100.f;
+    floor.mat_idx = 2;
+    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
 void tesseract_reflector() {
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    material* edge_mat = new specular(edge_color);
+    specular edge_mat(edge_color);
     materials.push_back(edge_mat);
 
     color sphere_color(0.f, 1.f, 0.f);
-    material* sphere_mat = new specular(sphere_color);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
     color floor_color(0.5f, 0.5f, 0.5f);
-    material* floor_mat = new lambertian(floor_color);
+    lambertian floor_mat(floor_color);
     materials.push_back(floor_mat);
 
-    ncube* nc = new ncube;
-    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    nc->corner = cor;
-    nc->albedo = edge_color;
-    nc->mat_idx = 0;
+    ncube nc;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
+    nc.mat_idx = 0;
     scene.push_back(nc);
 
-    nsphere* ns = new nsphere;
-    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
-    ns->radius = 0.5f;
-    ns->mat_idx = 1;
-    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    nsphere ns;
+    ns.radius = 0.5f;
+    ns.mat_idx = 1;
+    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    nsphere* floor = new nsphere;
-    floor->radius = 100.f;
-    floor->mat_idx = 2;
-    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    nsphere floor;
+    floor.radius = 100.f;
+    floor.mat_idx = 2;
+    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    lights.push_back(lig1);
+}
+
+void tesseract_glass() {
+    dielectric edge_mat(1.5f);
+    materials.push_back(edge_mat);
+
+    color sphere_color(0.f, 1.f, 0.f);
+    specular sphere_mat(sphere_color);
+    materials.push_back(sphere_mat);
+
+    color floor_color(1.f, 0.8f, 0.5f);
+    lambertian floor_mat(floor_color);
+    materials.push_back(floor_mat);
+
+    ncube nc;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
+    nc.mat_idx = 0;
+    scene.push_back(nc);
+
+    nsphere ns;
+    ns.radius = 0.5f;
+    ns.mat_idx = 1;
+    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns);
+
+    nsphere floor;
+    floor.radius = 100.f;
+    floor.mat_idx = 2;
+    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
+    scene.push_back(floor);
+
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
 void spheres() {
-    color sphere_color(0.9f, 0.9f, 0.9f);
-    material* sphere_mat = new specular(sphere_color);
+    color sphere_color(0.9f, 0.5f, 0.9f);
+    specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
 
     color sphere2_color(0.f, 1.f, 1.f);
-    material* sphere2_mat = new specular(sphere2_color);
+    specular sphere2_mat(sphere2_color);
     materials.push_back(sphere2_mat);
 
+    dielectric sphere3_mat(1.5f);
+    materials.push_back(sphere3_mat);
+
     color floor_color(0.5f, 0.5f, 0.5f);
-    material* floor_mat = new lambertian(floor_color);
+    lambertian floor_mat(floor_color);
     materials.push_back(floor_mat);
 
-    nsphere* ns = new nsphere;
-    ns->center = point4(-1.f, 0.f, -1.f, 0.f);
-    ns->radius = 0.5f;
-    ns->mat_idx = 0;
-    //ns->translate(point4(-1.f, 0.f, -1.f, 0.f));
+    nsphere ns;
+    ns.radius = 0.5f;
+    ns.mat_idx = 0;
+    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
 
-    nsphere* ns2 = new nsphere;
-    ns2->center = point4(0.f, 0.f, -1.f, 0.f);
-    ns2->radius = 0.5f;
-    ns2->mat_idx = 1;
+    nsphere ns2;
+    ns2.radius = 0.5f;
+    ns2.mat_idx = 1;
+    ns2.translate(vec4(0.f, 0.f, -1.f, 0.f));
     scene.push_back(ns2);
 
-    nsphere* floor = new nsphere;
-    floor->radius = 100.f;
-    floor->mat_idx = 2;
-    floor->translate(point4(0.f, -100.5f, -1.f, 0.f));
+    nsphere ns3;
+    ns3.radius = 0.5f;
+    ns3.mat_idx = 2;
+    ns3.translate(vec4(1.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns3);
+
+    nsphere floor;
+    floor.radius = 100.f;
+    floor.mat_idx = 3;
+    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
     scene.push_back(floor);
 
-    direction_light* lig1 = new direction_light;
-    lig1->col = color(1.0f, 1.0f, 0.9f);
-    lig1->dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
+    direction_light lig1;
+    lig1.col = color(1.0f, 1.0f, 0.9f);
+    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
     lights.push_back(lig1);
 }
 
+// BSDFs are modelled with the unit half 3-sphere (if there is a 4-th spatial dimension it makes sense?)
+void quad_light_test() {
+    lambertian red(color(1.f, 1.f, 0.05f));
+    materials.push_back(red);
+    light_material white(color(4.f, 4.f, 4.f));
+    materials.push_back(white);
+    lambertian green(color(0.12f, 0.45f, 0.15f));
+    materials.push_back(green);
+
+    quad q1(point4(-3.f, -2.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q1.mat_idx = 0;
+    scene.push_back(q1);
+
+    quad q2(point4(-2.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f), vec4(0.f, 1.f, 0.f, 0.f));
+    q2.mat_idx = 1;
+    scene.push_back(q2);
+}
+
+void cornell_box() {
+    lambertian red(color(0.65f, 0.05f, 0.05f));
+    lambertian white(color(0.73f, 0.73f, 0.73f));
+    lambertian green(color(0.12f, 0.45f, 0.15f));
+    light_material ceiling(color(15.f, 15.f, 15.f));
+    materials.push_back(red);
+    materials.push_back(white);
+    materials.push_back(green);
+    materials.push_back(ceiling);
+
+    quad q1(point4(555.f, 0.f, 0.f, 0.f), vec4(0.f, 555.f, 0.f, 0.f), vec4(0.f, 0.f, 555.f, 0.f));
+    q1.mat_idx = 2;
+    quad q2(point4(0.f, 0.f, 0.f, 0.f), vec4(0.f, 555.f, 0.f, 0.f), vec4(0.f, 0.f, 555.f, 0.f));
+    q2.mat_idx = 0;
+    quad q3(point4(343.f, 554.f, 332.f, 0.f), vec4(-130.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -105.f, 0.f));
+    q3.mat_idx = 3;
+    quad q4(point4(0.f, 0.f, 0.f, 0.f), vec4(555.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, 555.f, 0.f));
+    q4.mat_idx = 1;
+    quad q5(point4(555.f, 555.f, 555.f, 0.f), vec4(-555.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -555.f, 0.f));
+    q5.mat_idx = 1;
+    quad q6(point4(0.f, 0.f, 555.f, 0.f), vec4(555.f, 0.f, 0.f, 0.f), vec4(0.f, 555.f, 0.f, 0.f));
+    q6.mat_idx = 1;
+    scene.push_back(q1);
+    scene.push_back(q2);
+    scene.push_back(q3);
+    scene.push_back(q4);
+    scene.push_back(q5);
+    scene.push_back(q6);
+}
+
+void my_cornell_box() {
+    lambertian red(color(0.65f, 0.05f, 0.05f));
+    lambertian white(color(0.73f, 0.73f, 0.73f));
+    lambertian green(color(0.12f, 0.45f, 0.15f));
+    light_material ceiling(color(30.f, 30.f, 30.f));
+    materials.push_back(red);
+    materials.push_back(white);
+    materials.push_back(green);
+    materials.push_back(ceiling);
+
+    quad q1(point4(-2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q1.mat_idx = 2;
+    scene.push_back(q1);
+
+    quad q2(point4(2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q2.mat_idx = 0;
+    scene.push_back(q2);
+
+    quad q3(point4(-2.f, -2.f, -2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q3.mat_idx = 1;
+    scene.push_back(q3);
+
+    quad q4(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
+    q4.mat_idx = 1;
+    scene.push_back(q4);
+
+    quad q5(point4(-2.f, 2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
+    q5.mat_idx = 1;
+    scene.push_back(q5);
+
+    quad q6(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q6.mat_idx = 1;
+    scene.push_back(q6);
+
+    quad area_light(point4(-1.f, 1.99f, 1.f, 0.f), vec4(1.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f));
+    area_light.mat_idx = 3;
+    scene.push_back(area_light);
+}
+
 void shape_axes() {
-    projected_cylinder* x_axis = new projected_cylinder;
-    x_axis->end0 = point4(AXIS_LEN, 0.f, 0.f, 0.f);
-    x_axis->radius = AXIS_RADIUS;
-    material* x_mat = new lambertian(color(1.f, 0.f, 0.f));
-    x_axis->mat_idx = materials.size();
+    projected_cylinder x_axis;
+    x_axis.end0 = point4(AXIS_LEN, 0.f, 0.f, 0.f);
+    x_axis.radius = AXIS_RADIUS;
+    lambertian x_mat(color(1.f, 0.f, 0.f));
+    x_axis.mat_idx = materials.size();
     materials.push_back(x_mat);
     scene.push_back(x_axis);
 
-    projected_cylinder* y_axis = new projected_cylinder;
-    y_axis->end0 = point4(0.f, AXIS_LEN, 0.f, 0.f);
-    y_axis->radius = AXIS_RADIUS;
-    material* y_mat = new lambertian(color(0.f, 1.f, 0.f));
-    y_axis->mat_idx = materials.size();
+    projected_cylinder y_axis;
+    y_axis.end0 = point4(0.f, AXIS_LEN, 0.f, 0.f);
+    y_axis.radius = AXIS_RADIUS;
+    lambertian y_mat(color(0.f, 1.f, 0.f));
+    y_axis.mat_idx = materials.size();
     materials.push_back(y_mat);
     scene.push_back(y_axis);
 
-    projected_cylinder* z_axis = new projected_cylinder;
-    z_axis->end0 = point4(0.f, 0.f, AXIS_LEN, 0.f);
-    z_axis->radius = AXIS_RADIUS;
-    material* z_mat = new lambertian(color(0.f, 0.f, 1.f));
-    z_axis->mat_idx = materials.size();
+    projected_cylinder z_axis;
+    z_axis.end0 = point4(0.f, 0.f, AXIS_LEN, 0.f);
+    z_axis.radius = AXIS_RADIUS;
+    lambertian z_mat(color(0.f, 0.f, 1.f));
+    z_axis.mat_idx = materials.size();
     materials.push_back(z_mat);
     scene.push_back(z_axis);
 
-    projected_cylinder* w_axis = new projected_cylinder;
-    w_axis->end0 = point4(0.f, 0.f, 0.f, AXIS_LEN);
-    w_axis->radius = AXIS_RADIUS;
-    material* w_mat = new lambertian(color(0.73f, 0.33f, 0.827f));
-    w_axis->mat_idx = materials.size();
+    projected_cylinder w_axis;
+    w_axis.end0 = point4(0.f, 0.f, 0.f, AXIS_LEN);
+    w_axis.radius = AXIS_RADIUS;
+    lambertian w_mat(color(0.73f, 0.33f, 0.827f));
+    w_axis.mat_idx = materials.size();
     materials.push_back(w_mat);
     scene.push_back(w_axis);
 }
@@ -689,32 +823,29 @@ int main() {
     ImGui_ImplOpenGL3_Init(glsl_version);
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    //spheres();
+    //quad_light_test();
+    my_cornell_box();
+    //cornell_box();
     //tesseract_lines();
     //tesseract();
-    //spheres();
     //tesseract_reflector();
     //tesseract_lines_reflector();
-    tesseract_one();
+    //tesseract_glass();
+    //all_white();
     //shape_axes();
     
+    size_t scene_len = scene.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_scene_len, &scene_len, sizeof(size_t)));
+    size_t lights_len = lights.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_lights_len, &lights_len, sizeof(size_t)));    
+    size_t materials_len = materials.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_materials_len, &materials_len, sizeof(size_t)));
 
     // can try space distortion too
     // tesseract lines with a sphere in the middle?
     // tesseract solid reflectors?
 
-    for (shape* s : scene) {
-        total_scene_bytes += s->size();
-    }
-
-    for (material* mat : materials) {
-        total_materials_bytes += mat->size();
-    }
-    
-    for (light* l : lights) {
-        total_lights_bytes += l->size();
-    }
-
-    world::initialize();
     camera::aspect_ratio = 16.f / 9.f;
     camera::image_width = 1280;
     // camera::render_normals = true;
@@ -745,10 +876,25 @@ int main() {
     bool is_rendering = true; //std::atomic<bool> is_rendering = true;
     uint row_range = std::ceil((float)camera::image_height / NUM_CPU_THREADS); // range: ceil(height / N)
 
-    image_data = std::vector<uchar4>(camera::image_width * camera::image_height);
+    uint num_pixels = camera::image_width * camera::image_height;
+    image_data = std::vector<uchar4>(num_pixels);
+
+    color* d_color_buffer;
+    gpuErrchk(cudaMalloc(&d_color_buffer, num_pixels * sizeof(color)));
+
     uchar4* d_image_data;
-    uint numel = camera::image_width * camera::image_height;
-    gpuErrchk(cudaMalloc(&d_image_data, numel * sizeof(uchar4)));
+    gpuErrchk(cudaMalloc(&d_image_data, num_pixels * sizeof(uchar4)));
+
+    //nvtxRangePush("Processing Inputs");
+    dim3 threads_per_block(16, 16);
+    dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
+    (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
+
+    uint64_t* d_pcg_states;
+    gpuErrchk(cudaMalloc(&d_pcg_states, num_pixels * sizeof(uint64_t)));
+    camera::init_pcg_states_kernel<<<num_blocks, threads_per_block>>>(d_pcg_states, camera::image_width, camera::image_height);
+
+    int num_samples = 0;
 
     while (!glfwWindowShouldClose(window)) {
         current_frame = glfwGetTime();
@@ -777,9 +923,6 @@ int main() {
         ImGui::NewFrame();
 
         if (false) {
-            dim3 threads_per_block(16, 16);
-            dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
-            (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
             test_render_kernel<<<num_blocks, threads_per_block>>>(d_image_data, camera::image_width, camera::image_height, static_cast<float>(glfwGetTime()));
 
             cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
@@ -803,15 +946,16 @@ int main() {
         ImGui::Begin("Render Output");
         //bool input_changed = handle_inputs();
         bool input_changed_cuda = handle_inputs_cuda();
-
         if (input_changed_cuda) {
-            nvtxRangePush("Processing Inputs");
-            dim3 threads_per_block(16, 16);
-            dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
-            (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
+            num_samples = 0;
+            gpuErrchk(cudaMemset(d_color_buffer, 0, num_pixels * sizeof(color)));
+            gpuErrchk(cudaMemset(d_image_data, 0, num_pixels * sizeof(uchar4)));
+        }
 
-            camera::render_kernel<<<num_blocks, threads_per_block, total_scene_bytes + total_lights_bytes + total_materials_bytes + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-            (d_image_data, camera::image_width, camera::image_height, total_scene_bytes, total_lights_bytes, total_materials_bytes);
+        if (true) {
+            camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
+            (num_samples, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
+            num_samples++;
 
             //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
@@ -827,7 +971,7 @@ int main() {
                     camera::image_height, // Height of the copy (rows)
                     cudaMemcpyDeviceToDevice)); // Type of copy (Device to Array)
             gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
-            nvtxRangePop();
+            //nvtxRangePop();
         }
 
         if (false) {
@@ -870,23 +1014,11 @@ int main() {
         glfwSwapBuffers(window);
     }
 
-    world::destruct<<<1,1>>>();
-    
-    for (shape* s : scene) {
-        delete s;
-    }
-
-    for (light* l : lights) {
-        delete l;
-    }
-
-    for (material* m : materials) {
-        delete m;
-    }
-
     gpuErrchk(cudaGraphicsUnregisterResource(render_texture_CUDA));
     gpuErrchk(cudaDeviceSynchronize());
+    gpuErrchk(cudaFree(d_color_buffer));
     gpuErrchk(cudaFree(d_image_data));
+    gpuErrchk(cudaFree(d_pcg_states));
 
     is_rendering = false;
     glDeleteTextures(1, &render_texture); // Clean up the texture

@@ -33,23 +33,14 @@ static inline std::string time_stamp(const std::string& fmt = "%F__%H-%M-%S") {
     return { buf, std::strftime(buf, sizeof(buf), fmt.c_str(), &bt) };
 }
 
-std::vector<shape*> scene;
-__device__ shape** d_scene;
-__device__ char* d_scene_data;
-__constant__ size_t d_scene_len;
-size_t total_scene_bytes = 0;
+device_list<shape> scene;
+__constant__ size_t d_scene_len; // static scenes for now
 
-std::vector<light*> lights;
-__device__ light** d_lights;
-__device__ char* d_lights_data;
+device_list<light> lights;
 __constant__ size_t d_lights_len;
-size_t total_lights_bytes = 0;
 
-std::vector<material*> materials;
-__device__ material** d_materials;
-__device__ char* d_materials_data;
+device_list<material> materials;
 __constant__ size_t d_materials_len;
-size_t total_materials_bytes = 0;
 
 std::vector<uchar4> image_data;
 
@@ -102,7 +93,7 @@ __device__ float scene_sdf_mod_cuda(const point4& p, shape** shared_scene, light
     return scene_sdf_cuda(p, shared_scene, shared_lights, target_ptr);
 }
 
-__device__ vec4 get_normal_cuda(const vec4& p, shape** shared_scene, light** shared_lights) {
+__device__ vec4 get_normal_cuda(const point4& p, shape** shared_scene, light** shared_lights) {
     float sdf_diff_x = scene_sdf_mod_cuda(p + d_delta_x, shared_scene, shared_lights) - scene_sdf_mod_cuda(p - d_delta_x, shared_scene, shared_lights);
     float sdf_diff_y = scene_sdf_mod_cuda(p + d_delta_y, shared_scene, shared_lights) - scene_sdf_mod_cuda(p - d_delta_y, shared_scene, shared_lights);
     float sdf_diff_z = scene_sdf_mod_cuda(p + d_delta_z, shared_scene, shared_lights) - scene_sdf_mod_cuda(p - d_delta_z, shared_scene, shared_lights);
@@ -129,30 +120,37 @@ __device__ void ray_march_cuda(ray& r, shape** target_ptr, shape** shared_scene,
 }
 
 __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
-    shape* target = nullptr;
     color col(1.f, 1.f, 1.f);
 
     for (uint k = 0; k < MAX_RAY_BOUNCES; k++) {
-        ray_march_cuda(r, &target, shared_scene, shared_lights);
-
-        if (target == nullptr) {
-            float a = 0.5f * (r.dir.y + 1.f);
-            return col; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+        hit_result res; // res is initialized with MAX_RAY_DIST
+        // ray_march_cuda(r, &target, shared_scene, shared_lights);
+        bool hit = false;
+        
+        // TODO: replace with BVH
+        for (size_t i = 0; i < d_scene_len; i++) {
+            hit = shared_scene[i]->intersect(r, res) || hit; // always evaluate intersect to find closer shapes
         }
 
-        vec4 normal = get_normal_cuda(r.pos, shared_scene, shared_lights);
+        if (!hit) {
+            float a = 0.5f * (r.dir.y + 1.f);
+            return color(0.f, 0.f, 0.f); //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+        }
+
+        const vec4& normal = res.normal;
 
         if (d_render_normals) {
             return 0.5f * color(normal.x + 1.f, normal.y + 1.f, normal.z + 1.f);
         }
         
-        material* mat = shared_materials[target->mat_idx];
-        transform t = transform::get_shading_transform(normal);
         bsdf_sample bs;
-
-        mat->sample_f(-r.dir, t, bs, pcg_state);
-        col *= bs.f;
-        r = ray(r.pos + EPSILON * bs.wi, bs.wi);
+        material* mat = shared_materials[res.target->mat_idx];
+        if (!mat->sample_f(-r.dir, res.m, bs, pcg_state)) { // material is not reflective, return
+            return col * bs.f;
+        } else {
+            col *= bs.f;
+        }
+        r = ray(res.p + EPSILON * bs.wi, bs.wi);
         
         /* color total_lighting(0.f, 0.f, 0.f);
         for (size_t i = 0; i < d_lights_len; i++) {
@@ -168,7 +166,7 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
     return color(0.f, 0.f, 0.f);
 }
 
-__global__ void render_kernel(uchar4* d_image_data, uint width, uint height, size_t h_total_scene_bytes, size_t h_total_lights_bytes, size_t h_total_materials_bytes) {
+__global__ void render_kernel(int num_samples, color* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
     extern __shared__ char buffer[];
 
     // buffer layout for shared memory
@@ -213,12 +211,29 @@ __global__ void render_kernel(uchar4* d_image_data, uint width, uint height, siz
         //point4 pixel_center = d_pixel00_center + (col * d_pixel_x) + (row * d_pixel_y);
         //vec4 direction = vec4::normalize(pixel_center - d_camera_transform.get_pos());
         //ray r(d_camera_transform.get_pos(), direction);
-
-        uint64_t pcg_state = 0x4d595df4d0f33173;
-        pcg32_init(idx, pcg_state);
+        point4 camera_pos = d_camera_transform.get_pos();
+        float row_offset = randf_pcg32(-0.5f, 0.5f, d_pcg_states[idx]);
+        float col_offset = randf_pcg32(-0.5f, 0.5f, d_pcg_states[idx]);
+        //vec4 offset{ randf_pcg32(-0.5f, 0.5f, pcg_state), randf_pcg32(-0.5f, 0.5f, pcg_state), 0.f, 0.f }; // Random point from center of unit square -0.5 <= x, y < 0.5
+        
+        point4 sample = d_pixel00_center + ((col + col_offset) * d_pixel_x) + ((row + row_offset) * d_pixel_y);
+        vec4 direction = vec4::normalize(sample - camera_pos);
+        ray r(camera_pos, direction);
+        
+        color c_sample = ray_color_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx]);
+        d_color_buffer[idx] = (1.f / (num_samples + 1.f)) * ((float)num_samples * d_color_buffer[idx] + c_sample);
+        
+        d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].r) * 255.999f);
+        d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].g) * 255.999f);
+        d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].b) * 255.999f);
+        d_image_data[idx].w = 255;
+        // r / n => (r + x) / (n + 1) = r / (n + 1) + x / (n + 1) = (r / n) * (n / (n + 1)) + x / (n + 1)
+        
+        /*
         point4 camera_pos = d_camera_transform.get_pos();
         color c(0.f, 0.f, 0.f);
 
+        // TODO: progressive renderer that draws k SPP every frame until total is reached (improve frame rates and interactions)
         for (uint s = 0; s < SAMPLES_PER_PIXEL; s++) {
             float row_offset = randf_pcg32(-0.5f, 0.5f, pcg_state);
             float col_offset = randf_pcg32(-0.5f, 0.5f, pcg_state);
@@ -232,7 +247,19 @@ __global__ void render_kernel(uchar4* d_image_data, uint width, uint height, siz
         d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, c.r / SAMPLES_PER_PIXEL) * 255.999f);
         d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, c.g / SAMPLES_PER_PIXEL) * 255.999f);
         d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, c.b / SAMPLES_PER_PIXEL) * 255.999f);
-        d_image_data[idx].w = 255;
+        d_image_data[idx].w = 255; */
+
+    }
+}
+
+__global__ void init_pcg_states_kernel(uint64_t* d_pcg_states, uint width, uint height) {
+    uint row = blockDim.x * blockIdx.x + threadIdx.x;
+    uint col = blockDim.y * blockIdx.y + threadIdx.y;
+    uint idx = row * width + col;
+
+    if (row < height && col < width) {
+        d_pcg_states[idx] = 0x4d595df4d0f33173;
+        pcg32_init(idx, d_pcg_states[idx]);
     }
 }
 
@@ -257,7 +284,8 @@ __global__ void render_stride_kernel(uchar4* d_image_data, uint width, uint num_
 float scene_sdf(const point4& p, shape** target_ptr) {
     float sdf = MAX_MARCH_DIST + 5.f;
     
-    for (shape* obj : scene) {
+    for (size_t i = 0; i < scene.size(); i++) {
+        shape* obj = scene[i];
         float obj_sdf = obj->sdf(p);
 
         if (obj_sdf < sdf) {
@@ -273,7 +301,8 @@ float scene_sdf(const point4& p, shape** target_ptr) {
 float scene_sdf(const point4& p) {
     float sdf = MAX_MARCH_DIST + 5.f;
 
-    for (shape* obj : scene) {
+    for (size_t i = 0; i < scene.size(); i++) {
+        shape* obj = scene[i];
         float obj_sdf = obj->sdf(p);
 
         if (obj_sdf < sdf) {
@@ -285,7 +314,7 @@ float scene_sdf(const point4& p) {
     return sdf;
 }
 
-vec4 get_normal(const vec4& p) {
+vec4 get_normal(const point4& p) {
     float sdf_diff_x = scene_sdf(p + delta_x) - scene_sdf(p - delta_x);
     float sdf_diff_y = scene_sdf(p + delta_y) - scene_sdf(p - delta_y);
     float sdf_diff_z = scene_sdf(p + delta_z) - scene_sdf(p - delta_z);
@@ -329,15 +358,16 @@ color ray_color(ray& r) {
 
     color total_lighting(0.f, 0.f, 0.f);
 
-    for (light* lig : lights) {
+    for (size_t i = 0; i < lights.len; i++) {
+        light* lig = lights[i];
         total_lighting += lig->Le(r.pos, normal);
         //printf("[CPU] Hit pos (%.3f, %.3f, %.3f, %.3f) | Total lighting (%.3f, %.3f, %.3f)\n",
         //r.pos.x, r.pos.y, r.pos.z, r.pos.w, total_lighting.r, total_lighting.g, total_lighting.b);
     }
 
-    color final_col = target->albedo * total_lighting;
-
-    return final_col;
+    //color final_col = target->albedo * total_lighting;
+    //return final_col;
+    return total_lighting;
 }
 
 void refresh_view() {
