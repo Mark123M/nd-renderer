@@ -737,6 +737,32 @@ void my_cornell_box() {
     quad area_light(point4(-1.f, 1.99f, 1.f, 0.f), vec4(1.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f));
     area_light.mat_idx = 3;
     scene.push_back(area_light);
+
+    lambertian lamb(color(1.f, 1.f, 1.f));
+    materials.push_back(lamb);
+    specular spec(color(1.f, 1.f, 1.f));
+    materials.push_back(spec);
+    dielectric glass(1.5f);
+    materials.push_back(glass);
+
+    ncube nc;
+    nc.mat_idx = 4;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
+    scene.push_back(nc);
+
+    nsphere ns2;
+    ns2.radius = 0.7f;
+    ns2.mat_idx = 5;
+    ns2.translate(vec4(-1.f, -1.f, -1.f, 0.f));
+    scene.push_back(ns2);
+
+    nsphere ns3;
+    ns3.radius = 0.7f;
+    ns3.mat_idx = 6;
+    ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
+    scene.push_back(ns3);
+
 }
 
 void shape_axes() {
