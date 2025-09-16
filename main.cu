@@ -755,12 +755,12 @@ void my_cornell_box() {
     smooth_dielectric glass(1.5f);
     materials.push_back(glass);
     rough_dielectric stained_glass(1.5f);
-    stained_glass.alpha = 0.3f;
+    stained_glass.alpha = 0.8f;
     materials.push_back(stained_glass);
 
     ncube nc;
     nc.half_len = 0.35f;
-    nc.mat_idx = 6;
+    nc.mat_idx = 7;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
     scene.push_back(nc);

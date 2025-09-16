@@ -219,17 +219,6 @@ struct vec4 {
 		return sin2_theta(w) / cos2_theta(w);
 	}
 
-	// NOT CORRECT FOR 4D POLAR ANGLES
-	__host__ __device__ static float cos_phi(const vec4& w) {
-		float sin_theta = sqrtf(sin2_theta(w));
-		return (sin_theta == 0) ? 1 : clamp(w.x / sin_theta, -1.f, 1.f);
-	}
-
-	__host__ __device__ static float sin_phi(const vec4& w) {
-		float sin_theta = sqrtf(sin2_theta(w));
-		return (sin_theta == 0) ? 0 : clamp(w.z / sin_theta, -1.f, 1.f);
-	}
-
 	__host__ __device__ void print() {
 		printf("vec4(%.3f, %.3f, %.3f, %.3f)\n", x, y, z, w);
 	}

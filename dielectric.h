@@ -72,25 +72,12 @@ struct rough_dielectric : public material {
     }
 
     __host__ __device__ bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const override {
-        bs.pdf = 1.f / (pi * pi); // sampling half 3-sphere
-        vec4 wm = vec4::rand_halfsphere_vector(pcg_state);
+       // bs.pdf = 1.f / (2.f * pi * pi); // sampling half 3-sphere
+       // vec4 wm = vec4::rand_unit_vector(pcg_state);
+        vec4 wm = vec4::rand_halfsphere_vector_cosine_weighted(pcg_state);
+        bs.pdf = (2.f * wm.y) / (pi * pi);
         float cos_wo_wm = vec4::dot(wo, wm);
         float etar = eta;
-        // 1. Importance sample the microfacet normal wm
-        /*float u1 = randf_pcg32(0.f, 1.f, pcg_state);
-        float u2 = randf_pcg32(0.f, 1.f, pcg_state);
-        float a2 = alpha * alpha;
-        float phi_m = 2.f * pi * u1;
-        float cos_theta_m = sqrtf((1.f - u2) / (1.f + (a2 - 1.f) * u2));
-        float sin_theta_m = sqrtf(fmaxf(0.f, 1.f - cos_theta_m * cos_theta_m));
-
-        vec4 wm(
-            sin_theta_m * cosf(phi_m),
-            cos_theta_m,
-            sin_theta_m * sinf(phi_m),
-            0.f
-        );
-        vec4::normalize(wm); */
 
         if (cos_wo_wm < 0.f) {
             cos_wo_wm = -cos_wo_wm;
@@ -114,22 +101,33 @@ struct rough_dielectric : public material {
 
         if (randf_pcg32(0.f, 1.f, pcg_state) < pr) {
             bs.wi = vec4::reflect(wo, wm);
-            // get pdf
-            bs.f = GGX::D(wm, alpha) * GGX::G(wo, bs.wi, alpha) * pr / (4.f * bs.wi.y * wo.y); // may need to flip cos theta in denom?
+            if (!same_side(wo, bs.wi)) {
+                bs.f = color(0.f, 0.f, 0.f);
+                return true;
+            }
+            // The Jacobian to convert pdf(wm) to pdf(wi) for reflection is 1 / (4 * dot(wi, wm))
+            float jacobian = 1.f / (4.f * fabsf(vec4::dot(wo, wm)));
+            bs.pdf = bs.pdf * jacobian * pr; // Don't forget the probability of choosing this path
+            // bs.f is the pure BRDF
+            bs.f = color(GGX::D(wm, alpha) * GGX::G(wo, bs.wi, alpha) * pr / (4.f * wo.y * bs.wi.y));
         } else {
             float cos_theta_t = sqrtf(1.f - sin2_theta_t);
 
             // Standard vector refraction formula: R = η_rel * I + (η_rel * cos(i) - cos(t)) * N
             // Where our I is -wo.
             bs.wi = -wo / etar + (cos_wo_wm / etar - cos_theta_t) * wm;
+            if (same_side(wo, bs.wi) || bs.wi.y == 0) {
+                bs.f = color(0.f, 0.f, 0.f);
+                return true;
+            }
 
             float d = vec4::dot(bs.wi, wm) + vec4::dot(wo, wm) / etar;
             float denom = d * d;
-            float dwm_dwi = fabsf(vec4::dot(bs.wi, wm)) / denom;
-
-            // get pdf
-            bs.f = color(pt * GGX::D(wm, alpha) * GGX::G(wo, bs.wi, alpha) * fabsf(vec4::dot(bs.wi, wm) * vec4::dot(wo, wm) / (bs.wi.y * wo.y * denom)));
-            bs.f /= etar * etar; // // Account for non-symmetry with transmission to different medium
+            float jacobian = fabsf(vec4::dot(bs.wi, wm)) / denom;
+            bs.pdf = bs.pdf * jacobian * pt; // Don't forget the probability of choosing this path
+            //bs.f = color(pt * GGX::D(wm, alpha) * GGX::G(wo, bs.wi, alpha) * fabsf(vec4::dot(bs.wi, wm) * vec4::dot(wo, wm) / (bs.wi.y * wo.y * denom)));
+            bs.f = color(pt * GGX::D(wm, alpha) * GGX::G(wo, bs.wi, alpha) * fabsf(vec4::dot(bs.wi, wm) * vec4::dot(wo, wm) / (wo.y * bs.wi.y * denom)));
+            bs.f /= etar * etar;
         }
 
         return true;
