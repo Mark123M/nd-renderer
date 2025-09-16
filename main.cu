@@ -757,10 +757,13 @@ void my_cornell_box() {
     rough_dielectric stained_glass(1.5f);
     stained_glass.alpha = 0.8f;
     materials.push_back(stained_glass);
+    rough_specular metal(color(0.97, 0.74, 0.62));
+    metal.alpha = 0.02f;
+    materials.push_back(metal);
 
     ncube nc;
     nc.half_len = 0.35f;
-    nc.mat_idx = 7;
+    nc.mat_idx = 8;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
     scene.push_back(nc);
@@ -771,11 +774,11 @@ void my_cornell_box() {
     ns2.translate(vec4(-1.f, -1.f, -1.f, 0.f));
     scene.push_back(ns2);
 
-    nsphere ns3;
+   /*nsphere ns3;
     ns3.radius = 0.7f;
     ns3.mat_idx = 5;
     ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
-    scene.push_back(ns3);
+    scene.push_back(ns3);*/
 
     ncube nc2;
     nc2.half_len = 0.35f;

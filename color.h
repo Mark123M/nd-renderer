@@ -28,6 +28,10 @@ struct color {
         return *this;
     }
 
+    __host__ __device__ color operator-(const color& other) const {
+        return { r - other.r, g - other.g, b - other.b };
+    }
+
     __host__ __device__ color operator*(const color& other) const {
         return { r * other.r, g * other.g, b * other.b };
     }
