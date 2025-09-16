@@ -14,7 +14,7 @@ struct smooth_dielectric : public material {
     }
 
     __host__ __device__ bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const override {
-        bs.f = color{1.f, 1.f, 1.f}; //* inv_pi;
+        bs.pdf = 1.f;
         float cos_theta = wo.y;
         float etar = eta;
         vec4 normal(0.f, 1.f, 0.f, 0.f);
@@ -25,24 +25,28 @@ struct smooth_dielectric : public material {
             normal.y = -1.f;
         }
 
-        float r0 = (1.f - etar) / (1.f + etar);
-        r0 = r0 * r0;
-        float fresnel = r0 + (1.f - r0) * powf((1.f - cos_theta), 5.f);
-
-        if (randf_pcg32(0.f, 1.f, pcg_state) < fresnel) {
-            bs.wi = vec4::reflect(wo); // might be wrong
+        float pr;
+        float sin2_theta_i = fmaxf(0.f, 1.f - cos_theta * cos_theta);
+        float sin2_theta_t = sin2_theta_i / (etar * etar);
+        
+        if (sin2_theta_t >= 1.f) { // total internal reflection
+            pr = 1.f;
         } else {
-            float sin2_theta_i = fmaxf(0.f, 1.f - cos_theta * cos_theta);
-            float sin2_theta_t = sin2_theta_i / (etar * etar);
-            if (sin2_theta_t >= 1.f) {
-                bs.wi = vec4::reflect(wo);
-            } else {
-                float cos_theta_t = sqrtf(1.f - sin2_theta_t);
+            float r0 = (1.f - etar) / (1.f + etar);
+            r0 = r0 * r0;
+            pr = r0 + (1.f - r0) * powf((1.f - cos_theta), 5.f);
+        }
 
-                // Standard vector refraction formula: R = η_rel * I + (η_rel * cos(i) - cos(t)) * N
-                // Where our I is -wo.
-                bs.wi = -wo / etar + (cos_theta / etar - cos_theta_t) * normal;
-            }
+        if (randf_pcg32(0.f, 1.f, pcg_state) < pr) {
+            bs.wi = vec4::reflect(wo);
+            bs.f = color(1.f, 1.f, 1.f) / cos_theta;
+        } else {
+            float cos_theta_t = sqrtf(1.f - sin2_theta_t);
+            // Standard vector refraction formula: R = η_rel * I + (η_rel * cos(i) - cos(t)) * N
+            // Where our I is -wo.
+            bs.wi = -wo / etar + (cos_theta / etar - cos_theta_t) * normal;
+            float eta_scale = 1.f / (etar * etar);
+            bs.f = color(1.f, 1.f, 1.f) * eta_scale / cos_theta;
         }
 
         return true;
@@ -68,8 +72,10 @@ struct rough_dielectric : public material {
     }
 
     __host__ __device__ bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const override {
-        bs.f = color{1.f, 1.f, 1.f}; //* inv_pi;
+        bs.pdf = 1.f / (pi * pi); // sampling half 3-sphere
         vec4 wm = vec4::rand_halfsphere_vector(pcg_state);
+        float cos_wo_wm = vec4::dot(wo, wm);
+        float etar = eta;
         // 1. Importance sample the microfacet normal wm
         /*float u1 = randf_pcg32(0.f, 1.f, pcg_state);
         float u2 = randf_pcg32(0.f, 1.f, pcg_state);
@@ -86,57 +92,44 @@ struct rough_dielectric : public material {
         );
         vec4::normalize(wm); */
 
-        float cos_wo_wm = vec4::dot(wo, wm);
-        float etar = eta;
-
         if (cos_wo_wm < 0.f) {
             cos_wo_wm = -cos_wo_wm;
             etar = 1.f / etar;
             wm = -wm;
         }
 
-        float r0 = (1.f - etar) / (1.f + etar);
-        r0 = r0 * r0;
-        float pr = r0 + (1.f - r0) * powf((1.f - cos_wo_wm), 5.f);
-        float pt = 1.f - pr;
+        float pr, pt;
+        float sin2_theta_i = fmaxf(0.f, 1.f - cos_wo_wm * cos_wo_wm);
+        float sin2_theta_t = sin2_theta_i / (etar * etar);
+
+        if (sin2_theta_t >= 1.f) {
+            pr = 1.f;
+        } else {
+            float r0 = (1.f - etar) / (1.f + etar);
+            r0 = r0 * r0;
+            pr = r0 + (1.f - r0) * powf((1.f - cos_wo_wm), 5.f);
+        }
+
+        pt = 1.f - pr;
 
         if (randf_pcg32(0.f, 1.f, pcg_state) < pr) {
-            bs.wi = vec4::reflect(wo, wm); // might be wrong
-
-            if (!same_side(wo, bs.wi)) {
-                bs.f = color(0.f, 0.f, 0.f);
-                return true;
-            }
+            bs.wi = vec4::reflect(wo, wm);
             // get pdf
             bs.f = GGX::D(wm, alpha) * GGX::G(wo, bs.wi, alpha) * pr / (4.f * bs.wi.y * wo.y); // may need to flip cos theta in denom?
         } else {
-            float sin2_theta_i = fmaxf(0.f, 1.f - cos_wo_wm * cos_wo_wm);
-            float sin2_theta_t = sin2_theta_i / (etar * etar);
+            float cos_theta_t = sqrtf(1.f - sin2_theta_t);
 
-            if (sin2_theta_t >= 1.f) {
-                bs.wi = vec4::reflect(wo, wm);
-                
-                if (!same_side(wo, bs.wi)) {
-                    bs.f = color(0.f, 0.f, 0.f);
-                    return true;
-                }
-                // get pdf
-                bs.f = color(GGX::D(wm, alpha) * GGX::G(wo, bs.wi, alpha) * pr / (4.f * bs.wi.y * wo.y)); // may need to flip cos theta in denom?
-            } else {
-                float cos_theta_t = sqrtf(1.f - sin2_theta_t);
+            // Standard vector refraction formula: R = η_rel * I + (η_rel * cos(i) - cos(t)) * N
+            // Where our I is -wo.
+            bs.wi = -wo / etar + (cos_wo_wm / etar - cos_theta_t) * wm;
 
-                // Standard vector refraction formula: R = η_rel * I + (η_rel * cos(i) - cos(t)) * N
-                // Where our I is -wo.
-                bs.wi = -wo / etar + (cos_wo_wm / etar - cos_theta_t) * wm;
+            float d = vec4::dot(bs.wi, wm) + vec4::dot(wo, wm) / etar;
+            float denom = d * d;
+            float dwm_dwi = fabsf(vec4::dot(bs.wi, wm)) / denom;
 
-                float d = vec4::dot(bs.wi, wm) + vec4::dot(wo, wm) / etar;
-                float denom = d * d;
-                float dwm_dwi = fabsf(vec4::dot(bs.wi, wm)) / denom;
-
-                // get pdf
-                bs.f = color(pt * GGX::D(wm, alpha) * GGX::G(wo, bs.wi, alpha) * fabsf(vec4::dot(bs.wi, wm) * vec4::dot(wo, wm) / (bs.wi.y * wo.y * denom)));
-                bs.f /= etar * etar; // // Account for non-symmetry with transmission to different medium
-            }
+            // get pdf
+            bs.f = color(pt * GGX::D(wm, alpha) * GGX::G(wo, bs.wi, alpha) * fabsf(vec4::dot(bs.wi, wm) * vec4::dot(wo, wm) / (bs.wi.y * wo.y * denom)));
+            bs.f /= etar * etar; // // Account for non-symmetry with transmission to different medium
         }
 
         return true;

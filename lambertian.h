@@ -19,8 +19,9 @@ struct lambertian : public material {
     }
 
     __host__ __device__ bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const override {
-        bs.f = albedo; //* inv_pi;
-        bs.wi = vec4::rand_halfsphere_vector(pcg_state);
+        bs.f = (2.f / (pi * pi)) * albedo; //* inv_pi;
+        bs.wi = vec4::rand_halfsphere_vector_cosine_weighted(pcg_state);
+        bs.pdf = (2.f * bs.wi.y) / (pi * pi);
         return true;
     }
 

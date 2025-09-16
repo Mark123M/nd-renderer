@@ -172,6 +172,41 @@ struct vec4 {
 		}
 	}
 
+	__host__ __device__ static vec4 rand_halfsphere_vector_cosine_weighted(uint64_t& pcg_state) {
+		// We need to generate a random point uniformly inside a 3-ball (a sphere volume in 3D)
+		// and then project it onto the surface of the half 3-sphere.
+
+		// 1. Generate three uniform random numbers
+		float u1 = randf_pcg32(0.f, 1.f, pcg_state);
+		float u2 = randf_pcg32(0.f, 1.f, pcg_state);
+		float u3 = randf_pcg32(0.f, 1.f, pcg_state);
+
+		// 2. Generate a random direction on the surface of a 2-sphere (standard 3D sphere point picking)
+		float phi = 2.f * pi * u1;
+		float cos_theta = 1.f - 2.f * u2;
+		float sin_theta = sqrtf(fmaxf(0.f, 1.f - cos_theta * cos_theta));
+
+		float dir_x = sin_theta * cosf(phi);
+		float dir_z = sin_theta * sinf(phi);
+		float dir_w = cos_theta; // Let's use x, z, w for the 3-ball components for clarity
+
+		// 3. Generate a random radius. For a uniform distribution within a 3-ball,
+		// the radius 'r' must be sampled such that r^3 is uniform. So, r = cbrt(u3).
+		float r = cbrtf(u3);
+
+		// 4. The point inside the 3-ball has coordinates (x, z, w)
+		float x = r * dir_x;
+		float z = r * dir_z;
+		float w = r * dir_w;
+
+		// 5. Project this point onto the half 3-sphere. The "up" direction is y.
+		// The squared distance from the center in the "3-ball plane" is r^2.
+		float y = sqrtf(fmaxf(0.f, 1.f - r * r));
+
+		// The final cosine-weighted 4D vector
+		return vec4(x, y, z, w);
+	}
+
 	__host__ __device__ static float cos2_theta(const vec4& w) {
 		return w.y * w.y;
 	}

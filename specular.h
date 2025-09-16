@@ -19,8 +19,16 @@ struct specular : public material {
     }
 
     __host__ __device__ bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const override {
-        bs.f = albedo; //* inv_pi;
+        float cos_theta = fabsf(wo.y);
+        if (cos_theta < 1e-6f) {
+            bs.f = color(0.f, 0.f, 0.f);
+            return false; // Or handle appropriately
+        }
+
+        // Pre-divide the reflectance by the cosine term.
+        bs.f = albedo / cos_theta;
         bs.wi = vec4::reflect(wo);
+        bs.pdf = 1.f; // must reflect
         return true;
     }
 

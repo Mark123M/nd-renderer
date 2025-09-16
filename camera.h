@@ -118,7 +118,9 @@ __device__ void ray_march_cuda(ray& r, shape** target_ptr, shape** shared_scene,
 }
 
 __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
-    color col(1.f, 1.f, 1.f);
+    color L(0.f, 0.f, 0.f);
+    //color col(1.f, 1.f, 1.f);
+    color beta(1.f, 1.f, 1.f);
 
     for (uint k = 0; k < MAX_RAY_BOUNCES; k++) {
         hit_result res; // res is initialized with MAX_RAY_DIST
@@ -132,7 +134,7 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
 
         if (!hit) {
             float a = 0.5f * (r.dir.y + 1.f);
-            return col; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+            break; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
         }
 
         const vec4& normal = res.normal;
@@ -143,11 +145,14 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         
         bsdf_sample bs;
         material* mat = shared_materials[res.target->mat_idx];
-        if (!mat->sample_f(-r.dir, res.m, bs, pcg_state)) { // material is not reflective, return
-            return col * bs.f;
+
+        if (!mat->sample_f(-r.dir, res.m, bs, pcg_state)) { // hit an area light, bs.f represents the light color
+            L = beta * bs.f;
+            break;
         } else {
-            col *= bs.f;
+            beta *= (bs.f * fabsf(vec4::dot(bs.wi, res.normal))) / bs.pdf;
         }
+        
         r = ray(res.p + EPSILON * bs.wi, bs.wi);
         
         /* color total_lighting(0.f, 0.f, 0.f);
@@ -161,7 +166,7 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         return target->albedo * total_lighting; */
     }
 
-    return color(0.f, 0.f, 0.f);
+    return L;
 }
 
 __global__ void render_kernel(int num_samples, color* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
