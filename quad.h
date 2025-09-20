@@ -113,6 +113,18 @@ struct quad : public shape {
 		return true;
 	}
 
+	__host__ __device__ bool sample(shape_sample& ss, const hit_result& res, uint64_t& pcg_state) const override {
+		float ru = randf_pcg32(0.f, 1.f, pcg_state), rv = randf_pcg32(0.f, 1.f, pcg_state);
+		point4 p = q + ru * u + rv * v;
+		ss.p = p;
+
+		float area = vec4::cross(u, v).length();
+		vec4 wi = vec4::normalize(p - res.p);
+		float len = vec4::length(p - res.p);
+		float jacobian = fabsf(vec4::dot(normal, -wi)) / (len * len * len);
+		ss.pdf = (1 / area) / jacobian;
+	}
+
     // Returns the size of the object in memory.
 	__host__ __device__ size_t size() const override {
 		return sizeof(quad);

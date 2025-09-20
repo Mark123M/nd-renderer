@@ -25,6 +25,10 @@ struct lambertian : public material {
         return true;
     }
 
+    __host__ __device__ bool is_specular() const override {
+        return false;
+    }
+
     __host__ __device__ size_t size() const override {
         return sizeof(lambertian);
     }

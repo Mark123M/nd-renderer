@@ -117,6 +117,61 @@ __device__ void ray_march_cuda(ray& r, shape** target_ptr, shape** shared_scene,
     }
 }
 
+__device__ bool intersect_world(ray& r, hit_result& res, shape** shared_scene) {
+    // ray_march_cuda(r, &target, shared_scene, shared_lights);
+    bool hit = false;
+    
+    // TODO: replace with BVH
+    for (size_t i = 0; i < d_scene_len; i++) {
+        hit = shared_scene[i]->intersect(r, res) || hit; // always evaluate intersect to find closer shapes
+    }
+
+    return hit;
+}
+
+__device__ color sample_ld(const hit_result& res, uint num_area_lights, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
+    float u = randf_pcg32(0.f, 1.f, pcg_state);
+    float p_light = 1.f / num_area_lights;
+    material* sampled_light = nullptr;
+    shape* sampled_shape = nullptr;
+    
+    for (size_t i = 0; i < d_scene_len; i++) {
+        shape* s = shared_scene[i];
+        material* m = shared_materials[s->mat_idx];
+        
+        if (m->can_sample_li()) {
+            u -= p_light;
+            if (u < 0.f) {
+                sampled_light = m;
+                sampled_shape = s;
+                break; 
+            }
+        }
+    }
+
+    // TODO: sample other type of lights
+    
+    light_sample ls;
+    if (!sampled_light || !sampled_light->sample_li(sampled_shape, res, ls, pcg_state)) {
+        return color(0.f, 0.f, 0.f);
+    }
+
+    vec4 wo = res.wo, wi = ls.wi;
+    ray shadow(res.p, wi);
+    hit_result shadow_res;
+    intersect_world(shadow, shadow_res, shared_scene); // TODO: casting shadow rays shouldnt compute geometry info
+
+    if (shadow_res.target != sampled_shape) { // occluded
+        return color{0.f, 0.f, 0.f};
+    }
+
+    material* bsdf = shared_materials[res.target->mat_idx];
+    color f = bsdf->f(wo, wi) * fabsf(vec4::dot(wi, res.normal));
+    float p_l = p_light * ls.pdf;
+
+    return ls.L * f / p_l; // TODO: multiple importance sampling?
+}
+
 __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
     color L(0.f, 0.f, 0.f);
     //color col(1.f, 1.f, 1.f);
@@ -124,15 +179,8 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
 
     for (uint k = 0; k < MAX_RAY_BOUNCES; k++) {
         hit_result res; // res is initialized with MAX_RAY_DIST
-        // ray_march_cuda(r, &target, shared_scene, shared_lights);
-        bool hit = false;
-        
-        // TODO: replace with BVH
-        for (size_t i = 0; i < d_scene_len; i++) {
-            hit = shared_scene[i]->intersect(r, res) || hit; // always evaluate intersect to find closer shapes
-        }
 
-        if (!hit) {
+        if (!intersect_world(r, res, shared_scene)) {
             float a = 0.5f * (r.dir.y + 1.f);
             break; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
         }
@@ -152,18 +200,17 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         } else {
             beta *= (bs.f * fabsf(vec4::dot(bs.wi, res.normal))) / bs.pdf;
         }
-        
+
         r = ray(res.p + EPSILON * bs.wi, bs.wi);
         
-        /* color total_lighting(0.f, 0.f, 0.f);
-        for (size_t i = 0; i < d_lights_len; i++) {
-            light* lig = shared_lights[i];
-            total_lighting += lig->Le_cuda(r.pos, normal, shared_scene, shared_lights);
-            //printf("[GPU] Hit pos (%.3f, %.3f, %.3f, %.3f) | Total lighting (%.3f, %.3f, %.3f)\n",
-            //r.pos.x, r.pos.y, r.pos.z, r.pos.w, total_lighting.r, total_lighting.g, total_lighting.b);
-        } 
-
-        return target->albedo * total_lighting; */
+        float beta_max = fmaxf(beta.r, fmaxf(beta.g, beta.b));
+        if (beta_max <= 1 && k >= 1) {
+            float q = fmaxf(0.f, 1 - beta_max);
+            if (randf_pcg32(0.f, 1.f, pcg_state) < q) {
+                break;
+            }
+            beta /= 1 - q;
+        }
     }
 
     return L;

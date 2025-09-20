@@ -32,6 +32,10 @@ struct specular : public material {
         return true;
     }
 
+    __host__ __device__ bool is_specular() const override {
+        return true;
+    }
+
     __host__ __device__ size_t size() const override {
         return sizeof(specular);
     }
@@ -77,6 +81,10 @@ struct rough_specular : public material {
         float cos_theta_i = fabsf(bs.wi.y);
         bs.f = pr * GGX::D(wm, alpha) * GGX::G(wo, bs.wi, alpha) / (4.f * cos_theta_i * cos_theta_o);
         return true;
+    }
+
+    __host__ __device__ bool is_specular() const override {
+        return alpha <= 0.001f;
     }
 
     __host__ __device__ size_t size() const override {

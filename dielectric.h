@@ -52,6 +52,10 @@ struct smooth_dielectric : public material {
         return true;
     }
 
+    __host__ __device__ bool is_specular() const override {
+        return true;
+    }
+
     __host__ __device__ size_t size() const override {
         return sizeof(smooth_dielectric);
     }
@@ -131,6 +135,10 @@ struct rough_dielectric : public material {
         }
 
         return true;
+    }
+
+    __host__ __device__ bool is_specular() const override {
+        return alpha <= 0.001f;
     }
 
     __host__ __device__ size_t size() const override {

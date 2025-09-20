@@ -7,13 +7,22 @@
 struct bsdf_sample {
 	color f;
 	vec4 wi;
-	float pdf = 0;
-	float eta = 1;
+	float pdf = 1.f;
+	float eta = 1.f;
+};
+
+struct light_sample {
+    color L;
+    vec4 wi;
+    float pdf = 1.f;
 };
 
 enum material_type {
     LAMBERTIAN, SPECULAR, DIELECTRIC
 };
+
+struct shape;
+struct hit_result;
 
 struct material {
     //int flags = 0;
@@ -37,6 +46,20 @@ struct material {
 
         bs.wi = vec4::normalize(t.local_to_world(bs.wi)); // re-normalize for for accumulated fp errors
         return true;
+    }
+
+    __host__ __device__ virtual bool sample_li(const shape* s, const hit_result& res, light_sample& ls, uint64_t& pcg_state) const {
+        return false;
+    }
+
+    __host__ __device__ virtual bool is_specular() const = 0;
+
+    __host__ __device__ virtual bool can_sample_f() const {
+        return true;
+    }
+
+    __host__ __device__ virtual bool can_sample_li() const {
+        return false;
     }
 
     __host__ __device__ bool same_side(const vec4& u, const vec4& v) const {

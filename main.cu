@@ -758,7 +758,7 @@ void my_cornell_box() {
     stained_glass.alpha = 0.8f;
     materials.push_back(stained_glass);
     rough_specular metal(color(0.97, 0.74, 0.62));
-    metal.alpha = 0.02f;
+    metal.alpha = 0.5f;
     materials.push_back(metal);
 
     ncube nc;
@@ -774,11 +774,11 @@ void my_cornell_box() {
     ns2.translate(vec4(-1.f, -1.f, -1.f, 0.f));
     scene.push_back(ns2);
 
-   /*nsphere ns3;
+    nsphere ns3;
     ns3.radius = 0.7f;
     ns3.mat_idx = 5;
     ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
-    scene.push_back(ns3);*/
+    scene.push_back(ns3);
 
     ncube nc2;
     nc2.half_len = 0.35f;

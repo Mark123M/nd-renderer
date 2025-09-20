@@ -21,6 +21,11 @@ struct hit_result {
 	const shape* target;
 };
 
+struct shape_sample {
+	point4 p;
+	float pdf = 1.f;
+};
+
 struct shape {
 	transform basis;
 	size_t mat_idx;
@@ -32,6 +37,10 @@ struct shape {
 	}
 
 	__host__ __device__ virtual bool intersect(const ray& r, hit_result& res) const {
+		return false;
+	}
+
+	__host__ __device__ virtual bool sample(shape_sample& ss, const hit_result& res, uint64_t& pcg_state) const {
 		return false;
 	}
 
