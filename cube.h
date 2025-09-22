@@ -112,6 +112,8 @@ struct cube : public shape {
                 copysignf(1.0f, local_r_pos.get(hit_axis) + local_r_dir.get(hit_axis) * t_hit) :
                 -copysignf(1.0f, local_r_dir.get(hit_axis));
             local_normal.set(hit_axis, sign);
+        } else {
+            return false;
         }
 
         // Step 6: Transform the normal back to world space and set shading basis.

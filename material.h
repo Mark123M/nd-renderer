@@ -26,6 +26,7 @@ struct hit_result;
 
 struct material {
     bool in_plane;
+
     __host__ __device__ virtual color f(const vec4& wo, const vec4& wi) const = 0;
     __host__ __device__ virtual bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const = 0;
     __host__ __device__ virtual size_t size() const = 0;
@@ -44,7 +45,13 @@ struct material {
             return false;
         }
 
-        bs.wi = vec4::normalize(t.local_to_world(bs.wi)); // re-normalize for for accumulated fp errors
+        vec4 wi_world = t.local_to_world(bs.wi);
+
+        if (in_plane) {
+            wi_world.w = 0.f;
+        }
+        
+        bs.wi = vec4::normalize(wi_world); // re-normalize for for accumulated fp errors
         return true;
     }
 
