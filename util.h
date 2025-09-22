@@ -174,6 +174,10 @@ __host__ __device__ float clamp(float x, float min_x, float max_x) {
    return fminf(max_x, fmaxf(min_x, x));
 }
 
+__host__ __device__ bool approx_equals(float x, float y) {
+   return fabsf(x - y) <= 1e-6f;
+}
+
 constexpr uint64_t multiplier = 6364136223846793005u;
 constexpr uint64_t increment  = 1442695040888963407u;	// Or an arbitrary odd constant
 

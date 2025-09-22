@@ -201,6 +201,11 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
             beta *= (bs.f * fabsf(vec4::dot(bs.wi, res.normal))) / bs.pdf;
         }
 
+        if (mat->in_plane) {
+            bs.wi.w = 0.f;
+            vec4::normalize(bs.wi);
+        }
+
         r = ray(res.p + EPSILON * bs.wi, bs.wi);
         
         float beta_max = fmaxf(beta.r, fmaxf(beta.g, beta.b));

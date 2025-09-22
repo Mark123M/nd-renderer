@@ -170,15 +170,15 @@ struct transform {
 		vec4 u[4];
 		v[0] = normal;
 
-		if (normal.x != 0.f) {
+		if (!approx_equals(normal.x, 0.f)) {
 			v[1] = standard_y;
 			v[2] = standard_z;
 			v[3] = standard_w;
-		} else if (normal.y != 0.f) {
+		} else if (!approx_equals(normal.y, 0.f)) {
 			v[1] = standard_x;
 			v[2] = standard_z;
 			v[3] = standard_w;
-		} else if (normal.z != 0.f) {
+		} else if (!approx_equals(normal.z, 0.f)) {
 			v[1] = standard_x;
 			v[2] = standard_y;
 			v[3] = standard_w;

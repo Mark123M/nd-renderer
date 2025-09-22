@@ -28,8 +28,8 @@ struct quad : public shape {
 	__host__ __device__ bool intersect(const ray& r, hit_result& res) const override {
 		float t;
 		
-		if (r.pos.w == 0.f) {
-			if (r.dir.w != 0) {
+		if (approx_equals(r.pos.w, 0.f)) {
+			if (!approx_equals(r.dir.w, 0.f)) {
 				return false;
 			}
 

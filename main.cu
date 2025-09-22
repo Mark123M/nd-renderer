@@ -14,6 +14,7 @@
 #include "ncube.h"
 #include "cylinder.h"
 #include "quad.h"
+#include "cube.h"
 #include "projected_cylinder.h"
 #include "camera.h"
 #include "world.h"
@@ -712,8 +713,11 @@ void cornell_box() {
 
 void my_cornell_box() {
     lambertian red(color(0.65f, 0.05f, 0.05f));
+    red.in_plane = true;
     lambertian white(color(0.73f, 0.73f, 0.73f));
+    white.in_plane = true;
     lambertian green(color(0.12f, 0.45f, 0.15f));
+    green.in_plane = true;
     light_material ceiling(color(30.f, 30.f, 30.f));
     materials.push_back(red);
     materials.push_back(white);
@@ -785,6 +789,11 @@ void my_cornell_box() {
     nc2.mat_idx = 6;
     nc2.translate(vec4(1.f, -1.5f, 1.5f, 0.f));
     scene.push_back(nc2);
+
+    cube c3;
+    c3.mat_idx = 2;
+    c3.translate(vec4(1.f, 0.f, -1.f, 0.f));
+    scene.push_back(c3);
 }
 
 void shape_axes() {

@@ -120,7 +120,7 @@ struct rough_dielectric : public material {
             // Standard vector refraction formula: R = η_rel * I + (η_rel * cos(i) - cos(t)) * N
             // Where our I is -wo.
             bs.wi = -wo / etar + (cos_wo_wm / etar - cos_theta_t) * wm;
-            if (same_side(wo, bs.wi) || bs.wi.y == 0) {
+            if (same_side(wo, bs.wi) || approx_equals(bs.wi.y, 0.f)) {
                 bs.f = color(0.f, 0.f, 0.f);
                 return true;
             }
