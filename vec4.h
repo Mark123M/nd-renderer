@@ -122,7 +122,7 @@ struct vec4 {
 			a.y * b.z - a.z * b.y,  // New X component
 			a.z * b.x - a.x * b.z,  // New Y component
 			a.x * b.y - a.y * b.x,  // New Z component
-			a.w                     // Preserve the w component
+			0.f
     	);
 	}
 

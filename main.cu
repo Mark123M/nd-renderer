@@ -758,12 +758,12 @@ void my_cornell_box() {
     stained_glass.alpha = 0.8f;
     materials.push_back(stained_glass);
     rough_specular metal(color(0.97, 0.74, 0.62));
-    metal.alpha = 0.5f;
+    metal.alpha = 0.1f;
     materials.push_back(metal);
 
     ncube nc;
     nc.half_len = 0.35f;
-    nc.mat_idx = 8;
+    nc.mat_idx = 6;
     // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
     // nc->corner = cor;
     scene.push_back(nc);
@@ -1062,6 +1062,9 @@ int main() {
         glfwSwapBuffers(window);
     }
 
+    delete &scene;
+    delete &lights;
+    delete &materials;
     gpuErrchk(cudaGraphicsUnregisterResource(render_texture_CUDA));
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaFree(d_color_buffer));

@@ -204,12 +204,12 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         r = ray(res.p + EPSILON * bs.wi, bs.wi);
         
         float beta_max = fmaxf(beta.r, fmaxf(beta.g, beta.b));
-        if (beta_max <= 1 && k >= 1) {
-            float q = fmaxf(0.f, 1 - beta_max);
+        if (beta_max <= 1.f && k >= 1.f) {
+            float q = fmaxf(0.f, 1.f - beta_max);
             if (randf_pcg32(0.f, 1.f, pcg_state) < q) {
                 break;
             }
-            beta /= 1 - q;
+            beta /= 1.f - q;
         }
     }
 
