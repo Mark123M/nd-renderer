@@ -10,6 +10,10 @@
 
 namespace world {
 
+__global__ void toggle_planar_reflection_kernel(size_t idx, material** materials_list) {
+    materials_list[idx]->in_plane = !materials_list[idx]->in_plane;
+}
+
 __global__ void translate_kernel(vec4 t, shape** scene_list) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
 

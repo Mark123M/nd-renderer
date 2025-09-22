@@ -9,10 +9,10 @@ struct transform {
 	affine inv_linear;
 
 	__host__ __device__ void set_basis(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
-		assert(fabsf(vx.length_squared() - 1.f) <= TOL);
-		assert(fabsf(vy.length_squared() - 1.f) <= TOL);
-		assert(fabsf(vz.length_squared() - 1.f) <= TOL);
-		assert(fabsf(vw.length_squared() - 1.f) <= TOL);
+		assert(approx_equals(vx.length_squared(), 1.f));
+		assert(approx_equals(vy.length_squared(), 1.f));
+		assert(approx_equals(vz.length_squared(), 1.f));
+		assert(approx_equals(vw.length_squared(), 1.f));
 
 		linear = affine{{
 			{vx.x, vy.x, vz.x, vw.x, 0.f},

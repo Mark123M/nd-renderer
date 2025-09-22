@@ -34,14 +34,17 @@ struct quad : public shape {
 			}
 
 			float denom = vec4::dot(normal, r.dir);
-
 			// Parallel to plane
-			if (std::fabs(denom) < 1e-8f) {
+			if (approx_equals(denom, 0.f)) {
 				return false;
 			}
 
 			t = (D - vec4::dot(normal, r.pos - origin)) / denom;
 		} else {
+			if (approx_equals(r.dir.w, 0.f)) {
+				return false;
+			}
+
 			t = -r.pos.w / r.dir.w;
 		}
 

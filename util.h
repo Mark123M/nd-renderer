@@ -175,7 +175,7 @@ __host__ __device__ float clamp(float x, float min_x, float max_x) {
 }
 
 __host__ __device__ bool approx_equals(float x, float y) {
-   return fabsf(x - y) <= 1e-6f;
+   return fabsf(x - y) <= TOL;
 }
 
 constexpr uint64_t multiplier = 6364136223846793005u;

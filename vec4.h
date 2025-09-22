@@ -116,7 +116,10 @@ struct vec4 {
 
 	// Cross product of the first three elements (w must be equal)
 	__host__ __device__ static vec4 cross(const vec4& a, const vec4& b) {
-		assert(a.w == b.w);
+		assert(approx_equals(a.w, b.w));
+		//if (!approx_equals(a.w, b.w)) {
+		//	printf("[GPU] Invalid cross product %.3f, %.3f", a.w, b.w);
+		//}
 
 		return vec4(
 			a.y * b.z - a.z * b.y,  // New X component

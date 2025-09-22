@@ -1054,6 +1054,20 @@ int main() {
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(camera::image_width, camera::image_height));
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        
+        for (size_t i = 0; i < materials_len; i++) {
+            std::string label = "material " + std::to_string(i);
+
+            if (ImGui::Button(label.c_str())) {
+                world::toggle_planar_reflection_kernel<<<1,1>>>(i, materials.d_list);
+                num_samples = 0;
+                gpuErrchk(cudaMemset(d_color_buffer, 0, num_pixels * sizeof(color)));
+                gpuErrchk(cudaMemset(d_image_data, 0, num_pixels * sizeof(uchar4)));
+            }
+
+            ImGui::SameLine();
+        }
+
         if (ImGui::Button("EXPORT IMAGE")) {
             camera::export_image(d_image_data, num_pixels);
         }
