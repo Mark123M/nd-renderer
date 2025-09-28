@@ -11,6 +11,7 @@
 #include "color.h"
 #include "ray.h"
 #include "nsphere.h"
+#include "sphere.h"
 #include "ncube.h"
 #include "cylinder.h"
 #include "quad.h"
@@ -750,6 +751,210 @@ void my_cornell_box() {
 
     quad area_light(point4(-1.f, 1.99f, 1.f, 0.f), vec4(1.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f));
     area_light.mat_idx = 3;
+    //scene.push_back(area_light);
+
+    lambertian lamb(color(1.f, 1.f, 1.f));
+    materials.push_back(lamb);
+    specular spec(color(1.f, 1.f, 1.f));
+    materials.push_back(spec);
+    smooth_dielectric glass(1.5f);
+    materials.push_back(glass);
+    rough_dielectric stained_glass(1.5f);
+    stained_glass.alpha = 0.8f;
+    // materials.push_back(stained_glass);
+    rough_specular metal(color(0.97, 0.74, 0.62));
+    metal.alpha = 0.1f;
+    // materials.push_back(metal);
+
+    ncube nc;
+    nc.half_len = 0.35f;
+    nc.mat_idx = 6;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
+    scene.push_back(nc);
+
+    nsphere ns2;
+    ns2.radius = 0.7f;
+    ns2.mat_idx = 4;
+    ns2.translate(vec4(-1.f, -1.f, -1.f, 0.f));
+    scene.push_back(ns2);
+
+    nsphere ns3;
+    ns3.radius = 0.7f;
+    ns3.mat_idx = 5;
+    ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
+    scene.push_back(ns3);
+
+    ncube nc2;
+    nc2.half_len = 0.35f;
+    nc2.mat_idx = 6;
+    nc2.translate(vec4(1.f, -1.5f, 1.5f, 0.f));
+    //scene.push_back(nc2);
+
+    cube c3;
+    c3.mat_idx = 2;
+    c3.translate(vec4(1.f, 0.f, -1.f, 0.f));
+    scene.push_back(c3);
+    
+    light_material ball(color(4.f, 4.f, 4.f));
+    materials.push_back(ball);
+
+    nsphere ns_light;
+    ns_light.mat_idx = materials.size() - 1;
+    ns_light.radius = 0.5f;
+    ns_light.translate(vec4(-1.f, 0.f, 0.f, 0.f));
+    scene.push_back(ns_light);
+
+    light_material ball2(color(0.f, 4.f, 4.f));
+    materials.push_back(ball2);
+
+    sphere s_light;
+    s_light.mat_idx = materials.size() - 1;
+    s_light.radius = 0.3f;
+    s_light.translate(vec4(1.f, 0.f, 0.f, 0.f));
+    scene.push_back(s_light);
+}
+
+void my_cornell_box2() {
+    lambertian red(color(0.65f, 0.05f, 0.05f));
+    lambertian white(color(0.73f, 0.73f, 0.73f));
+    lambertian green(color(0.12f, 0.45f, 0.15f));
+    light_material ceiling(color(30.f, 30.f, 30.f));
+    materials.push_back(red);
+    materials.push_back(white);
+    materials.push_back(green);
+    materials.push_back(ceiling);
+
+    quad q1(point4(-2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q1.mat_idx = 2;
+    scene.push_back(q1);
+
+    quad q2(point4(2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q2.mat_idx = 0;
+    scene.push_back(q2);
+
+    quad q3(point4(-2.f, -2.f, -2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q3.mat_idx = 1;
+    scene.push_back(q3);
+
+    quad q4(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
+    q4.mat_idx = 1;
+    scene.push_back(q4);
+
+    quad q5(point4(-2.f, 2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
+    q5.mat_idx = 1;
+    scene.push_back(q5);
+
+    quad q6(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q6.mat_idx = 1;
+    scene.push_back(q6);
+
+    quad area_light(point4(-1.f, 1.99f, 1.f, 0.f), vec4(1.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f));
+    area_light.mat_idx = 3;
+    //scene.push_back(area_light);
+
+    lambertian lamb(color(1.f, 1.f, 1.f));
+    materials.push_back(lamb);
+    specular spec(color(1.f, 1.f, 1.f));
+    materials.push_back(spec);
+    smooth_dielectric glass(1.5f);
+    materials.push_back(glass);
+    rough_dielectric stained_glass(1.5f);
+    stained_glass.alpha = 0.8f;
+    // materials.push_back(stained_glass);
+    rough_specular metal(color(0.97, 0.74, 0.62));
+    metal.alpha = 0.1f;
+    // materials.push_back(metal);
+
+    ncube nc;
+    nc.half_len = 0.35f;
+    nc.mat_idx = 6;
+    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
+    // nc->corner = cor;
+    scene.push_back(nc);
+
+    nsphere ns2;
+    ns2.radius = 0.7f;
+    ns2.mat_idx = 4;
+    ns2.translate(vec4(-1.f, -1.f, -1.f, 0.f));
+    scene.push_back(ns2);
+
+    nsphere ns3;
+    ns3.radius = 0.7f;
+    ns3.mat_idx = 5;
+    ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
+    scene.push_back(ns3);
+
+    ncube nc2;
+    nc2.half_len = 0.35f;
+    nc2.mat_idx = 6;
+    nc2.translate(vec4(1.f, -1.5f, 1.5f, 0.f));
+    //scene.push_back(nc2);
+    
+    light_material ball(color(4.f, 4.f, 4.f));
+    materials.push_back(ball);
+
+    nsphere ns_light;
+    ns_light.mat_idx = materials.size() - 1;
+    ns_light.radius = 0.5f;
+    ns_light.translate(vec4(-1.f, 0.f, 0.f, 0.f));
+    scene.push_back(ns_light);
+
+    cube c3;
+    c3.mat_idx = 6;  //materials.size() - 1; //2;
+    c3.translate(vec4(1.f, 0.f, -1.f, 0.f));
+    scene.push_back(c3);
+
+    light_material ball2(color(0.f, 4.f, 4.f));
+    materials.push_back(ball2);
+
+    sphere s_light;
+    s_light.mat_idx = materials.size() - 1;
+    s_light.radius = 0.3f;
+    s_light.half_w = 0.01f;
+    s_light.translate(vec4(1.f, 0.f, 0.f, 0.f));
+    scene.push_back(s_light);
+}
+
+void my_cornell_box_white() {
+    lambertian red(color(1.f, 1.f, 1.f));
+    red.in_plane = true;
+    lambertian white(color(1.f, 1.f, 1.f));
+    white.in_plane = true;
+    lambertian green(color(1.f, 1.f, 1.f));
+    green.in_plane = true;
+    light_material ceiling(color(1.f, 1.f, 1.f));
+    materials.push_back(red);
+    materials.push_back(white);
+    materials.push_back(green);
+    materials.push_back(ceiling);
+
+    quad q1(point4(-2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q1.mat_idx = 2;
+    scene.push_back(q1);
+
+    quad q2(point4(2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q2.mat_idx = 0;
+    scene.push_back(q2);
+
+    quad q3(point4(-2.f, -2.f, -2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q3.mat_idx = 1;
+    scene.push_back(q3);
+
+    quad q4(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
+    q4.mat_idx = 1;
+    scene.push_back(q4);
+
+    quad q5(point4(-2.f, 2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
+    q5.mat_idx = 1;
+    scene.push_back(q5);
+
+    quad q6(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
+    q6.mat_idx = 1;
+    scene.push_back(q6);
+
+    quad area_light(point4(-1.f, 1.99f, 1.f, 0.f), vec4(1.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f));
+    area_light.mat_idx = 3;
     scene.push_back(area_light);
 
     lambertian lamb(color(1.f, 1.f, 1.f));
@@ -760,10 +965,10 @@ void my_cornell_box() {
     materials.push_back(glass);
     rough_dielectric stained_glass(1.5f);
     stained_glass.alpha = 0.8f;
-    materials.push_back(stained_glass);
+    // materials.push_back(stained_glass);
     rough_specular metal(color(0.97, 0.74, 0.62));
     metal.alpha = 0.1f;
-    materials.push_back(metal);
+    // materials.push_back(metal);
 
     ncube nc;
     nc.half_len = 0.35f;
@@ -882,7 +1087,9 @@ int main() {
 
     //spheres();
     //quad_light_test();
-    my_cornell_box();
+    //my_cornell_box();
+    my_cornell_box2();
+    //my_cornell_box_white();
     //cornell_box();
     //tesseract_lines();
     //tesseract();
@@ -1067,6 +1274,8 @@ int main() {
 
             ImGui::SameLine();
         }
+
+        ImGui::NewLine();
 
         if (ImGui::Button("EXPORT IMAGE")) {
             camera::export_image(d_image_data, num_pixels);

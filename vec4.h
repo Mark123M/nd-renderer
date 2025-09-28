@@ -114,6 +114,10 @@ struct vec4 {
 		return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
 	}
 
+	__host__ __device__ static float dot3(const vec4& a, const vec4& b) {
+		return a.x * b.x + a.y * b.y + a.z * b.z;
+	}
+
 	// Cross product of the first three elements (w must be equal)
 	__host__ __device__ static vec4 cross(const vec4& a, const vec4& b) {
 		assert(approx_equals(a.w, b.w));
