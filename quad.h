@@ -21,45 +21,45 @@ struct quad : public shape {
 
 		vec4 n = vec4::cross(u, v);
 		normal = vec4::normalize(n);
-		D = vec4::dot(normal, o - origin);
-		w = n / vec4::dot(n, n);
+		D = vec4::dot3(normal, o - origin);
+		w = n / vec4::dot3(n, n);
 	}
 
 	__host__ __device__ bool intersect(const ray& r, hit_result& res) const override {
 		float t;
 		
-		if (approx_equals(r.pos.w, 0.f)) {
-			if (!approx_equals(r.dir.w, 0.f)) {
-				return false;
-			}
-
-			float denom = vec4::dot(normal, r.dir);
+		//if (approx_equals(r.pos.w, 0.f)) {
+			float denom = vec4::dot3(normal, r.dir);
 			// Parallel to plane
 			if (approx_equals(denom, 0.f)) {
 				return false;
 			}
 
-			t = (D - vec4::dot(normal, r.pos - origin)) / denom;
-		} else {
+			t = (D - vec4::dot3(normal, r.pos - origin)) / denom;
+		/*} else {
 			if (approx_equals(r.dir.w, 0.f)) {
 				return false;
 			}
 
 			t = -r.pos.w / r.dir.w;
-		}
+		}*/
 
 		if (t < TOL) {
 			return false;
 		}
 
-		point4 p = r.pos + t * r.dir;
-
-		if (fabsf(vec4::dot(p - o, normal) - 0.f) > TOL) {
+		if (t >= res.t) {
 			return false;
 		}
 
-		float alpha = vec4::dot(w, vec4::cross(p - o, v));
-		float beta = vec4::dot(w, vec4::cross(u, p - o));
+		point4 p = r.pos + t * r.dir;
+
+		//if (!approx_equals(vec4::dot3(p - o, normal), 0.f)) {
+		//	return false;
+		//}
+
+		float alpha = vec4::dot3(w, vec4::cross(p - o, v));
+		float beta = vec4::dot3(w, vec4::cross(u, p - o));
 
 		if (alpha < 0.f || alpha > 1.f || beta < 0.f || beta > 1.f) {
 			return false;
