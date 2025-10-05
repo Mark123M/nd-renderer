@@ -86,6 +86,12 @@ static bool handle_inputs_cuda() {
         if (mouse_delta.y != 0.0f) {
             world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
         }
+        if (ImGui::IsKeyDown(ImGuiKey_Z)) {
+            world::rotate_camera_yw_kernel<<<1, 1>>>(CAMERA_ROTATE_RATE * fixed_delta_time);
+        }
+        if (ImGui::IsKeyDown(ImGuiKey_C)) {
+            world::rotate_camera_xw_kernel<<<1, 1>>>(CAMERA_ROTATE_RATE * fixed_delta_time);
+        }
         did_input = true;
     }
 
@@ -972,11 +978,11 @@ void my_cornell_box2() {
     scene.push_back(ns_light);
 
     cube c3;
-    c3.mat_idx = 6;  //materials.size() - 1; //2;
+    c3.mat_idx = 2;  //materials.size() - 1; //2;
     c3.translate(vec4(1.f, 0.f, -1.f, 0.f));
     scene.push_back(c3);
 
-    light_material ball2(color(0.f, 4.f, 4.f));
+    light_material ball2(color(0.f, 20.f, 20.f));
     materials.push_back(ball2);
 
     sphere s_light;
@@ -1072,69 +1078,50 @@ void my_cornell_box_white() {
     scene.push_back(c3);
 }
 
-void touch_test() {
-    lambertian red(color(0.65f, 0.05f, 0.05f));
-    lambertian white(color(0.73f, 0.73f, 0.73f));
-    lambertian green(color(0.12f, 0.45f, 0.15f));
-    light_material ceiling(color(10.f, 10.f, 10.f));
-    materials.push_back(red);
-    materials.push_back(white);
-    materials.push_back(green);
-    materials.push_back(ceiling);
-
-    quad q1(point4(-2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q1.mat_idx = 2;
-    scene.push_back(q1);
-
-    quad q2(point4(2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q2.mat_idx = 0;
-    scene.push_back(q2);
-
-    quad q3(point4(-2.f, -2.f, -2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q3.mat_idx = 1;
-    scene.push_back(q3);
-
-    quad q4(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
-    q4.mat_idx = 1;
-    scene.push_back(q4);
-
-    quad q5(point4(-2.f, 2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
-    q5.mat_idx = 1;
-    scene.push_back(q5);
-
-    quad q6(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q6.mat_idx = 1;
-    scene.push_back(q6);
+void DI_test() {
+    light_material lig(color(1.f, 1.f, 1.f));
+    materials.push_back(lig);
 
     lambertian lamb(color(1.f, 1.f, 1.f));
     materials.push_back(lamb);
-    specular spec(color(1.f, 1.f, 1.f));
-    materials.push_back(spec);
-    smooth_dielectric glass(1.5f);
-    materials.push_back(glass);
-    rough_dielectric stained_glass(1.5f);
-    stained_glass.alpha = 0.8f;
-    // materials.push_back(stained_glass);
-    rough_specular metal(color(0.97, 0.74, 0.62));
-    metal.alpha = 0.1f;
 
     nsphere ns_light;
-    ns_light.mat_idx = 3;
+    ns_light.mat_idx = 0;
     ns_light.radius = 0.5f;
     ns_light.translate(vec4(0.f, 0.f, -1.f, 0.f));
     scene.push_back(ns_light);
 
     nsphere ns;
-    ns.mat_idx = 4;
+    ns.mat_idx = 1;
     ns.radius = 0.5f;
     ns.translate(vec4(1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns);
+}
+
+void GI_test() {
+    lambertian lamb(color(1.f, 1.f, 1.f));
+    materials.push_back(lamb);
+
+    nsphere ns1;
+    ns1.mat_idx = 0;
+    ns1.radius = 0.5f;
+    ns1.translate(vec4(0.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns1);
+
+    smooth_dielectric glass(1.5f);
+    materials.push_back(glass);
 
     nsphere ns2;
-    ns2.mat_idx = 6;
+    ns2.mat_idx = 0;
     ns2.radius = 0.5f;
-    ns2.translate(vec4(-1.f, 0.f, -1.f, 0.f));
+    ns2.translate(vec4(1.f, 0.f, -1.f, 0.f));
     scene.push_back(ns2);
+
+    nsphere ns3;
+    ns3.mat_idx = 0;
+    ns3.radius = 0.5f;
+    ns3.translate(vec4(2.f, 0.f, -1.f, 0.f));
+    scene.push_back(ns3);
 }
 
 void shape_axes() {
@@ -1225,10 +1212,10 @@ int main() {
     //quad_light_test();
     //my_cornell_box_old();
     //my_cornell_box();
-    //my_cornell_box2();
-    touch_test();
+    my_cornell_box2();
+    // DI_test();
+    //GI_test();
     //my_cornell_box_white();
-    //cornell_box();
     //tesseract_lines();
     //tesseract();
     //tesseract_reflector();

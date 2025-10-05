@@ -47,6 +47,16 @@ __global__ void rotate_camera_vertical_kernel(float angle) {
     camera::refresh_view_cuda();
 }
 
+__global__ void rotate_camera_yw_kernel(float angle) {
+    camera::d_camera_transform.rotate_yw(angle);
+    camera::refresh_view_cuda();
+}
+
+__global__ void rotate_camera_xw_kernel(float angle) {
+    camera::d_camera_transform.rotate_xw(angle);
+    camera::refresh_view_cuda();
+}
+
 __global__ void rotate_xy_kernel(float angle, shape** scene_list) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
     

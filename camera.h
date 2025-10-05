@@ -182,7 +182,8 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
 
         if (!intersect_world(r, res, shared_scene)) {
             float a = 0.5f * (r.dir.y + 1.f);
-            break; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+            return color(0.5f, 0.5f, 0.5f); // constant environment map
+            // break; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
         }
 
         const vec4& normal = res.normal;
