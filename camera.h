@@ -139,7 +139,7 @@ __device__ color sample_ld(const hit_result& res, uint num_area_lights, shape** 
         shape* s = shared_scene[i];
         material* m = shared_materials[s->mat_idx];
         
-        if (m->can_sample_li()) {
+        if (m->is_emissive()) {
             u -= p_light;
             if (u < 0.f) {
                 sampled_light = m;
@@ -181,9 +181,9 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         hit_result res; // res is initialized with MAX_RAY_DIST
 
         if (!intersect_world(r, res, shared_scene)) {
-            float a = 0.5f * (r.dir.y + 1.f);
-            return color(0.5f, 0.5f, 0.5f); // constant environment map
-            // break; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+            // float a = 0.5f * (r.dir.y + 1.f);
+            // return color(0.5f, 0.5f, 0.5f); // constant environment map
+            break; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
         }
 
         const vec4& normal = res.normal;
@@ -217,7 +217,76 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
     return L;
 }
 
-__global__ void render_kernel(int num_samples, color* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
+__device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
+    float total_surface_volume = 0.f;
+
+    for (size_t i = 0; i < d_scene_len; i++) {
+        float sv = shared_scene[i]->surface_volume();
+        total_surface_volume += sv;
+
+        if (approx_equals(sv, 0.f)) { // can't area sample when sv function hasn't been implemented
+            return color(0.f, 0.f, 0.f);
+        }
+    }
+
+    color L(0.f, 0.f, 0.f);
+    color beta(1.f, 1.f, 1.f);
+    hit_result res;
+    hit_result res_next;
+
+    if (!intersect_world(r, res, shared_scene)) { // can't area sample when the world is unbounded
+        return color(0.f, 0.f, 0.f);
+    }
+
+    while (true) {
+        material* mat = shared_materials[res.target->mat_idx];
+
+        if (mat->is_emissive()) {
+            L = beta * mat->L();
+            break;
+        }
+
+        // sample point in scene
+        shape* s = nullptr;
+        float u = randf_pcg32(0.f, 1.f, pcg_state);
+
+        for (size_t i = 0; i < d_scene_len; i++) {
+            u -= shared_scene[i]->surface_volume() / total_surface_volume;
+
+            if (u < 0) {
+                s = shared_scene[i];
+            }
+        }
+
+        if (s == nullptr) {
+            return color(0.f, 0.f, 0.f);
+        }
+
+        shape_sample ss;
+        s->sample(ss, res, pcg_state);
+
+        vec4 v = ss.p - res.p; // vector to shape
+        float dist = vec4::length(v);
+        vec4 wi = v / dist;
+        color f = mat->f(res.wo, wi);
+        r = ray(res.p + EPSILON * wi, wi);
+
+        // visibility term
+        if (!intersect_world(r, res_next, shared_scene) || res_next.target != s) {
+            break;
+        }
+
+        float cos_wi = vec4::dot(wi, res.normal); 
+        float cos_wo_next = vec4::dot(-wi, res_next.normal);
+        float G = (fabsf(cos_wi) * fabsf(cos_wo_next)) / (dist * dist * dist);
+        beta *= (G * f) / (1.f / total_surface_volume);
+        res = res_next;
+    }
+
+    return L;
+}
+
+__global__ void render_kernel(int num_samples, bool sample_solid_angles, color* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
     extern __shared__ char buffer[];
 
     // buffer layout for shared memory
@@ -266,7 +335,8 @@ __global__ void render_kernel(int num_samples, color* d_color_buffer, uchar4* d_
         vec4 direction = vec4::normalize(sample - camera_pos);
         ray r(camera_pos, direction);
         
-        color c_sample = ray_color_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx]);
+        color c_sample = sample_solid_angles ? ray_color_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx])
+            : ray_color_area_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx]);
         d_color_buffer[idx] = (1.f / (num_samples + 1.f)) * ((float)num_samples * d_color_buffer[idx] + c_sample);
         
         d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].r) * 255.999f);

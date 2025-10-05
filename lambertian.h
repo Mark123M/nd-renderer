@@ -15,7 +15,7 @@ struct lambertian : public material {
             return {0.f, 0.f, 0.f};
         }
 
-        return albedo; //* inv_pi;
+        return (2.f / (pi * pi)) * albedo; //* inv_pi;
     }
 
     __host__ __device__ bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const override {

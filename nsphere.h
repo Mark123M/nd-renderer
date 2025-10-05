@@ -62,6 +62,16 @@ struct nsphere : public shape {
 		return true;
 	}
 
+	__host__ __device__ virtual float surface_volume() const {
+		return 2 * pi * pi * radius * radius * radius;
+	}
+
+	__host__ __device__ bool sample(shape_sample& ss, const hit_result& res, uint64_t& pcg_state) const override {
+		ss.p = origin + vec4::rand_unit_vector(pcg_state) * radius;
+		ss.pdf = 1.f / surface_volume();
+		return true;
+	}
+
 	__host__ __device__ size_t size() const override {
 		return sizeof(nsphere);
 	}

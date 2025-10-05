@@ -86,12 +86,23 @@ static bool handle_inputs_cuda() {
         if (mouse_delta.y != 0.0f) {
             world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
         }
-        if (ImGui::IsKeyDown(ImGuiKey_Z)) {
-            world::rotate_camera_yw_kernel<<<1, 1>>>(CAMERA_ROTATE_RATE * fixed_delta_time);
+
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyDown(ImGuiKey_Z)) {
+        if (mouse_delta.x != 0.f) {
+            world::rotate_camera_yw_kernel<<<1, 1>>>(mouse_delta.x * CAMERA_ROTATE_RATE * fixed_delta_time);
         }
-        if (ImGui::IsKeyDown(ImGuiKey_C)) {
-            world::rotate_camera_xw_kernel<<<1, 1>>>(CAMERA_ROTATE_RATE * fixed_delta_time);
+
+        did_input = true;
+    }
+
+    if (ImGui::IsKeyDown(ImGuiKey_C)) {
+        if (mouse_delta.x != 0.f) {
+            world::rotate_camera_xw_kernel<<<1, 1>>>(mouse_delta.x * CAMERA_ROTATE_RATE * fixed_delta_time);
         }
+
         did_input = true;
     }
 
@@ -1099,13 +1110,13 @@ void DI_test() {
 }
 
 void GI_test() {
-    lambertian lamb(color(1.f, 1.f, 1.f));
+    lambertian lamb(color(0.5f, 0.5f, 0.5f));
     materials.push_back(lamb);
 
     nsphere ns1;
     ns1.mat_idx = 0;
     ns1.radius = 0.5f;
-    ns1.translate(vec4(0.f, 0.f, -1.f, 0.f));
+    ns1.translate(vec4(-1.f, 0.f, 0.f, 0.f));
     scene.push_back(ns1);
 
     smooth_dielectric glass(1.5f);
@@ -1114,14 +1125,22 @@ void GI_test() {
     nsphere ns2;
     ns2.mat_idx = 0;
     ns2.radius = 0.5f;
-    ns2.translate(vec4(1.f, 0.f, -1.f, 0.f));
+    ns2.translate(vec4(0.f, 0.f, 0.f, 0.f));
     scene.push_back(ns2);
 
     nsphere ns3;
     ns3.mat_idx = 0;
     ns3.radius = 0.5f;
-    ns3.translate(vec4(2.f, 0.f, -1.f, 0.f));
+    ns3.translate(vec4(1.f, 0.f, 0.f, 0.f));
     scene.push_back(ns3);
+
+    light_material lig(color(0.7f, 0.7f, 0.7f));
+    materials.push_back(lig);
+
+    nsphere env; // constant environment map
+    env.mat_idx = 2;
+    env.radius = 2.f;
+    scene.push_back(env);
 }
 
 void shape_axes() {
@@ -1212,9 +1231,9 @@ int main() {
     //quad_light_test();
     //my_cornell_box_old();
     //my_cornell_box();
-    my_cornell_box2();
+    //my_cornell_box2();
     // DI_test();
-    //GI_test();
+    GI_test();
     //my_cornell_box_white();
     //tesseract_lines();
     //tesseract();
@@ -1341,7 +1360,7 @@ int main() {
 
         if (true) {
             camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-            (num_samples, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
+            (num_samples, false, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
             num_samples++;
 
             //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);

@@ -59,13 +59,17 @@ struct material {
         return false;
     }
 
+    __host__ __device__ virtual color L() const { // isotropic emittance of object
+        return color(0.f, 0.f, 0.f);
+    }
+
     __host__ __device__ virtual bool is_specular() const = 0;
 
     __host__ __device__ virtual bool can_sample_f() const {
         return true;
     }
 
-    __host__ __device__ virtual bool can_sample_li() const {
+    __host__ __device__ virtual bool is_emissive() const {
         return false;
     }
 

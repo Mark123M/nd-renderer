@@ -11,17 +11,17 @@ struct light_material : public material {
     __host__ __device__ light_material(const color& albedo): albedo{albedo} {}
 
     __host__ __device__ color f(const vec4& wo, const vec4& wi) const override {
-        if (!same_side(wo, wi)) {
-            return {0.f, 0.f, 0.f};
-        }
-
-        return albedo; //* inv_pi;
+        return color(0.f, 0.f, 0.f);
     }
 
     __host__ __device__ bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const override {
         bs.f = albedo; //* inv_pi;
         bs.wi = vec4(0.f, 0.f, 0.f, 0.f);
         return false;
+    }
+
+    __host__ __device__ color L() const override {
+        return albedo;
     }
 
     __host__ __device__ bool sample_li(const shape* s, const hit_result& res, light_sample& ls, uint64_t& pcg_state) const override {
@@ -44,7 +44,7 @@ struct light_material : public material {
         return false;
     }
 
-    __host__ __device__ bool can_sample_li() const override {
+    __host__ __device__ bool is_emissive() const override {
         return true;
     }
 

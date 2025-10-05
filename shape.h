@@ -40,6 +40,10 @@ struct shape {
 		return false;
 	}
 
+	__host__ __device__ virtual float surface_volume() const {
+		return 0.f; // 0 means not implemented
+	}
+
 	__host__ __device__ virtual bool sample(shape_sample& ss, const hit_result& res, uint64_t& pcg_state) const {
 		return false;
 	}
