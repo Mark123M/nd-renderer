@@ -9,10 +9,10 @@ struct transform {
 	affine inv_linear;
 
 	__host__ __device__ void set_basis(const vec4& vx, const vec4& vy, const vec4& vz, const vec4& vw) {
-		assert(fabsf(vx.length_squared() - 1.f) <= TOL);
-		assert(fabsf(vy.length_squared() - 1.f) <= TOL);
-		assert(fabsf(vz.length_squared() - 1.f) <= TOL);
-		assert(fabsf(vw.length_squared() - 1.f) <= TOL);
+		assert(approx_equals(vx.length_squared(), 1.f));
+		assert(approx_equals(vy.length_squared(), 1.f));
+		assert(approx_equals(vz.length_squared(), 1.f));
+		assert(approx_equals(vw.length_squared(), 1.f));
 
 		linear = affine{{
 			{vx.x, vy.x, vz.x, vw.x, 0.f},
@@ -34,8 +34,8 @@ struct transform {
 	// simple rotation over the a-b plane
 	__host__ __device__ void rotate(float angle, uint a, uint b) {
 		affine R = rotate_mat(angle, a, b);
-		linear = matmul(R, linear); // AR(R^-1A^-1)
-		inv_linear = matmul(inv_linear, R.transpose());
+		linear = matmul(linear, R); // AR(R^-1A^-1)
+		inv_linear = matmul(R.transpose(), inv_linear);
 	}
 
 	// R * T * R
@@ -45,14 +45,14 @@ struct transform {
 		T.m[1][4] = t.y;
 		T.m[2][4] = t.z;
 		T.m[3][4] = t.w;
-		linear = matmul(linear, T); // TA(A^-1T^-1)
+		linear = matmul(T, linear); // TA(A^-1T^-1)
 
 		affine T_inv = identity_affine;
 		T_inv.m[0][4] = -t.x;
 		T_inv.m[1][4] = -t.y;
 		T_inv.m[2][4] = -t.z;
 		T_inv.m[3][4] = -t.w;
-		inv_linear = matmul(T_inv, inv_linear);
+		inv_linear = matmul(inv_linear, T_inv);
 	}
 
 	__host__ __device__ void rotate_xy(float angle) {
@@ -170,15 +170,15 @@ struct transform {
 		vec4 u[4];
 		v[0] = normal;
 
-		if (normal.x != 0.f) {
+		if (!approx_equals(normal.x, 0.f)) {
 			v[1] = standard_y;
 			v[2] = standard_z;
 			v[3] = standard_w;
-		} else if (normal.y != 0.f) {
+		} else if (!approx_equals(normal.y, 0.f)) {
 			v[1] = standard_x;
 			v[2] = standard_z;
 			v[3] = standard_w;
-		} else if (normal.z != 0.f) {
+		} else if (!approx_equals(normal.z, 0.f)) {
 			v[1] = standard_x;
 			v[2] = standard_y;
 			v[3] = standard_w;

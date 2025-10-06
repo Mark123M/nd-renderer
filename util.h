@@ -147,7 +147,7 @@ constexpr float MAX_RAY_DIST = 1000.f;
 constexpr float MAX_MARCH_DIST = 5.f;
 constexpr uint MAX_MARCH_STEPS = 50;
 constexpr uint SAMPLES_PER_PIXEL = 20;
-constexpr uint MAX_RAY_BOUNCES = 10;
+constexpr uint MAX_RAY_BOUNCES = 30;
 
 // scene
 constexpr float AMBIENT = 0.3f;
@@ -168,6 +168,14 @@ constexpr float pi_over_4 = 0.78539816339744830961f;
 // utility functions
 __host__ __device__ float deg2rad(float deg) {
 	return deg * pi / 180.f;
+}
+
+__host__ __device__ float clamp(float x, float min_x, float max_x) {
+   return fminf(max_x, fmaxf(min_x, x));
+}
+
+__host__ __device__ bool approx_equals(float x, float y) {
+   return fabsf(x - y) <= TOL;
 }
 
 constexpr uint64_t multiplier = 6364136223846793005u;

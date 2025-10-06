@@ -11,17 +11,18 @@ struct lambertian : public material {
     __host__ __device__ lambertian(const color& albedo): albedo{albedo} {}
 
     __host__ __device__ color f(const vec4& wo, const vec4& wi) const override {
-        if (!same_side(wo, wi)) {
-            return {0.f, 0.f, 0.f};
-        }
-
-        return albedo; //* inv_pi;
+        return 0.738f * inv_pi * albedo; // (74.2f / (100.f * pi)) * albedo; //* inv_pi;
     }
 
     __host__ __device__ bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const override {
-        bs.f = albedo; //* inv_pi;
-        bs.wi = vec4::rand_halfsphere_vector(pcg_state);
+        bs.f = (2.f / (pi * pi)) * albedo; //* inv_pi;
+        bs.wi = vec4::rand_halfsphere_vector_cosine_weighted(pcg_state);
+        bs.pdf = (2.f * bs.wi.y) / (pi * pi);
         return true;
+    }
+
+    __host__ __device__ bool is_specular() const override {
+        return false;
     }
 
     __host__ __device__ size_t size() const override {

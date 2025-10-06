@@ -116,6 +116,11 @@ struct ncube : public shape {
         return true;
     }
 
+    __host__ __device__ float surface_volume() const override {
+        int len = half_len * 2;
+		return 8 * len * len * len;
+	}
+
 	__host__ __device__ size_t size() const override {
 		return sizeof(ncube);
 	}

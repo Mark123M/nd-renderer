@@ -10,6 +10,10 @@
 
 namespace world {
 
+__global__ void toggle_planar_reflection_kernel(size_t idx, material** materials_list) {
+    materials_list[idx]->in_plane = !materials_list[idx]->in_plane;
+}
+
 __global__ void translate_kernel(vec4 t, shape** scene_list) {
     size_t idx = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -28,6 +32,11 @@ __global__ void move_camera_z_kernel(float amount) {
     camera::refresh_view_cuda();
 }
 
+__global__ void move_camera_w_kernel(float amount) {
+    camera::d_camera_transform.translate(amount * camera::d_camera_transform.get_vec_w());
+    camera::refresh_view_cuda();
+}
+
 __global__ void rotate_camera_horizontal_kernel(float angle) {
     camera::d_camera_transform.rotate_xz(angle);
     camera::refresh_view_cuda();
@@ -35,6 +44,16 @@ __global__ void rotate_camera_horizontal_kernel(float angle) {
 
 __global__ void rotate_camera_vertical_kernel(float angle) {
     camera::d_camera_transform.rotate_yz(-angle);
+    camera::refresh_view_cuda();
+}
+
+__global__ void rotate_camera_yw_kernel(float angle) {
+    camera::d_camera_transform.rotate_yw(angle);
+    camera::refresh_view_cuda();
+}
+
+__global__ void rotate_camera_xw_kernel(float angle) {
+    camera::d_camera_transform.rotate_xw(angle);
     camera::refresh_view_cuda();
 }
 

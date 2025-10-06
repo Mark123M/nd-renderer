@@ -42,8 +42,6 @@ __constant__ size_t d_lights_len;
 device_list<material> materials;
 __constant__ size_t d_materials_len;
 
-std::vector<uchar4> image_data;
-
 namespace camera {
 
 float aspect_ratio = 1.f;
@@ -119,22 +117,73 @@ __device__ void ray_march_cuda(ray& r, shape** target_ptr, shape** shared_scene,
     }
 }
 
+__device__ bool intersect_world(ray& r, hit_result& res, shape** shared_scene) {
+    // ray_march_cuda(r, &target, shared_scene, shared_lights);
+    bool hit = false;
+    
+    // TODO: replace with BVH
+    for (size_t i = 0; i < d_scene_len; i++) {
+        hit = shared_scene[i]->intersect(r, res) || hit; // always evaluate intersect to find closer shapes
+    }
+
+    return hit;
+}
+
+__device__ color sample_ld(const hit_result& res, uint num_area_lights, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
+    float u = randf_pcg32(0.f, 1.f, pcg_state);
+    float p_light = 1.f / num_area_lights;
+    material* sampled_light = nullptr;
+    shape* sampled_shape = nullptr;
+    
+    for (size_t i = 0; i < d_scene_len; i++) {
+        shape* s = shared_scene[i];
+        material* m = shared_materials[s->mat_idx];
+        
+        if (m->is_emissive()) {
+            u -= p_light;
+            if (u < 0.f) {
+                sampled_light = m;
+                sampled_shape = s;
+                break; 
+            }
+        }
+    }
+
+    // TODO: sample other type of lights
+    
+    light_sample ls;
+    if (!sampled_light || !sampled_light->sample_li(sampled_shape, res, ls, pcg_state)) {
+        return color(0.f, 0.f, 0.f);
+    }
+
+    vec4 wo = res.wo, wi = ls.wi;
+    ray shadow(res.p, wi);
+    hit_result shadow_res;
+    intersect_world(shadow, shadow_res, shared_scene); // TODO: casting shadow rays shouldnt compute geometry info
+
+    if (shadow_res.target != sampled_shape) { // occluded
+        return color{0.f, 0.f, 0.f};
+    }
+
+    material* bsdf = shared_materials[res.target->mat_idx];
+    color f = bsdf->f(wo, wi) * fabsf(vec4::dot(wi, res.normal));
+    float p_l = p_light * ls.pdf;
+
+    return ls.L * f / p_l; // TODO: multiple importance sampling?
+}
+
 __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
-    color col(1.f, 1.f, 1.f);
+    color L(0.f, 0.f, 0.f);
+    //color col(1.f, 1.f, 1.f);
+    color beta(1.f, 1.f, 1.f);
 
     for (uint k = 0; k < MAX_RAY_BOUNCES; k++) {
         hit_result res; // res is initialized with MAX_RAY_DIST
-        // ray_march_cuda(r, &target, shared_scene, shared_lights);
-        bool hit = false;
-        
-        // TODO: replace with BVH
-        for (size_t i = 0; i < d_scene_len; i++) {
-            hit = shared_scene[i]->intersect(r, res) || hit; // always evaluate intersect to find closer shapes
-        }
 
-        if (!hit) {
-            float a = 0.5f * (r.dir.y + 1.f);
-            return color(0.f, 0.f, 0.f); //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+        if (!intersect_world(r, res, shared_scene)) {
+            // float a = 0.5f * (r.dir.y + 1.f);
+            // return color(0.5f, 0.5f, 0.5f); // constant environment map
+            break; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
         }
 
         const vec4& normal = res.normal;
@@ -145,28 +194,99 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         
         bsdf_sample bs;
         material* mat = shared_materials[res.target->mat_idx];
-        if (!mat->sample_f(-r.dir, res.m, bs, pcg_state)) { // material is not reflective, return
-            return col * bs.f;
+
+        if (!mat->sample_f(-r.dir, res.m, bs, pcg_state)) { // hit an area light, bs.f represents the light color
+            L = beta * bs.f;
+            break;
         } else {
-            col *= bs.f;
+            beta *= (bs.f * fabsf(vec4::dot(bs.wi, res.normal))) / bs.pdf;
         }
+
         r = ray(res.p + EPSILON * bs.wi, bs.wi);
         
-        /* color total_lighting(0.f, 0.f, 0.f);
-        for (size_t i = 0; i < d_lights_len; i++) {
-            light* lig = shared_lights[i];
-            total_lighting += lig->Le_cuda(r.pos, normal, shared_scene, shared_lights);
-            //printf("[GPU] Hit pos (%.3f, %.3f, %.3f, %.3f) | Total lighting (%.3f, %.3f, %.3f)\n",
-            //r.pos.x, r.pos.y, r.pos.z, r.pos.w, total_lighting.r, total_lighting.g, total_lighting.b);
-        } 
-
-        return target->albedo * total_lighting; */
+        float beta_max = fmaxf(beta.r, fmaxf(beta.g, beta.b));
+        if (beta_max <= 1.f && k >= 1.f) {
+            float q = fmaxf(0.f, 1.f - beta_max);
+            if (randf_pcg32(0.f, 1.f, pcg_state) < q) {
+                break;
+            }
+            beta /= 1.f - q;
+        }
     }
 
-    return color(0.f, 0.f, 0.f);
+    return L;
 }
 
-__global__ void render_kernel(int num_samples, color* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
+__device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
+    float total_surface_volume = 0.f;
+
+    for (size_t i = 0; i < d_scene_len; i++) {
+        float sv = shared_scene[i]->surface_volume();
+        total_surface_volume += sv;
+
+        if (approx_equals(sv, 0.f)) { // can't area sample when sv function hasn't been implemented
+            return color(0.f, 0.f, 0.f);
+        }
+    }
+
+    color L(0.f, 0.f, 0.f);
+    color beta(1.f, 1.f, 1.f);
+    hit_result res;
+    hit_result res_next;
+
+    if (!intersect_world(r, res, shared_scene)) { // can't area sample when the world is unbounded
+        return color(0.f, 0.f, 0.f);
+    }
+
+    while (true) {
+        material* mat = shared_materials[res.target->mat_idx];
+
+        if (mat->is_emissive()) {
+            L = beta * mat->L();
+            break;
+        }
+
+        // sample point in scene
+        shape* s = nullptr;
+        float u = randf_pcg32(0.f, 1.f, pcg_state);
+
+        for (size_t i = 0; i < d_scene_len; i++) {
+            u -= shared_scene[i]->surface_volume() / total_surface_volume;
+
+            if (u < 0) {
+                s = shared_scene[i];
+            }
+        }
+
+        if (s == nullptr) {
+            break;
+        }
+
+        shape_sample ss;
+        s->sample(ss, res, pcg_state);
+
+        vec4 v = ss.p - res.p; // vector to shape
+        float dist = vec4::length(v);
+        vec4 wi = v / dist;
+        color f = mat->f(res.wo, wi);
+        r = ray(res.p + EPSILON * wi, wi);
+
+        // visibility term
+        if (!intersect_world(r, res_next, shared_scene) || !point4::approx_points_equals(res_next.p, ss.p)) {
+            break;
+        }
+
+        float cos_wi = vec4::dot(wi, res.normal); 
+        float cos_wo_next = vec4::dot(-wi, res_next.normal);
+        float G = (fabsf(cos_wi) * fabsf(cos_wo_next)) / (dist * dist * dist);
+        beta *= (G * f) / (1.f / total_surface_volume);
+        res = res_next;
+    }
+
+    return L;
+}
+
+__global__ void render_kernel(int num_samples, bool sample_solid_angles, color* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
     extern __shared__ char buffer[];
 
     // buffer layout for shared memory
@@ -207,48 +327,22 @@ __global__ void render_kernel(int num_samples, color* d_color_buffer, uchar4* d_
     uint idx = row * width + col;
 
     if (row < height && col < width) {
-        // need device versions of these functions/structs
-        //point4 pixel_center = d_pixel00_center + (col * d_pixel_x) + (row * d_pixel_y);
-        //vec4 direction = vec4::normalize(pixel_center - d_camera_transform.get_pos());
-        //ray r(d_camera_transform.get_pos(), direction);
         point4 camera_pos = d_camera_transform.get_pos();
         float row_offset = randf_pcg32(-0.5f, 0.5f, d_pcg_states[idx]);
         float col_offset = randf_pcg32(-0.5f, 0.5f, d_pcg_states[idx]);
-        //vec4 offset{ randf_pcg32(-0.5f, 0.5f, pcg_state), randf_pcg32(-0.5f, 0.5f, pcg_state), 0.f, 0.f }; // Random point from center of unit square -0.5 <= x, y < 0.5
         
         point4 sample = d_pixel00_center + ((col + col_offset) * d_pixel_x) + ((row + row_offset) * d_pixel_y);
         vec4 direction = vec4::normalize(sample - camera_pos);
         ray r(camera_pos, direction);
         
-        color c_sample = ray_color_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx]);
+        color c_sample = sample_solid_angles ? ray_color_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx])
+            : ray_color_area_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx]);
         d_color_buffer[idx] = (1.f / (num_samples + 1.f)) * ((float)num_samples * d_color_buffer[idx] + c_sample);
         
         d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].r) * 255.999f);
         d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].g) * 255.999f);
         d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].b) * 255.999f);
         d_image_data[idx].w = 255;
-        // r / n => (r + x) / (n + 1) = r / (n + 1) + x / (n + 1) = (r / n) * (n / (n + 1)) + x / (n + 1)
-        
-        /*
-        point4 camera_pos = d_camera_transform.get_pos();
-        color c(0.f, 0.f, 0.f);
-
-        // TODO: progressive renderer that draws k SPP every frame until total is reached (improve frame rates and interactions)
-        for (uint s = 0; s < SAMPLES_PER_PIXEL; s++) {
-            float row_offset = randf_pcg32(-0.5f, 0.5f, pcg_state);
-            float col_offset = randf_pcg32(-0.5f, 0.5f, pcg_state);
-            //vec4 offset{ randf_pcg32(-0.5f, 0.5f, pcg_state), randf_pcg32(-0.5f, 0.5f, pcg_state), 0.f, 0.f }; // Random point from center of unit square -0.5 <= x, y < 0.5
-            point4 sample = d_pixel00_center + ((col + col_offset) * d_pixel_x) + ((row + row_offset) * d_pixel_y);
-            vec4 direction = vec4::normalize(sample - camera_pos);
-            ray r(camera_pos, direction);
-            c += ray_color_cuda(r, shared_scene, shared_lights, shared_materials, pcg_state);
-        }
-
-        d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, c.r / SAMPLES_PER_PIXEL) * 255.999f);
-        d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, c.g / SAMPLES_PER_PIXEL) * 255.999f);
-        d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, c.b / SAMPLES_PER_PIXEL) * 255.999f);
-        d_image_data[idx].w = 255; */
-
     }
 }
 
@@ -279,6 +373,24 @@ __global__ void render_stride_kernel(uchar4* d_image_data, uint width, uint num_
         d_image_data[i].w = 255; */
     
     }
+}
+
+void export_image(uchar4* d_image_data, uint num_pixels) {
+    std::vector<uchar4> image_data(num_pixels);
+    gpuErrchk(cudaMemcpy(image_data.data(), d_image_data, num_pixels * sizeof(uchar4), cudaMemcpyDeviceToHost));
+    std::ofstream file{ "renders/" + time_stamp() + ".ppm", std::ios::app };
+    file << "P3\n" << image_width << " " << image_height << "\n255\n";
+
+    for (uint row = 0; row < image_height; row++) {
+        std::clog << "\rScanlines remaining: " << (image_height - row) << "     " << std::flush;
+        for (uint col = 0; col < image_width; col++) {
+            uint idx = row * image_width + col;
+            file << (int)image_data[idx].x << " " << (int)image_data[idx].y << " " << (int)image_data[idx].z << " ";
+        }
+    }
+    
+    std::clog << "\rEXPORT COMPLETE                                                    \n";
+    file.close();
 }
 
 float scene_sdf(const point4& p, shape** target_ptr) {
@@ -324,8 +436,6 @@ vec4 get_normal(const point4& p) {
 }
 
 void ray_march(ray& r, shape** target_ptr) {
-    //float a = 0.5f * (r.dir.y + 1.f);
-    //return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
     do {
         float dist = scene_sdf(r.pos, target_ptr);
 
@@ -427,10 +537,10 @@ void render_rt(uint first_row, uint last_row) {
             ray r(camera_transform.get_pos(), direction);
             
             color color = ray_color(r);
-            image_data[idx].x = static_cast<unsigned char>(fminf(1.f, color.r) * 255.999f);
+            /*image_data[idx].x = static_cast<unsigned char>(fminf(1.f, color.r) * 255.999f);
             image_data[idx].y = static_cast<unsigned char>(fminf(1.f, color.g) * 255.999f);
             image_data[idx].z = static_cast<unsigned char>(fminf(1.f, color.b) * 255.999f);
-            image_data[idx].w = 255;
+            image_data[idx].w = 255;*/
         }
     }
 }
