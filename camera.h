@@ -259,7 +259,7 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
         }
 
         if (s == nullptr) {
-            return color(0.f, 0.f, 0.f);
+            break;
         }
 
         shape_sample ss;
@@ -272,7 +272,7 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
         r = ray(res.p + EPSILON * wi, wi);
 
         // visibility term
-        if (!intersect_world(r, res_next, shared_scene) || res_next.target != s) {
+        if (!intersect_world(r, res_next, shared_scene) || !point4::approx_points_equals(res_next.p, ss.p)) {
             break;
         }
 

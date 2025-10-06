@@ -1110,7 +1110,7 @@ void DI_test() {
 }
 
 void GI_test() {
-    lambertian lamb(color(0.5f, 0.5f, 0.5f));
+    lambertian lamb(color(1.f, 1.f, 1.f));
     materials.push_back(lamb);
 
     nsphere ns1;
@@ -1132,7 +1132,7 @@ void GI_test() {
     ns3.mat_idx = 0;
     ns3.radius = 0.5f;
     ns3.translate(vec4(1.f, 0.f, 0.f, 0.f));
-    scene.push_back(ns3);
+    //scene.push_back(ns3);
 
     light_material lig(color(0.7f, 0.7f, 0.7f));
     materials.push_back(lig);

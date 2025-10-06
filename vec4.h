@@ -171,6 +171,16 @@ struct vec4 {
 		}
 	}
 
+	__host__ __device__ static vec4 rand_unit_vector3(uint64_t& pcg_state) {
+		while (true) {
+			vec4 p = vec4{ randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state), randf_pcg32(-1, 1, pcg_state), 0.f};
+			float lensq = p.length_squared();
+			if (EPSILON < lensq && lensq <= 1) {
+				return p / sqrtf(lensq);
+			}
+		}
+	}
+
 	__host__ __device__ static vec4 rand_unit_disk_vector(uint64_t& pcg_state) {
 		while (true) {
 			auto p = vec4{ randf_pcg32(-1, 1, pcg_state), 0.f, randf_pcg32(-1, 1, pcg_state), 0.f};
@@ -308,6 +318,10 @@ struct point4 {
 			w = val;
 			break;
 		}
+	}
+
+	__host__ __device__ static bool approx_points_equals(const point4& p1, const point4& p2) {
+		return approx_equals(p1.x, p2.x) && approx_equals(p1.y, p2.y) && approx_equals(p1.z, p2.z) && approx_equals(p1.w, p2.w);
 	}
 };
 
