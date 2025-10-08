@@ -1112,11 +1112,13 @@ void DI_test() {
 void GI_test() {
     lambertian lamb(color(1.f, 1.f, 1.f));
     materials.push_back(lamb);
+    light_material lig(color(0.7f, 0.7f, 0.7f));
+    materials.push_back(lig);
 
     nsphere ns1;
     ns1.mat_idx = 0;
     ns1.radius = 0.5f;
-    ns1.translate(vec4(-1.f, 0.f, 0.f, 0.f));
+    ns1.translate(vec4(-0.5f, 0.f, 0.f, 0.f));
     scene.push_back(ns1);
 
     smooth_dielectric glass(1.5f);
@@ -1125,7 +1127,7 @@ void GI_test() {
     nsphere ns2;
     ns2.mat_idx = 0;
     ns2.radius = 0.5f;
-    ns2.translate(vec4(0.f, 0.f, 0.f, 0.f));
+    ns2.translate(vec4(0.5f, 0.f, 0.f, 0.f));
     scene.push_back(ns2);
 
     nsphere ns3;
@@ -1134,12 +1136,9 @@ void GI_test() {
     ns3.translate(vec4(1.f, 0.f, 0.f, 0.f));
     //scene.push_back(ns3);
 
-    light_material lig(color(0.7f, 0.7f, 0.7f));
-    materials.push_back(lig);
-
     nsphere env; // constant environment map
-    env.mat_idx = 2;
-    env.radius = 2.f;
+    env.mat_idx = 1;
+    env.radius = 0.5f;
     scene.push_back(env);
 }
 
@@ -1161,13 +1160,13 @@ void touch_test() {
     nsphere ns2;
     ns2.mat_idx = 1;
     ns2.radius = 0.5f;
-    ns2.translate(vec4(0.f, 0.f, 0.f, 0.f));
+    // ns2.translate(vec4(0.f, 0.f, 0.f, 0.f));
     scene.push_back(ns2);
 
     nsphere env; // constant environment map
     env.mat_idx = 2;
     env.radius = 2.f;
-    scene.push_back(env);
+    //scene.push_back(env);
 }
 
 void shape_axes() {
@@ -1258,9 +1257,9 @@ int main() {
     //quad_light_test();
     //my_cornell_box_old();
     //my_cornell_box();
-    my_cornell_box2();
+    //my_cornell_box2();
     // DI_test();
-    //GI_test();
+    GI_test();
     //touch_test();
     //my_cornell_box_white();
     //tesseract_lines();
@@ -1388,7 +1387,7 @@ int main() {
 
         if (true) {
             camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-            (num_samples, true, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
+            (num_samples, false, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
             num_samples++;
 
             //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);

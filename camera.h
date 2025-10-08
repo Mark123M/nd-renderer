@@ -5,6 +5,7 @@
 #include <vector>
 #include <ctime>
 #include <mutex>
+#include <math.h>
 
 #include "color.h"
 #include "ray.h"
@@ -232,7 +233,6 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
     color L(0.f, 0.f, 0.f);
     color beta(1.f, 1.f, 1.f);
     hit_result res;
-    hit_result res_next;
 
     if (!intersect_world(r, res, shared_scene)) { // can't area sample when the world is unbounded
         return color(0.f, 0.f, 0.f);
@@ -271,12 +271,28 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
         float dist = vec4::length(v);
         vec4 wi = v / dist;
         color f = mat->f(res.wo, wi);
-        r = ray(res.p + EPSILON * wi, wi);
+        ray next_r = ray(res.p, wi);
 
         // visibility term
-        if (!intersect_world(r, res_next, shared_scene) || !point4::approx_points_equals(res_next.p, ss.p)) {
+        hit_result res_next;
+        if (!intersect_world(next_r, res_next, shared_scene) || !point4::approx_points_equals(res_next.p, ss.p)) {
             break;
         }
+
+        /*if (!point4::approx_points_equals(res_next.p, ss.p)) {
+            if (isnan(res_next.p.x) || isnan(res_next.p.y) || isnan(res_next.p.z) || isnan(res_next.p.w)) {
+                printf("Intersect point NaN");
+            }
+            if (isnan(ss.p.x) || isnan(ss.p.y) || isnan(ss.p.z) || isnan(ss.p.w)) {
+                printf("Sampled point NaN");
+            }
+            if (s != res.target) {
+                //printf("Intersected point (%.3f, %.3f, %.3f, %.3f), Sampled point (%.3f, %.3f, %.3f, %.3f)\n", res_next.p.x, res_next.p.y, res_next.p.z, res_next.p.w, ss.p.x, ss.p.y, ss.p.z, ss.p.w); 
+            }
+            break;
+        } else if (!color::approx_colors_equals(shared_materials[s->mat_idx]->L(), color(0.f, 0.f, 0.f))) {
+            printf("Light sampled\n");
+        }*/
 
         float cos_wi = vec4::dot(wi, res.normal); 
         float cos_wo_next = vec4::dot(-wi, res_next.normal);

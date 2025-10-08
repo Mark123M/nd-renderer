@@ -57,6 +57,10 @@ struct color {
         b /= k;
         return *this;
     }
+
+    __host__ __device__ static bool approx_colors_equals(const color& c1, const color& c2) {
+		return approx_equals(c1.r, c2.r) && approx_equals(c1.g, c2.g) && approx_equals(c1.b, c2.b);
+	}
 };
 
 __host__ __device__ color operator*(float k, color c) {
