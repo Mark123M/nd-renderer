@@ -238,6 +238,8 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
         return color(0.f, 0.f, 0.f);
     }
 
+    uint k = 0;
+
     while (true) {
         material* mat = shared_materials[res.target->mat_idx];
 
@@ -281,6 +283,17 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
         float G = (fabsf(cos_wi) * fabsf(cos_wo_next)) / (dist * dist * dist);
         beta *= (G * f) / (1.f / total_surface_volume);
         res = res_next;
+
+        float beta_max = fmaxf(beta.r, fmaxf(beta.g, beta.b));
+        if (beta_max <= 1.f && k >= 2) {
+            float q = fmaxf(0.f, 1.f - beta_max);
+            if (randf_pcg32(0.f, 1.f, pcg_state) < q) {
+                break;
+            }
+            beta /= 1.f - q;
+        }
+
+        k++;
     }
 
     return L;
