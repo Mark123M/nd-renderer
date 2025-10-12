@@ -7,6 +7,10 @@
 #include "imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
 #include <thread>
+#include <fstream>
+#include <filesystem>
+#include "json/include/nlohmann/json.hpp"
+using json = nlohmann::json;
 
 #include "color.h"
 #include "ray.h"
@@ -71,7 +75,7 @@ __global__ void hello() {
     printf("Hello from block: %u, thread: %u\n", blockIdx.x, threadIdx.x);
 }
 
-static bool handle_inputs_cuda() {
+static bool handle_inputs_cuda(device_list<shape>& scene) {
     bool did_input = false;
     uint threads_per_block = 64;
     uint num_blocks = (scene.size() + threads_per_block - 1) / threads_per_block;
@@ -159,77 +163,6 @@ static bool handle_inputs_cuda() {
     return did_input;
 }
 
-static float handle_inputs() {
-    bool did_input = false;
-
-    if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-        for (size_t i = 0; i < scene.size(); i++) {
-            shape* c = scene[i];
-            c->translate(vec4(-CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
-        }
-
-        did_input = true;
-    }
-
-    if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-        for (size_t i = 0; i < scene.size(); i++) {
-            shape* c = scene[i];
-            c->translate(vec4(CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
-        }
-
-        did_input = true;
-    }
-
-    if (ImGui::IsKeyPressed(ImGuiKey_W)) {
-        for (size_t i = 0; i < scene.size(); i++) {
-            shape* c = scene[i];
-            c->translate(vec4(0.f, CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f));
-        }
-
-        did_input = true;
-    }
-
-    if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-        for (size_t i = 0; i < scene.size(); i++) {
-            shape* c = scene[i];
-            c->translate(vec4(0.f, -CAMERA_MOVE_RATE * fixed_delta_time, 0.f, 0.f));
-        }
-        
-        did_input = true;
-    }
-
-    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
-        for (size_t i = 0; i < scene.size(); i++) {
-            shape* c = scene[i];
-            c->rotate_xz(ROTATE_RATE * fixed_delta_time);
-            c->rotate_yw(ROTATE_RATE * fixed_delta_time);
-        }
-
-        did_input = true;
-    }
-
-    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-        for (size_t i = 0; i < scene.size(); i++) {
-            shape* c = scene[i];
-            c->rotate_yz(ROTATE_RATE * fixed_delta_time);
-        }
-
-        did_input = true;
-    }
-
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
-        for (size_t i = 0; i < scene.size(); i++) {
-            shape* c = scene[i];
-            c->rotate_xz(ROTATE_RATE * fixed_delta_time);
-        }
-
-        did_input = true;
-    }
-
-    return did_input;
-}
-
-
 __global__ void math_test() {
     vec4 N(-1.4f, 0.5f, -3.f, 2.f);
     transform t = transform::get_shading_transform(N);
@@ -242,7 +175,7 @@ __global__ void math_test() {
     t2.linear.print();
 }
 
-void tesseract_lines() {
+void tesseract_lines(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
         // Tesseract Scene
     float L = 0.5f;
 
@@ -360,7 +293,7 @@ void tesseract_lines() {
     lights.push_back(lig1);
 }
 
-void tesseract_lines_reflector() {
+void tesseract_lines_reflector(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
         // Tesseract Scene
     float L = 0.5f;
 
@@ -488,7 +421,7 @@ void tesseract_lines_reflector() {
     lights.push_back(lig1);
 }
 
-void tesseract() {
+void tesseract(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
     lambertian edge_mat(edge_color);
     materials.push_back(edge_mat);
@@ -525,7 +458,7 @@ void tesseract() {
     lights.push_back(lig1);
 }
 
-void all_white() {
+void all_white(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     color edge_color(1.f, 1.f, 1.f); // Orange
     lambertian edge_mat(edge_color);
     materials.push_back(edge_mat);
@@ -562,7 +495,7 @@ void all_white() {
     lights.push_back(lig1);
 }
 
-void tesseract_reflector() {
+void tesseract_reflector(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     color edge_color(1.0f, 0.647f, 0.0f); // Orange
     specular edge_mat(edge_color);
     materials.push_back(edge_mat);
@@ -599,7 +532,7 @@ void tesseract_reflector() {
     lights.push_back(lig1);
 }
 
-void tesseract_glass() {
+void tesseract_glass(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     smooth_dielectric edge_mat(1.5f);
     materials.push_back(edge_mat);
 
@@ -635,7 +568,7 @@ void tesseract_glass() {
     lights.push_back(lig1);
 }
 
-void spheres() {
+void spheres(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     color sphere_color(0.9f, 0.5f, 0.9f);
     specular sphere_mat(sphere_color);
     materials.push_back(sphere_mat);
@@ -682,7 +615,7 @@ void spheres() {
 }
 
 // BSDFs are modelled with the unit half 3-sphere (if there is a 4-th spatial dimension it makes sense?)
-void quad_light_test() {
+void quad_light_test(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     lambertian red(color(1.f, 1.f, 0.05f));
     materials.push_back(red);
     light_material white(color(4.f, 4.f, 4.f));
@@ -699,7 +632,7 @@ void quad_light_test() {
     scene.push_back(q2);
 }
 
-void cornell_box() {
+void cornell_box(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     lambertian red(color(0.65f, 0.05f, 0.05f));
     lambertian white(color(0.73f, 0.73f, 0.73f));
     lambertian green(color(0.12f, 0.45f, 0.15f));
@@ -729,7 +662,7 @@ void cornell_box() {
     scene.push_back(q6);
 }
 
-void my_cornell_box_old() {
+void my_cornell_box_old(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     lambertian red(color(0.65f, 0.05f, 0.05f));
     lambertian white(color(0.73f, 0.73f, 0.73f));
     lambertian green(color(0.12f, 0.45f, 0.15f));
@@ -800,7 +733,7 @@ void my_cornell_box_old() {
 
 }
 
-void my_cornell_box() {
+void my_cornell_box(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     lambertian red(color(0.65f, 0.05f, 0.05f));
     red.in_plane = true;
     lambertian white(color(0.73f, 0.73f, 0.73f));
@@ -903,7 +836,7 @@ void my_cornell_box() {
     scene.push_back(s_light);
 }
 
-void my_cornell_box2() {
+void my_cornell_box2(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     lambertian red(color(0.65f, 0.05f, 0.05f));
     lambertian white(color(0.73f, 0.73f, 0.73f));
     lambertian green(color(0.12f, 0.45f, 0.15f));
@@ -1004,7 +937,7 @@ void my_cornell_box2() {
     scene.push_back(s_light);
 }
 
-void my_cornell_box_white() {
+void my_cornell_box_white(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     lambertian red(color(1.f, 1.f, 1.f));
     red.in_plane = true;
     lambertian white(color(1.f, 1.f, 1.f));
@@ -1089,34 +1022,34 @@ void my_cornell_box_white() {
     scene.push_back(c3);
 }
 
-void DI_test() {
-    light_material lig(color(1.f, 1.f, 1.f));
+void DI_test(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
+    lambertian lamb(color(1.f, 1.f, 1.f));
+    materials.push_back(lamb);
+    light_material lig(color(0.7f, 0.7f, 0.7f));
     materials.push_back(lig);
-
-    lambertian lamb(color(1.f, 1.f, 1.f));
-    materials.push_back(lamb);
-
-    nsphere ns_light;
-    ns_light.mat_idx = 0;
-    ns_light.radius = 0.5f;
-    ns_light.translate(vec4(0.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns_light);
-
-    nsphere ns;
-    ns.mat_idx = 1;
-    ns.radius = 0.5f;
-    ns.translate(vec4(1.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns);
-}
-
-void GI_test() {
-    lambertian lamb(color(1.f, 1.f, 1.f));
-    materials.push_back(lamb);
 
     nsphere ns1;
     ns1.mat_idx = 0;
     ns1.radius = 0.5f;
-    ns1.translate(vec4(-1.f, 0.f, 0.f, 0.f));
+    // ns1.translate(vec4(-0.5f, 0.f, 0.f, 0.f));
+    scene.push_back(ns1);
+
+    nsphere env; // constant environment map
+    env.mat_idx = 1;
+    env.radius = 2.f;
+    scene.push_back(env);
+}
+
+void GI_test(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
+    lambertian lamb(color(1.f, 1.f, 1.f));
+    materials.push_back(lamb);
+    light_material lig(color(0.7f, 0.7f, 0.7f));
+    materials.push_back(lig);
+
+    nsphere ns1;
+    ns1.mat_idx = 0;
+    ns1.radius = 0.5f;
+    ns1.translate(vec4(-0.5f, 0.f, 0.f, 0.f));
     scene.push_back(ns1);
 
     smooth_dielectric glass(1.5f);
@@ -1125,7 +1058,7 @@ void GI_test() {
     nsphere ns2;
     ns2.mat_idx = 0;
     ns2.radius = 0.5f;
-    ns2.translate(vec4(0.f, 0.f, 0.f, 0.f));
+    ns2.translate(vec4(0.5f, 0.f, 0.f, 0.f));
     scene.push_back(ns2);
 
     nsphere ns3;
@@ -1134,16 +1067,105 @@ void GI_test() {
     ns3.translate(vec4(1.f, 0.f, 0.f, 0.f));
     //scene.push_back(ns3);
 
-    light_material lig(color(0.7f, 0.7f, 0.7f));
-    materials.push_back(lig);
-
     nsphere env; // constant environment map
-    env.mat_idx = 2;
+    env.mat_idx = 1;
     env.radius = 2.f;
     scene.push_back(env);
 }
 
-void shape_axes() {
+void touch_test(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
+    lambertian lamb;
+    lamb.albedo = color(1.f, 1.f, 1.f);
+    materials.push_back(lamb);
+    light_material lig;
+    lig.col = color(0.7f, 0.7f, 0.7f);
+    materials.push_back(lig);
+
+    nsphere ns1;
+    ns1.mat_idx = 0;
+    ns1.radius = 0.5f;
+    ns1.translate(vec4(-1.f, 0.f, 0.f, 0.f));
+    scene.push_back(ns1);
+
+    nsphere ns2;
+    ns2.mat_idx = 1;
+    ns2.radius = 0.5f;
+    // ns2.translate(vec4(0.f, 0.f, 0.f, 0.f));
+    scene.push_back(ns2);
+}
+
+void build_scene(json& data, device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
+    scene.clear();
+    materials.clear();
+    lights.clear();
+
+    for (auto& shape_data : data["shapes"]) {
+        std::string shape_class = shape_data["class"].template get<std::string>();
+        size_t mat_idx = shape_data["mat_idx"].template get<size_t>();
+        vec4 t(0.f, 0.f, 0.f, 0.f);
+        // vec4 r(0.f, 0.f, 0.f, 0.f);
+        if (shape_data.find("translate") != shape_data.end()) {
+            t.x = shape_data["translate"][0].template get<float>();
+            t.y = shape_data["translate"][1].template get<float>();
+            t.z = shape_data["translate"][2].template get<float>();
+            t.w = shape_data["translate"][3].template get<float>();
+        }
+
+        if (shape_class == "nsphere") {
+            nsphere ns;
+
+            if (shape_data.find("radius") != shape_data.end()) {
+                ns.radius = shape_data["radius"].template get<float>();
+            }
+
+            std::cout << "constructing nsphere radius " << ns.radius << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
+            ns.mat_idx = mat_idx;
+            ns.translate(t);
+            scene.push_back(ns);
+        }
+    }
+
+    for (auto& mat_data : data["materials"]) {
+        std::string mat_class = mat_data["class"].template get<std::string>();
+
+        if (mat_class == "lambertian") {
+            lambertian l;
+            
+            if (mat_data.find("albedo") != mat_data.end()) {
+                color c;
+                c.r = mat_data["albedo"][0].template get<float>();
+                c.g = mat_data["albedo"][1].template get<float>();
+                c.b = mat_data["albedo"][2].template get<float>();
+                l.albedo = c;
+            }
+
+            std::cout << "constructing lambertian albedo " << l.albedo.r << " " << l.albedo.g << " " << l.albedo.b << std::endl;
+            materials.push_back(l);
+        } else if (mat_class == "light_material") {
+            light_material lig;
+            
+            if (mat_data.find("color") != mat_data.end()) {
+                color c;
+                c.r = mat_data["color"][0].template get<float>();
+                c.g = mat_data["color"][1].template get<float>();
+                c.b = mat_data["color"][2].template get<float>();
+                lig.col = c;
+            }
+
+            std::cout << "constructing light color " << lig.col.r << " " << lig.col.g << " " << lig.col.b << std::endl;
+            materials.push_back(lig);
+        }
+    }
+
+    size_t scene_len = scene.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_scene_len, &scene_len, sizeof(size_t)));
+    size_t lights_len = lights.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_lights_len, &lights_len, sizeof(size_t)));    
+    size_t materials_len = materials.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_materials_len, &materials_len, sizeof(size_t)));
+}
+
+void shape_axes(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     projected_cylinder x_axis;
     x_axis.end0 = point4(AXIS_LEN, 0.f, 0.f, 0.f);
     x_axis.radius = AXIS_RADIUS;
@@ -1186,8 +1208,6 @@ int main() {
     uint stride_num_blocks = (g_sm_max_threads / stride_threads_per_block) * g_sm_count;
     printf("SM count %d | Max threads per SM %d | Stride block count %d\n", g_sm_count, g_sm_max_threads, stride_num_blocks);
 
-    math_test<<<1, 1>>>();
-
     glfwSetErrorCallback(glfw_error_callback);
 
     if (!glfwInit()) {
@@ -1227,13 +1247,26 @@ int main() {
     ImGui_ImplOpenGL3_Init(glsl_version);
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    device_list<shape> scene;
+    device_list<light> lights;
+    device_list<material> materials;
+
+    std::filesystem::path init_scene_path("scenes/di_test.json");
+    std::filesystem::directory_entry cur_scene_entry(init_scene_path);
+    std::filesystem::file_time_type cur_scene_last_write_time = cur_scene_entry.last_write_time();
+    std::ifstream f(init_scene_path);
+    json data = json::parse(f);
+    build_scene(data, scene, materials, lights);
+    //std::cout << data["shapes"][0]["class"] << std::endl;
+
     //spheres();
     //quad_light_test();
     //my_cornell_box_old();
     //my_cornell_box();
     //my_cornell_box2();
     // DI_test();
-    GI_test();
+    //GI_test();
+    //touch_test();
     //my_cornell_box_white();
     //tesseract_lines();
     //tesseract();
@@ -1242,14 +1275,6 @@ int main() {
     //tesseract_glass();
     //all_white();
     //shape_axes();
-    
-    size_t scene_len = scene.size();
-    gpuErrchk(cudaMemcpyToSymbol(d_scene_len, &scene_len, sizeof(size_t)));
-    size_t lights_len = lights.size();
-    gpuErrchk(cudaMemcpyToSymbol(d_lights_len, &lights_len, sizeof(size_t)));    
-    size_t materials_len = materials.size();
-    gpuErrchk(cudaMemcpyToSymbol(d_materials_len, &materials_len, sizeof(size_t)));
-
     // can try space distortion too
     // tesseract lines with a sphere in the middle?
     // tesseract solid reflectors?
@@ -1301,6 +1326,11 @@ int main() {
     camera::init_pcg_states_kernel<<<num_blocks, threads_per_block>>>(d_pcg_states, camera::image_width, camera::image_height);
 
     int num_samples = 0;
+    auto clear_buffer = [&num_samples, num_pixels, d_color_buffer, d_image_data]() -> void {
+        num_samples = 0;
+        gpuErrchk(cudaMemset(d_color_buffer, 0, num_pixels * sizeof(color)));
+        gpuErrchk(cudaMemset(d_image_data, 0, num_pixels * sizeof(uchar4)));
+    };
 
     while (!glfwWindowShouldClose(window)) {
         current_frame = glfwGetTime();
@@ -1348,19 +1378,25 @@ int main() {
             //glBindTexture(GL_TEXTURE_2D, 0); // Unbind
         }
 
-                // --- Render Target Window ---
+        // --- Render Target Window ---
         ImGui::Begin("Render Output");
         //bool input_changed = handle_inputs();
-        bool input_changed_cuda = handle_inputs_cuda();
+        bool input_changed_cuda = handle_inputs_cuda(scene);
         if (input_changed_cuda) {
-            num_samples = 0;
-            gpuErrchk(cudaMemset(d_color_buffer, 0, num_pixels * sizeof(color)));
-            gpuErrchk(cudaMemset(d_image_data, 0, num_pixels * sizeof(uchar4)));
+            clear_buffer();
+        }
+
+        if (cur_scene_entry.last_write_time() > cur_scene_last_write_time) {
+            cur_scene_last_write_time = cur_scene_entry.last_write_time();
+            std::ifstream f(cur_scene_entry.path());
+            json data = json::parse(f);
+            build_scene(data, scene, materials, lights);
+            clear_buffer();
         }
 
         if (true) {
             camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-            (num_samples, false, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
+            (num_samples, true, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
             num_samples++;
 
             //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
@@ -1380,40 +1416,33 @@ int main() {
             //nvtxRangePop();
         }
 
-        if (false) {
-            uint first_row = 0;
-
-            for (uint i = 0; i < NUM_CPU_THREADS; i++) {
-                uint last_row = std::min(first_row + row_range, camera::image_height - 1);
-
-                threads[i] = std::thread([first_row, last_row]() { 
-                    camera::render_rt(first_row, last_row);
-                });
-
-                first_row += row_range;
-            }
-
-            for (uint i = 0; i < NUM_CPU_THREADS; i++) {
-                threads[i].join();
-            }
-
-            //glBindTexture(GL_TEXTURE_2D, render_texture);
-            //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, camera::image_width, camera::image_height, GL_RGBA, GL_UNSIGNED_BYTE, image_data.data());
-            //glBindTexture(GL_TEXTURE_2D, 0); // Unbind
-        }
-
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(camera::image_width, camera::image_height));
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
         
-        for (size_t i = 0; i < materials_len; i++) {
+        for (const auto& entry : std::filesystem::directory_iterator(PATH_TO_SCENES)) {
+            const char* stem = entry.path().stem().c_str();
+            
+            if (ImGui::Button(stem)) {
+                cur_scene_entry = entry;
+                cur_scene_last_write_time = cur_scene_entry.last_write_time();
+                std::ifstream f(entry.path());
+                json data = json::parse(f);
+                build_scene(data, scene, materials, lights);
+                clear_buffer();
+            }
+
+            ImGui::SameLine();
+        }
+
+        ImGui::NewLine();
+
+        for (size_t i = 0; i < materials.size(); i++) {
             std::string label = "material " + std::to_string(i);
 
             if (ImGui::Button(label.c_str())) {
                 world::toggle_planar_reflection_kernel<<<1,1>>>(i, materials.d_list);
-                num_samples = 0;
-                gpuErrchk(cudaMemset(d_color_buffer, 0, num_pixels * sizeof(color)));
-                gpuErrchk(cudaMemset(d_image_data, 0, num_pixels * sizeof(uchar4)));
+                clear_buffer();
             }
 
             ImGui::SameLine();
@@ -1438,9 +1467,6 @@ int main() {
         glfwSwapBuffers(window);
     }
 
-    delete &scene;
-    delete &lights;
-    delete &materials;
     gpuErrchk(cudaGraphicsUnregisterResource(render_texture_CUDA));
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaFree(d_color_buffer));

@@ -15,7 +15,7 @@ struct direction_light : public light {
         point4 shadow_ray_origin = p + normal * EPSILON; // slight offset
         ray shadow_ray(shadow_ray_origin, dir);
         shape* shadow_target = nullptr;
-        camera::ray_march(shadow_ray, &shadow_target);
+        //camera::ray_march(shadow_ray, &shadow_target);
 
         bool visibility = shadow_target == nullptr; // check of occlusion
         return (diffuse * visibility + AMBIENT) * col;
@@ -26,7 +26,7 @@ struct direction_light : public light {
         point4 shadow_ray_origin = p + normal * EPSILON; // slight offset
         ray shadow_ray(shadow_ray_origin, dir);
         shape* shadow_target = nullptr;
-        camera::ray_march_cuda(shadow_ray, &shadow_target, shared_scene, shared_lights);
+        //camera::ray_march_cuda(shadow_ray, &shadow_target, shared_scene, shared_lights);
 
         bool visibility = shadow_target == nullptr; // check of occlusion
         return (diffuse * visibility + AMBIENT) * col;

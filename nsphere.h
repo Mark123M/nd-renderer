@@ -67,7 +67,8 @@ struct nsphere : public shape {
 	}
 
 	__host__ __device__ bool sample(shape_sample& ss, const hit_result& res, uint64_t& pcg_state) const override {
-		ss.p = origin + vec4::rand_unit_vector(pcg_state) * radius;
+		point4 local_p = origin + radius * vec4::rand_unit_vector(pcg_state);
+		ss.p = basis.local_to_world(local_p);
 		ss.pdf = 1.f / surface_volume();
 		return true;
 	}
