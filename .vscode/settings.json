@@ -83,7 +83,11 @@
         "__string": "cpp",
         "locale": "cpp",
         "__functional_03": "cpp",
-        "__functional_base": "cpp"
+        "__functional_base": "cpp",
+        "ranges": "cpp",
+        "regex": "cpp",
+        "unordered_set": "cpp",
+        "list": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

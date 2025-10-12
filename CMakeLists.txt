@@ -101,6 +101,11 @@ target_link_libraries(nd-raytracer glfw)
 find_package(OpenGL REQUIRED)
 target_link_libraries(nd-raytracer OpenGL::GL)
 
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+add_subdirectory(json)
+target_link_libraries(nd-raytracer nlohmann_json::nlohmann_json)
+target_compile_definitions(nd-raytracer PRIVATE JSON_HAS_RANGES=0)
+
 # We need to explicitly state that we need all CUDA files in the 
 # particle library to be built with -dc as the member functions 
 # could be called by other libraries and executables

@@ -7,6 +7,9 @@
 #include "imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
 #include <thread>
+#include <fstream>
+#include "json/include/nlohmann/json.hpp"
+using json = nlohmann::json;
 
 #include "color.h"
 #include "ray.h"
@@ -1090,23 +1093,21 @@ void my_cornell_box_white() {
 }
 
 void DI_test() {
-    light_material lig(color(1.f, 1.f, 1.f));
-    materials.push_back(lig);
-
     lambertian lamb(color(1.f, 1.f, 1.f));
     materials.push_back(lamb);
+    light_material lig(color(0.7f, 0.7f, 0.7f));
+    materials.push_back(lig);
 
-    nsphere ns_light;
-    ns_light.mat_idx = 0;
-    ns_light.radius = 0.5f;
-    ns_light.translate(vec4(0.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns_light);
+    nsphere ns1;
+    ns1.mat_idx = 0;
+    ns1.radius = 0.5f;
+    // ns1.translate(vec4(-0.5f, 0.f, 0.f, 0.f));
+    scene.push_back(ns1);
 
-    nsphere ns;
-    ns.mat_idx = 1;
-    ns.radius = 0.5f;
-    ns.translate(vec4(1.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns);
+    nsphere env; // constant environment map
+    env.mat_idx = 1;
+    env.radius = 2.f;
+    scene.push_back(env);
 }
 
 void GI_test() {
@@ -1138,18 +1139,17 @@ void GI_test() {
 
     nsphere env; // constant environment map
     env.mat_idx = 1;
-    env.radius = 0.5f;
+    env.radius = 2.f;
     scene.push_back(env);
 }
 
 void touch_test() {
-    lambertian lamb(color(1.f, 1.f, 1.f));
+    lambertian lamb;
+    lamb.albedo = color(1.f, 1.f, 1.f);
     materials.push_back(lamb);
-    light_material lig(color(0.7f, 0.7f, 0.7f));
+    light_material lig;
+    lig.col = color(0.7f, 0.7f, 0.7f);
     materials.push_back(lig);
-
-    light_material env_mat(color(0.f, 0.f, 0.f));
-    materials.push_back(env_mat);
 
     nsphere ns1;
     ns1.mat_idx = 0;
@@ -1162,11 +1162,66 @@ void touch_test() {
     ns2.radius = 0.5f;
     // ns2.translate(vec4(0.f, 0.f, 0.f, 0.f));
     scene.push_back(ns2);
+}
 
-    nsphere env; // constant environment map
-    env.mat_idx = 2;
-    env.radius = 2.f;
-    //scene.push_back(env);
+void build_scene(json& data) {
+    for (auto& shape_data : data["shapes"]) {
+        std::string shape_class = shape_data["class"].template get<std::string>();
+        size_t mat_idx = shape_data["mat_idx"].template get<size_t>();
+        vec4 t(0.f, 0.f, 0.f, 0.f);
+        // vec4 r(0.f, 0.f, 0.f, 0.f);
+        if (shape_data.find("translate") != shape_data.end()) {
+            t.x = shape_data["translate"][0].template get<float>();
+            t.y = shape_data["translate"][1].template get<float>();
+            t.z = shape_data["translate"][2].template get<float>();
+            t.w = shape_data["translate"][3].template get<float>();
+        }
+
+        if (shape_class == "nsphere") {
+            nsphere ns;
+
+            if (shape_data.find("radius") != shape_data.end()) {
+                ns.radius = shape_data["radius"].template get<float>();
+            }
+
+            std::cout << "constructing nsphere radius " << ns.radius << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
+            ns.mat_idx = mat_idx;
+            ns.translate(t);
+            scene.push_back(ns);
+        }
+    }
+
+    for (auto& mat_data : data["materials"]) {
+        std::string mat_class = mat_data["class"].template get<std::string>();
+
+        if (mat_class == "lambertian") {
+            lambertian l;
+            
+            if (mat_data.find("albedo") != mat_data.end()) {
+                color c;
+                c.r = mat_data["albedo"][0].template get<float>();
+                c.g = mat_data["albedo"][1].template get<float>();
+                c.b = mat_data["albedo"][2].template get<float>();
+                l.albedo = c;
+            }
+
+            std::cout << "constructing lambertian albedo " << l.albedo.r << " " << l.albedo.g << " " << l.albedo.b << std::endl;
+            materials.push_back(l);
+        } else if (mat_class == "light_material") {
+            light_material lig;
+            
+            if (mat_data.find("color") != mat_data.end()) {
+                color c;
+                c.r = mat_data["color"][0].template get<float>();
+                c.g = mat_data["color"][1].template get<float>();
+                c.b = mat_data["color"][2].template get<float>();
+                lig.col = c;
+            }
+
+            std::cout << "constructing light color " << lig.col.r << " " << lig.col.g << " " << lig.col.b << std::endl;
+            materials.push_back(lig);
+        }
+    }
 }
 
 void shape_axes() {
@@ -1253,13 +1308,18 @@ int main() {
     ImGui_ImplOpenGL3_Init(glsl_version);
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    std::ifstream f("scenes/di_test.json");
+    json data = json::parse(f);
+    build_scene(data);
+    //std::cout << data["shapes"][0]["class"] << std::endl;
+
     //spheres();
     //quad_light_test();
     //my_cornell_box_old();
     //my_cornell_box();
     //my_cornell_box2();
     // DI_test();
-    GI_test();
+    //GI_test();
     //touch_test();
     //my_cornell_box_white();
     //tesseract_lines();
@@ -1387,7 +1447,7 @@ int main() {
 
         if (true) {
             camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-            (num_samples, false, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
+            (num_samples, true, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
             num_samples++;
 
             //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
