@@ -17,6 +17,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 constexpr uint NUM_CPU_THREADS = 20;
 constexpr float SIMULATION_RATE = 100.f;
 constexpr float MIN_DELTA_TIME = 1.f / SIMULATION_RATE;
+const char* PATH_TO_SCENES = "./scenes";
 
 template <typename T>
 struct managed_allocator {
@@ -132,11 +133,19 @@ struct device_list {
       return len;
    }
 
-   ~device_list() {
-      free_list_kernel<T><<<1, 1>>>(d_data, len);
-      gpuErrchk(cudaDeviceSynchronize());
+   void clear() {
+      // free_list_kernel<T><<<1, 1>>>(d_data, len);
+      // gpuErrchk(cudaDeviceSynchronize());
       gpuErrchk(cudaFree(d_list));
       gpuErrchk(cudaFree(d_data));
+      d_list = nullptr;
+      d_data = nullptr; // prevent double free
+      len = 0;
+      data_size = 0;
+   }
+
+   ~device_list() {
+      clear();
    }
 };
 

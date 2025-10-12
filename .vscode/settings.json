@@ -87,7 +87,10 @@
         "ranges": "cpp",
         "regex": "cpp",
         "unordered_set": "cpp",
-        "list": "cpp"
+        "list": "cpp",
+        "valarray": "cpp",
+        "forward_list": "cpp",
+        "any": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

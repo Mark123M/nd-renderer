@@ -34,14 +34,9 @@ static inline std::string time_stamp(const std::string& fmt = "%F__%H-%M-%S") {
     return { buf, std::strftime(buf, sizeof(buf), fmt.c_str(), &bt) };
 }
 
-device_list<shape> scene;
-__constant__ size_t d_scene_len; // static scenes for now
-
-device_list<light> lights;
-__constant__ size_t d_lights_len;
-
-device_list<material> materials;
-__constant__ size_t d_materials_len;
+__device__ size_t d_scene_len; // static scenes for now
+__device__ size_t d_lights_len;
+__device__ size_t d_materials_len;
 
 namespace camera {
 
@@ -422,93 +417,6 @@ void export_image(uchar4* d_image_data, uint num_pixels) {
     file.close();
 }
 
-float scene_sdf(const point4& p, shape** target_ptr) {
-    float sdf = MAX_MARCH_DIST + 5.f;
-    
-    for (size_t i = 0; i < scene.size(); i++) {
-        shape* obj = scene[i];
-        float obj_sdf = obj->sdf(p);
-
-        if (obj_sdf < sdf) {
-            sdf = obj_sdf;
-            *target_ptr = obj; // assign object pointer
-        }
-    }
-
-    assert(sdf >= -TOL); // only reflections
-    return sdf;
-}
-
-float scene_sdf(const point4& p) {
-    float sdf = MAX_MARCH_DIST + 5.f;
-
-    for (size_t i = 0; i < scene.size(); i++) {
-        shape* obj = scene[i];
-        float obj_sdf = obj->sdf(p);
-
-        if (obj_sdf < sdf) {
-            sdf = obj_sdf;
-        }
-    }
-
-    assert(sdf >= -TOL); // only reflections
-    return sdf;
-}
-
-vec4 get_normal(const point4& p) {
-    float sdf_diff_x = scene_sdf(p + delta_x) - scene_sdf(p - delta_x);
-    float sdf_diff_y = scene_sdf(p + delta_y) - scene_sdf(p - delta_y);
-    float sdf_diff_z = scene_sdf(p + delta_z) - scene_sdf(p - delta_z);
-    float sdf_diff_w = scene_sdf(p + delta_w) - scene_sdf(p - delta_w);
-
-    return vec4::normalize(vec4(sdf_diff_x, sdf_diff_y, sdf_diff_z, sdf_diff_w));
-}
-
-void ray_march(ray& r, shape** target_ptr) {
-    do {
-        float dist = scene_sdf(r.pos, target_ptr);
-
-        if (dist <= TOL) {
-            return;
-        } else if (dist > MAX_MARCH_DIST) {
-            *target_ptr = nullptr; // no object hit
-            return;
-        } else {
-            r.march(dist);
-        }
-    } while (true);
-}
-
-color ray_color(ray& r) {
-    shape* target = nullptr;
-    ray_march(r, &target);
-
-    if (target == nullptr) {
-        vec4 unit_direction = vec4::normalize(r.dir);
-        float a = 0.5f * (unit_direction.y + 1.f);
-        return (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
-    }
-
-    vec4 normal = get_normal(r.pos);
-
-    if (render_normals) {
-        return 0.5f * color(normal.x + 1.f, normal.y + 1.f, normal.z + 1.f);
-    }
-
-    color total_lighting(0.f, 0.f, 0.f);
-
-    for (size_t i = 0; i < lights.len; i++) {
-        light* lig = lights[i];
-        total_lighting += lig->Le(r.pos, normal);
-        //printf("[CPU] Hit pos (%.3f, %.3f, %.3f, %.3f) | Total lighting (%.3f, %.3f, %.3f)\n",
-        //r.pos.x, r.pos.y, r.pos.z, r.pos.w, total_lighting.r, total_lighting.g, total_lighting.b);
-    }
-
-    //color final_col = target->albedo * total_lighting;
-    //return final_col;
-    return total_lighting;
-}
-
 void refresh_view() {
     vec4 viewport_x = viewport_width * camera_transform.get_vec_x();
     vec4 viewport_y = -viewport_height * camera_transform.get_vec_y();
@@ -554,61 +462,6 @@ void initialize() {
     gpuErrchk(cudaMemcpyToSymbol(d_delta_z, &delta_z, sizeof(vec4)));
     gpuErrchk(cudaMemcpyToSymbol(d_delta_w, &delta_w, sizeof(vec4)));
 }
-
-void render_rt(uint first_row, uint last_row) {
-    // assume camera parameters are all initialized
-    for (uint row = first_row; row <= last_row; row++) {
-        //std::clog << "\rScanlines remaining: " << (image_height - j) << "     " << std::flush;
-        for (uint col = 0; col < image_width; col++) {
-            uint idx = row * image_width + col;
-            point4 pixel_center = pixel00_center + (col * pixel_x) + (row * pixel_y);
-            vec4 direction = vec4::normalize(pixel_center - camera_transform.get_pos());
-            ray r(camera_transform.get_pos(), direction);
-            
-            color color = ray_color(r);
-            /*image_data[idx].x = static_cast<unsigned char>(fminf(1.f, color.r) * 255.999f);
-            image_data[idx].y = static_cast<unsigned char>(fminf(1.f, color.g) * 255.999f);
-            image_data[idx].z = static_cast<unsigned char>(fminf(1.f, color.b) * 255.999f);
-            image_data[idx].w = 255;*/
-        }
-    }
-}
-
-void render() {
-    initialize();
-
-    std::ofstream file{ "renders/render_" + time_stamp() + ".ppm", std::ios::app };
-
-    clock_t t0 = clock();
-    file << "P3\n" << image_width << " " << image_height << "\n255\n";
-
-    for (uint j = 0; j < image_height; j++) {
-        std::clog << "\rScanlines remaining: " << (image_height - j) << "     " << std::flush;
-        for (uint i = 0; i < image_width; i++) {
-            point4 pixel_center = pixel00_center + (i * pixel_x) + (j * pixel_y);
-            vec4 direction = vec4::normalize(pixel_center - camera_transform.get_pos());
-            ray r(camera_transform.get_pos(), direction);
-
-            color color = ray_color(r);
-            write_color(file, color);
-        }
-    }
-
-    int duration = (clock() - t0) / 1000;
-    std::clog << "\rDone " << duration << "ms                                                    \n";
-
-    std::stringstream ss;
-    ss << duration / 1000;
-    std::string duration_string = ss.str();
-    std::ofstream metadata{ "renders/render_" + time_stamp() + "_" + duration_string + "s.metadata.txt", std::ios::app };
-    metadata << "time elapsed: " << duration << " ms/" << duration / 1000.0 << " s/" << duration / 60000.0 << " m" << std::endl;
-    metadata << "width: " << image_width << " height: " << image_height << "  " << std::endl;
-    //metadata << "samples: " << samples_per_pixel << " max depth: " << max_depth << std::endl;
-
-    file.close();
-    metadata.close();
-}
-
 }
 
 #endif

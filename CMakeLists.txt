@@ -4,8 +4,8 @@
 # See README.md for guidance.
 #---------------------------------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
-project(nd-light-transport LANGUAGES CXX CUDA)
 set(CMAKE_CUDA_ARCHITECTURES "89")
+project(nd-light-transport LANGUAGES CXX CUDA)
 set(CMAKE_CUDA_STANDARD 20)
 # For VS Code IntelliSense and other tools to pick up compile commands
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
