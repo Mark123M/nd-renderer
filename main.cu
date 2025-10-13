@@ -1105,10 +1105,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
         vec4 t(0.f, 0.f, 0.f, 0.f);
         // vec4 r(0.f, 0.f, 0.f, 0.f);
         if (shape_data.find("translate") != shape_data.end()) {
-            t.x = shape_data["translate"][0].template get<float>();
-            t.y = shape_data["translate"][1].template get<float>();
-            t.z = shape_data["translate"][2].template get<float>();
-            t.w = shape_data["translate"][3].template get<float>();
+            t = shape_data["translate"].template get<vec4>();
         }
 
         if (shape_class == "nsphere") {
@@ -1122,6 +1119,57 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             ns.mat_idx = mat_idx;
             ns.translate(t);
             scene.push_back(ns);
+        } else if (shape_class == "ncube") {
+            ncube nc;
+
+            if (shape_data.find("half_len") != shape_data.end()) {
+                nc.half_len = shape_data["half_len"].template get<float>();
+            }
+
+            std::cout << "constructing ncube half_len " << nc.half_len << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
+            nc.mat_idx = mat_idx;
+            nc.translate(t);
+            scene.push_back(nc);
+        } else if (shape_class == "sphere") {
+            sphere s;
+
+            if (shape_data.find("radius") != shape_data.end()) {
+                s.radius = shape_data["radius"].template get<float>();
+            }
+
+            if (shape_data.find("half_w") != shape_data.end()) {
+                s.half_w = shape_data["half_w"].template get<float>();
+            }
+
+            std::cout << "constructing sphere radius " << s.radius << " half_w " << s.half_w << std::endl;
+            s.mat_idx = mat_idx;
+            s.translate(t);
+            scene.push_back(s);
+        } else if (shape_class == "cube") {
+            cube c;
+
+            if (shape_data.find("half_len") != shape_data.end()) {
+                c.half_len = shape_data["half_len"].template get<float>();
+            }
+
+            if (shape_data.find("half_w") != shape_data.end()) {
+                c.half_w = shape_data["half_w"].template get<float>();
+            }
+
+            std::cout << "constructing cube half_len " << c.half_len << " half_w" << c.half_w << std::endl;
+            c.mat_idx = mat_idx;
+            c.translate(t);
+            scene.push_back(c);
+        } else if (shape_class == "quad") {
+            point4 o = shape_data["origin"].template get<point4>();
+            vec4 u = shape_data["u"].template get<vec4>();
+            vec4 v = shape_data["v"].template get<vec4>();
+            quad q(o, u, v);
+            std::cout << "constructing quad" << std::endl;
+            
+            q.mat_idx = mat_idx;
+            q.translate(t);
+            scene.push_back(q);
         }
     }
 
@@ -1132,10 +1180,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             lambertian l;
             
             if (mat_data.find("albedo") != mat_data.end()) {
-                color c;
-                c.r = mat_data["albedo"][0].template get<float>();
-                c.g = mat_data["albedo"][1].template get<float>();
-                c.b = mat_data["albedo"][2].template get<float>();
+                color c = mat_data["albedo"].template get<color>();
                 l.albedo = c;
             }
 
@@ -1145,15 +1190,28 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             light_material lig;
             
             if (mat_data.find("color") != mat_data.end()) {
-                color c;
-                c.r = mat_data["color"][0].template get<float>();
-                c.g = mat_data["color"][1].template get<float>();
-                c.b = mat_data["color"][2].template get<float>();
+                color c = mat_data["color"].template get<color>();
                 lig.col = c;
             }
 
             std::cout << "constructing light color " << lig.col.r << " " << lig.col.g << " " << lig.col.b << std::endl;
             materials.push_back(lig);
+        } else if (mat_class == "dielectric") {
+            smooth_dielectric sd;
+
+            if (mat_data.find("eta") != mat_data.end()) {
+                sd.eta = mat_data["eta"].template get<float>();
+            }
+
+            materials.push_back(sd);
+        } else if (mat_class == "specular") {
+            specular sp;
+
+            if (mat_data.find("albedo") != mat_data.end()) {
+                sp.albedo = mat_data["albedo"].template get<color>();
+            }
+
+            materials.push_back(sp);
         }
     }
 
@@ -1251,7 +1309,7 @@ int main() {
     device_list<light> lights;
     device_list<material> materials;
 
-    std::filesystem::path init_scene_path("scenes/di_test.json");
+    std::filesystem::path init_scene_path("scenes/empty.json");
     std::filesystem::directory_entry cur_scene_entry(init_scene_path);
     std::filesystem::file_time_type cur_scene_last_write_time = cur_scene_entry.last_write_time();
     std::ifstream f(init_scene_path);
@@ -1263,7 +1321,7 @@ int main() {
     //quad_light_test();
     //my_cornell_box_old();
     //my_cornell_box();
-    //my_cornell_box2();
+    //my_cornell_box2(scene, materials, lights);
     // DI_test();
     //GI_test();
     //touch_test();

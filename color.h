@@ -85,4 +85,10 @@ __host__ __device__ void write_color(std::ofstream& file, const color& col) {
     //file << ir << " " << ig << " " << ib << " ";
 }
 
+void from_json(const json& j, color& c) {
+	j[0].get_to(c.r);
+	j[1].get_to(c.g);
+	j[2].get_to(c.b);
+}
+
 #endif
