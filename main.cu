@@ -1390,6 +1390,8 @@ int main() {
         gpuErrchk(cudaMemset(d_image_data, 0, num_pixels * sizeof(uchar4)));
     };
 
+    int sample_mode = 0;
+
     while (!glfwWindowShouldClose(window)) {
         current_frame = glfwGetTime();
         fixed_delta_time = current_frame - prev_frame;
@@ -1452,27 +1454,25 @@ int main() {
             clear_buffer();
         }
 
-        if (true) {
-            camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-            (num_samples, true, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
-            num_samples++;
+        camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
+        (num_samples, sample_mode, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
+        num_samples++;
 
-            //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
+        //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
-            cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
-            gpuErrchk(cudaGraphicsMapResources(1, &render_texture_CUDA, 0)); // Map on stream 0
-            gpuErrchk(cudaGraphicsSubResourceGetMappedArray(&d_texture_array, render_texture_CUDA, 0, 0));
+        cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
+        gpuErrchk(cudaGraphicsMapResources(1, &render_texture_CUDA, 0)); // Map on stream 0
+        gpuErrchk(cudaGraphicsSubResourceGetMappedArray(&d_texture_array, render_texture_CUDA, 0, 0));
 
-            gpuErrchk(cudaMemcpy2DToArray(d_texture_array, // Destination: CUDA array
-                    0, 0,             // Destination X, Y offsets (start at top-left)
-                    d_image_data,      // Source: Device pointer to your linear pixel data
-                    camera::image_width * sizeof(uchar4), // Source pitch (bytes per row)
-                    camera::image_width * sizeof(uchar4), // Width of the copy (bytes)
-                    camera::image_height, // Height of the copy (rows)
-                    cudaMemcpyDeviceToDevice)); // Type of copy (Device to Array)
-            gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
-            //nvtxRangePop();
-        }
+        gpuErrchk(cudaMemcpy2DToArray(d_texture_array, // Destination: CUDA array
+                0, 0,             // Destination X, Y offsets (start at top-left)
+                d_image_data,      // Source: Device pointer to your linear pixel data
+                camera::image_width * sizeof(uchar4), // Source pitch (bytes per row)
+                camera::image_width * sizeof(uchar4), // Width of the copy (bytes)
+                camera::image_height, // Height of the copy (rows)
+                cudaMemcpyDeviceToDevice)); // Type of copy (Device to Array)
+        gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
+        //nvtxRangePop();
 
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(camera::image_width, camera::image_height));
@@ -1507,6 +1507,16 @@ int main() {
         }
 
         ImGui::NewLine();
+        
+        if (ImGui::RadioButton("Sample solid angles", &sample_mode, 0)) {
+            clear_buffer();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::RadioButton("Sample surface area", &sample_mode, 1)) {
+            clear_buffer();
+        }
 
         if (ImGui::Button("EXPORT IMAGE")) {
             camera::export_image(d_image_data, num_pixels);

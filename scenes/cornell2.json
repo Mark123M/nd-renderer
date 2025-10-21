@@ -1,0 +1,126 @@
+{
+    "materials": [
+        {
+            "class": "lambertian",
+            "albedo": [0.65, 0.05, 0.05]
+        },
+        {
+            "class": "lambertian",
+            "albedo": [0.73, 0.73, 0.73]
+        },
+        {
+            "class": "lambertian",
+            "albedo": [0.12, 0.45, 0.15]
+        },
+        {
+            "class": "light_material",
+            "color": [100.0, 100.0, 100.0]
+        },
+        {
+            "class": "lambertian",
+            "albedo": [1.0, 1.0, 1.0]
+        },
+        {
+            "class": "specular",
+            "albedo": [1.0, 1.0, 1.0]
+        },
+        {
+            "class": "dielectric",
+            "eta": 1.5
+        },
+        {
+            "class": "light_material",
+            "color": [4.0, 4.0, 4.0]
+        },
+        {
+            "class": "light_material",
+            "color": [0.0, 20.0, 20.0]
+        }
+    ],
+    "shapes": [
+        {
+            "class": "quad",
+            "mat_idx": 2,
+            "origin": [-2.0, -2.0, 2.0, 0.0],
+            "u": [0.0, 0.0, -4.0, 0.0],
+            "v": [0.0, 4.0, 0.0, 0.0],
+            "translate": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "quad",
+            "mat_idx": 0,
+            "origin": [2.0, -2.0, 2.0, 0.0],
+            "u": [0.0, 0.0, -4.0, 0.0],
+            "v": [0.0, 4.0, 0.0, 0.0],
+            "translate": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "quad",
+            "mat_idx": 1,
+            "origin": [-2.0, -2.0, -2.0, 0.0],
+            "u": [4.0, 0.0, 0.0, 0.0],
+            "v": [0.0, 4.0, 0.0, 0.0],
+            "translate": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "quad",
+            "mat_idx": 1,
+            "origin": [-2.0, -2.0, 2.0, 0.0],
+            "u": [4.0, 0.0, 0.0, 0.0],
+            "v": [0.0, 0.0, -4.0, 0.0],
+            "translate": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "quad",
+            "mat_idx": 1,
+            "origin": [-2.0, 2.0, 2.0, 0.0],
+            "u": [4.0, 0.0, 0.0, 0.0],
+            "v": [0.0, 0.0, -4.0, 0.0],
+            "translate": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "quad",
+            "mat_idx": 1,
+            "origin": [-2.0, -2.0, 2.0, 0.0],
+            "u": [4.0, 0.0, 0.0, 0.0],
+            "v": [0.0, 4.0, 0.0, 0.0],
+            "translate": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "ncube",
+            "mat_idx": 5,
+            "half_len": 0.35,
+            "translate": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "nsphere",
+            "mat_idx": 4,
+            "radius": 0.7,
+            "translate": [-1.0, -1.0, -1.0, 0.0]
+        },
+        {
+            "class": "nsphere",
+            "mat_idx": 5,
+            "radius": 0.7,
+            "translate": [1.0, -1.0, -1.0, 0.0]
+        },
+        {
+            "class": "nsphere",
+            "mat_idx": 3,
+            "radius": 0.5,
+            "translate": [0.0, 2.0, -1.0, 0.0]
+        },
+        {
+            "class": "cube",
+            "mat_idx": 2,
+            "translate": [1.0, 0.0, -1.0, 0.0]
+        },
+        {
+            "class": "sphere",
+            "mat_idx": 8,
+            "radius": 0.3,
+            "half_w": 0.01,
+            "translate": [1.0, 0.0, 0.0, 0.0]
+        }
+    ]
+}
