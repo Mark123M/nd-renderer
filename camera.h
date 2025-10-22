@@ -224,8 +224,10 @@ __device__ bool sample_area(area_sample& as, const shape* s, const material* mat
     shape_sample ss;
     s->sample(ss, res, pcg_state);
 
-    point4 p_offset = res.p + EPSILON * res.normal;
+    vec4 oriented_normal = vec4::dot(res.wo, res.normal) < 0.f ? -res.normal : res.normal;
+    point4 p_offset = res.p + EPSILON * oriented_normal;
     vec4 v = ss.p - p_offset; // vector to shape
+    
     float dist = vec4::length(v);
     vec4 wi = v / dist;
     color f = mat_hit->f(res.wo, wi, res.m);
@@ -282,7 +284,7 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
         return mat_hit->L();
     }
 
-    while (true) {
+    for (uint k = 0; k < MAX_RAY_BOUNCES; k++) {
         mat_hit = shared_materials[res.target->mat_idx];
         specular_bounce = mat_hit->is_specular();
 
@@ -340,7 +342,15 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
 
         beta *= (as.G * as.f) / (1.f / total_surface_volume);
         res = as.res_next;
-        k++;
+
+        float beta_max = fmaxf(beta.r, fmaxf(beta.g, beta.b));
+        if (beta_max <= 1.f && k >= 2) {
+            float q = fmaxf(0.f, 1.f - beta_max);
+            if (randf_pcg32(0.f, 1.f, pcg_state) < q) {
+                break;
+            }
+            beta /= 1.f - q;
+        }
     }
 
     return L;
