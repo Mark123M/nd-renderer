@@ -46,3 +46,4 @@ build
 
 glfw-3.4/
 resources
+*.ppm

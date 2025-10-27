@@ -1,0 +1,38 @@
+{
+    "shapes": [
+        {
+            "class": "nsphere",
+            "mat_idx": 0,
+            "radius": 1.0,
+            "translate": [-0.75, 0.0, 0.0, 0.0]
+        },
+                {
+            "class": "nsphere",
+            "mat_idx": 0,
+            "radius": 0.5,
+            "translate": [1.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "nsphere",
+            "mat_idx": 0,
+            "radius": 2.0
+        }
+    ],
+    "materials": [
+        {
+            "class": "light_material",
+            "color": [0.5, 0.5, 0.5],
+            "albedo": [0.3, 0.3, 0.3]
+        },
+        {
+            "class": "light_material",
+            "color": [0.5, 0.5, 0.5],
+            "albedo": [0.0, 0.0, 0.0]
+        },
+        {
+            "class": "light_material",
+            "color": [0.0, 0.0, 0.0],
+            "albedo": [1.0, 1.0, 1.0]
+        }
+    ]
+}

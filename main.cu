@@ -1194,7 +1194,12 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
                 lig.col = c;
             }
 
-            std::cout << "constructing light color " << lig.col.r << " " << lig.col.g << " " << lig.col.b << std::endl;
+            if (mat_data.find("albedo") != mat_data.end()) {
+                color c = mat_data["albedo"].template get<color>();
+                lig.albedo = c;
+            }
+
+            std::cout << "constructing light color " << lig.col.r << " " << lig.col.g << " " << lig.col.b << " albedo " << lig.albedo.r << " " << lig.albedo.g << " " << lig.albedo.b << std::endl;
             materials.push_back(lig);
         } else if (mat_class == "dielectric") {
             smooth_dielectric sd;
@@ -1391,6 +1396,7 @@ int main() {
     };
 
     int sample_mode = 0;
+    bool sample_lights = true; // NEE;
 
     while (!glfwWindowShouldClose(window)) {
         current_frame = glfwGetTime();
@@ -1455,7 +1461,7 @@ int main() {
         }
 
         camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-        (num_samples, sample_mode, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
+        (num_samples, sample_mode, sample_lights, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
         num_samples++;
 
         //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
@@ -1515,6 +1521,10 @@ int main() {
         ImGui::SameLine();
 
         if (ImGui::RadioButton("Sample surface area", &sample_mode, 1)) {
+            clear_buffer();
+        }
+
+        if (ImGui::Checkbox("Sample lights", &sample_lights)) {
             clear_buffer();
         }
 

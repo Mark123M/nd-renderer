@@ -168,7 +168,7 @@ __device__ color sample_ld(const hit_result& res, uint num_area_lights, shape** 
     return ls.L * f / p_l; // TODO: multiple importance sampling?
 }
 
-__device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
+__device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, bool sample_lights, uint64_t& pcg_state) {
     color L(0.f, 0.f, 0.f);
     //color col(1.f, 1.f, 1.f);
     color beta(1.f, 1.f, 1.f);
@@ -179,29 +179,27 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         if (!intersect_world(r, res, shared_scene)) {
             // float a = 0.5f * (r.dir.y + 1.f);
             // return color(0.5f, 0.5f, 0.5f); // constant environment map
-            break; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+            // return color(0.f, 0.f, 0.f); //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+            break;
         }
 
-        const vec4& normal = res.normal;
+        material* mat = shared_materials[res.target->mat_idx];
 
-        if (d_render_normals) {
-            return 0.5f * color(normal.x + 1.f, normal.y + 1.f, normal.z + 1.f);
+        if (mat->is_emissive()) { // no NEE for now
+            L += beta * mat->L();
         }
         
         bsdf_sample bs;
-        material* mat = shared_materials[res.target->mat_idx];
 
-        if (!mat->sample_f(-r.dir, res.m, bs, pcg_state)) { // hit an area light, bs.f represents the light color
-            L = beta * bs.f;
+        if (!mat->sample_f(-r.dir, res.m, bs, pcg_state)) {
             break;
-        } else {
-            beta *= (bs.f * fabsf(vec4::dot(bs.wi, res.normal))) / bs.pdf;
         }
 
+        beta *= (bs.f * fabsf(vec4::dot(bs.wi, res.normal))) / bs.pdf;
         r = ray(res.p + EPSILON * bs.wi, bs.wi);
         
         float beta_max = fmaxf(beta.r, fmaxf(beta.g, beta.b));
-        if (beta_max <= 1.f && k >= 1.f) {
+        if (beta_max <= 1.f && k >= 2) {
             float q = fmaxf(0.f, 1.f - beta_max);
             if (randf_pcg32(0.f, 1.f, pcg_state) < q) {
                 break;
@@ -249,7 +247,7 @@ __device__ bool sample_area(area_sample& as, const shape* s, const material* mat
     return true;
 }
 
-__device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
+__device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, bool sample_lights, uint64_t& pcg_state) {
     float total_surface_volume = 0.f;
     float total_emitter_surface_volume = 0.f;
 
@@ -276,12 +274,12 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
     }
 
     uint k = 0;
-    bool sample_lights = true;
     bool specular_bounce = true;
     material* mat_hit = shared_materials[res.target->mat_idx];
 
-    if (mat_hit->is_emissive()) {
-        return mat_hit->L();
+    if (sample_lights && mat_hit->is_emissive()) {
+        L = mat_hit->L();
+        // return mat_hit->L();
     }
 
     for (uint k = 0; k < MAX_RAY_BOUNCES; k++) {
@@ -293,7 +291,7 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
                 L += beta * mat_hit->L();
             }
 
-            break;
+            // break;
         }
 
         if (sample_lights) {
@@ -356,7 +354,7 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
     return L;
 }
 
-__global__ void render_kernel(int num_samples, int sample_mode, color* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
+__global__ void render_kernel(int num_samples, int sample_mode, bool sample_lights, color* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
     extern __shared__ char buffer[];
 
     // buffer layout for shared memory
@@ -405,8 +403,8 @@ __global__ void render_kernel(int num_samples, int sample_mode, color* d_color_b
         vec4 direction = vec4::normalize(sample - camera_pos);
         ray r(camera_pos, direction);
         
-        color c_sample = sample_mode == 0 ? ray_color_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx])
-            : ray_color_area_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx]);
+        color c_sample = sample_mode == 0 ? ray_color_cuda(r, shared_scene, shared_lights, shared_materials, sample_lights, d_pcg_states[idx])
+            : ray_color_area_cuda(r, shared_scene, shared_lights, shared_materials, sample_lights, d_pcg_states[idx]);
         d_color_buffer[idx] = (1.f / (num_samples + 1.f)) * ((float)num_samples * d_color_buffer[idx] + c_sample);
         
         d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].r) * 255.999f);

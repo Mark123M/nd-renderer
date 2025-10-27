@@ -5,19 +5,28 @@
 
 struct light_material : public material {
     color col;
+    color albedo; // diffuse reflectance
 
-    __host__ __device__ light_material(): col{} {}
+    __host__ __device__ light_material(): col{}, albedo{} {}
 
-    __host__ __device__ light_material(const color& col): col{col} {}
+    __host__ __device__ light_material(const color& col): col{col}, albedo{} {}
+
+    __host__ __device__ light_material(const color& col, const color& albedo): col{col}, albedo{} {}
 
     __host__ __device__ color f(const vec4& wo, const vec4& wi) const override {
-        return color(0.f, 0.f, 0.f);
+        return 0.75f * inv_pi * albedo;
     }
 
     __host__ __device__ bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const override {
-        bs.f = col; //* inv_pi;
-        bs.wi = vec4(0.f, 0.f, 0.f, 0.f);
-        return false;
+        bs.f = 0.75f * inv_pi * albedo; //* inv_pi;
+        bs.wi = vec4::rand_halfsphere_vector_cosine_weighted(pcg_state);
+        bs.pdf = 0.75f * inv_pi * bs.wi.y;
+
+        if (wo.y < 0.f) {
+            bs.wi = -bs.wi;
+        }
+        
+        return true;
     }
 
     __host__ __device__ color L() const override {
