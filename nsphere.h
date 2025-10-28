@@ -62,7 +62,7 @@ struct nsphere : public shape {
 		return true;
 	}
 
-	__host__ __device__ virtual float surface_volume() const {
+	__host__ __device__ float surface_volume() const override {
 		return 2 * pi * pi * radius * radius * radius;
 	}
 

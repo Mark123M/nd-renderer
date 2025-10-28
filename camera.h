@@ -305,9 +305,10 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
                 if (mat->is_emissive()) {
                     u -= shared_scene[i]->surface_volume() / total_emitter_surface_volume;
 
-                    if (u < 0) {
+                    if (u <= 0) {
                         e = shared_scene[i];
                         light_mat = mat;
+                        break;
                     }
                 }
             }
@@ -327,8 +328,9 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
         for (size_t i = 0; i < d_scene_len; i++) {
             u -= shared_scene[i]->surface_volume() / total_surface_volume;
 
-            if (u < 0) {
+            if (u <= 0) {
                 s = shared_scene[i];
+                break;
             }
         }
 
