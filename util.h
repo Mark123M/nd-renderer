@@ -157,6 +157,7 @@ constexpr float MAX_MARCH_DIST = 5.f;
 constexpr uint MAX_MARCH_STEPS = 50;
 constexpr uint SAMPLES_PER_PIXEL = 20;
 constexpr uint MAX_RAY_BOUNCES = 100;
+constexpr float MAX_SAMPLE_L = 100.f;
 
 // scene
 constexpr float AMBIENT = 0.3f;

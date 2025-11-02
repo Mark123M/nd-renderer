@@ -1373,8 +1373,8 @@ int main() {
     uint row_range = std::ceil((float)camera::image_height / NUM_CPU_THREADS); // range: ceil(height / N)
 
     uint num_pixels = camera::image_width * camera::image_height;
-    color* d_color_buffer;
-    gpuErrchk(cudaMalloc(&d_color_buffer, num_pixels * sizeof(color)));
+    double3* d_color_buffer;
+    gpuErrchk(cudaMalloc(&d_color_buffer, num_pixels * sizeof(double3)));
 
     uchar4* d_image_data;
     gpuErrchk(cudaMalloc(&d_image_data, num_pixels * sizeof(uchar4)));
@@ -1391,7 +1391,7 @@ int main() {
     int num_samples = 0;
     auto clear_buffer = [&num_samples, num_pixels, d_color_buffer, d_image_data]() -> void {
         num_samples = 0;
-        gpuErrchk(cudaMemset(d_color_buffer, 0, num_pixels * sizeof(color)));
+        gpuErrchk(cudaMemset(d_color_buffer, 0, num_pixels * sizeof(double3)));
         gpuErrchk(cudaMemset(d_image_data, 0, num_pixels * sizeof(uchar4)));
     };
 
