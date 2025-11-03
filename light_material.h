@@ -19,8 +19,8 @@ struct light_material : public material {
 
     __host__ __device__ bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const override {
         bs.f = 0.75f * inv_pi * albedo; //* inv_pi;
-        bs.wi = vec4::rand_halfsphere_vector_cosine_weighted(pcg_state);
-        bs.pdf = 0.75f * inv_pi * bs.wi.y;
+        bs.wi = vec4::rand_halfsphere_vector(pcg_state);
+        bs.pdf = 1.f / (pi * pi);
 
         if (wo.y < 0.f) {
             bs.wi = -bs.wi;

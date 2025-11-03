@@ -1460,6 +1460,12 @@ int main() {
             clear_buffer();
         }
 
+        if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+            clear_buffer();
+            world::reset_camera_kernel<<<1,1>>>();
+            gpuErrchk(cudaDeviceSynchronize());
+        }
+
         camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
         (num_samples, sample_mode, sample_lights, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
         num_samples++;
