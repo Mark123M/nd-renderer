@@ -1094,6 +1094,17 @@ void touch_test(device_list<shape>& scene, device_list<material>& materials, dev
     scene.push_back(ns2);
 }
 
+void build_base_shape(shape* s, size_t mat_idx, const vec4& t, float rxy, float rxz, float rxw, float ryz, float ryw, float rzw) {
+    s->mat_idx = mat_idx;
+    s->translate(t);
+    s->rotate_xy(rxy);
+    s->rotate_xz(rxz);
+    s->rotate_xw(rxw);
+    s->rotate_yz(ryz);
+    s->rotate_yw(ryw);
+    s->rotate_zw(rzw);
+}
+
 void build_scene(json& data, device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     scene.clear();
     materials.clear();
@@ -1103,9 +1114,34 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
         std::string shape_class = shape_data["class"].template get<std::string>();
         size_t mat_idx = shape_data["mat_idx"].template get<size_t>();
         vec4 t(0.f, 0.f, 0.f, 0.f);
+        float rxy = 0.f;
+        float rxz = 0.f;
+        float rxw = 0.f;
+        float ryz = 0.f;
+        float ryw = 0.f; 
+        float rzw = 0.f;
         // vec4 r(0.f, 0.f, 0.f, 0.f);
         if (shape_data.find("translate") != shape_data.end()) {
             t = shape_data["translate"].template get<vec4>();
+        }
+
+        if (shape_data.find("rotate_xy") != shape_data.end()) {
+            rxy = shape_data["rotate_xy"].template get<float>();
+        }
+        if (shape_data.find("rotate_xz") != shape_data.end()) {
+            rxz = shape_data["rotate_xz"].template get<float>();
+        }
+        if (shape_data.find("rotate_xw") != shape_data.end()) {
+            rxw = shape_data["rotate_xw"].template get<float>();
+        }
+        if (shape_data.find("rotate_yz") != shape_data.end()) {
+            ryz = shape_data["rotate_yz"].template get<float>();
+        }
+        if (shape_data.find("rotate_yw") != shape_data.end()) {
+            ryw = shape_data["rotate_yw"].template get<float>();
+        }
+        if (shape_data.find("rotate_zw") != shape_data.end()) {
+            rzw = shape_data["rotate_zw"].template get<float>();
         }
 
         if (shape_class == "nsphere") {
@@ -1116,9 +1152,8 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             }
 
             std::cout << "constructing nsphere radius " << ns.radius << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
-            ns.mat_idx = mat_idx;
-            ns.translate(t);
-            scene.push_back(ns);
+            build_base_shape(&ns, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
+            scene.push_back<nsphere>(ns);
         } else if (shape_class == "ncube") {
             ncube nc;
 
@@ -1127,9 +1162,8 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             }
 
             std::cout << "constructing ncube half_len " << nc.half_len << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
-            nc.mat_idx = mat_idx;
-            nc.translate(t);
-            scene.push_back(nc);
+            build_base_shape(&nc, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
+            scene.push_back<ncube>(nc);
         } else if (shape_class == "sphere") {
             sphere s;
 
@@ -1142,9 +1176,8 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             }
 
             std::cout << "constructing sphere radius " << s.radius << " half_w " << s.half_w << std::endl;
-            s.mat_idx = mat_idx;
-            s.translate(t);
-            scene.push_back(s);
+            build_base_shape(&s, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
+            scene.push_back<sphere>(s);
         } else if (shape_class == "cube") {
             cube c;
 
@@ -1157,19 +1190,17 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             }
 
             std::cout << "constructing cube half_len " << c.half_len << " half_w" << c.half_w << std::endl;
-            c.mat_idx = mat_idx;
-            c.translate(t);
-            scene.push_back(c);
+            build_base_shape(&c, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
+            scene.push_back<cube>(c);
         } else if (shape_class == "quad") {
             point4 o = shape_data["origin"].template get<point4>();
             vec4 u = shape_data["u"].template get<vec4>();
             vec4 v = shape_data["v"].template get<vec4>();
             quad q(o, u, v);
+
             std::cout << "constructing quad" << std::endl;
-            
-            q.mat_idx = mat_idx;
-            q.translate(t);
-            scene.push_back(q);
+            build_base_shape(&q, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
+            scene.push_back<quad>(q);
         }
     }
 
@@ -1185,7 +1216,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             }
 
             std::cout << "constructing lambertian albedo " << l.albedo.r << " " << l.albedo.g << " " << l.albedo.b << std::endl;
-            materials.push_back(l);
+            materials.push_back<lambertian>(l);
         } else if (mat_class == "light_material") {
             light_material lig;
             
@@ -1200,7 +1231,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             }
 
             std::cout << "constructing light color " << lig.col.r << " " << lig.col.g << " " << lig.col.b << " albedo " << lig.albedo.r << " " << lig.albedo.g << " " << lig.albedo.b << std::endl;
-            materials.push_back(lig);
+            materials.push_back<light_material>(lig);
         } else if (mat_class == "dielectric") {
             smooth_dielectric sd;
 
@@ -1208,7 +1239,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
                 sd.eta = mat_data["eta"].template get<float>();
             }
 
-            materials.push_back(sd);
+            materials.push_back<smooth_dielectric>(sd);
         } else if (mat_class == "specular") {
             specular sp;
 
@@ -1216,7 +1247,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
                 sp.albedo = mat_data["albedo"].template get<color>();
             }
 
-            materials.push_back(sp);
+            materials.push_back<specular>(sp);
         }
     }
 
@@ -1314,7 +1345,7 @@ int main() {
     device_list<light> lights;
     device_list<material> materials;
 
-    std::filesystem::path init_scene_path("scenes/empty.json");
+    std::filesystem::path init_scene_path("scenes/cornell2.json");
     std::filesystem::directory_entry cur_scene_entry(init_scene_path);
     std::filesystem::file_time_type cur_scene_last_write_time = cur_scene_entry.last_write_time();
     std::ifstream f(init_scene_path);
@@ -1380,7 +1411,7 @@ int main() {
     gpuErrchk(cudaMalloc(&d_image_data, num_pixels * sizeof(uchar4)));
 
     //nvtxRangePush("Processing Inputs");
-    dim3 threads_per_block(16, 16);
+    dim3 threads_per_block(32, 32);
     dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
     (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
 
@@ -1488,7 +1519,7 @@ int main() {
 
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(camera::image_width, camera::image_height));
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        ImGui::Text("%.3f ms/frame (%.1f FPS), %d samples per pixel", 1000.0f / io.Framerate, io.Framerate, num_samples);
         
         for (const auto& entry : std::filesystem::directory_iterator(PATH_TO_SCENES)) {
             const char* stem = entry.path().stem().c_str();

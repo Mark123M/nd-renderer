@@ -21,18 +21,8 @@
     "materials": [
         {
             "class": "light_material",
-            "color": [0.5, 0.5, 0.5],
+            "color": [0.7, 0.7, 0.7],
             "albedo": [0.3, 0.3, 0.3]
-        },
-        {
-            "class": "light_material",
-            "color": [0.5, 0.5, 0.5],
-            "albedo": [0.0, 0.0, 0.0]
-        },
-        {
-            "class": "light_material",
-            "color": [0.0, 0.0, 0.0],
-            "albedo": [1.0, 1.0, 1.0]
         }
     ]
 }

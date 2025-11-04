@@ -1,0 +1,25 @@
+{
+    "shapes": [
+        {
+            "class": "ncube",
+            "mat_idx": 1,
+            "half_len": 2.0
+        },
+        {
+            "class": "nsphere",
+            "mat_idx": 0,
+            "radius": 0.70,
+            "translate": [0.0, 0.0, 0.0, 0.0]
+        }
+    ],
+    "materials": [
+        {
+            "class": "light_material",
+            "color": [5.0, 5.0, 5.0]
+        },
+        {
+            "class": "lambertian",
+            "albedo": [0.8, 0.8, 0.8]
+        }
+    ]
+}
