@@ -3,6 +3,8 @@
 
 #include <cmath>
 #include <iostream>
+#include <string>
+#include <format>
 #include "util.h"
 
 struct vec4;
@@ -340,6 +342,10 @@ struct point4 {
 	__host__ __device__ static point4 max(const point4& p1, const point4& p2) {
 		return point4(fmaxf(p1.x, p2.x), fmaxf(p1.y, p2.y), fmaxf(p1.z, p2.z), fmaxf(p1.w, p2.w));
 	}
+
+	static std::string to_string(const point4& p) {
+		return std::format("point4({:.3f}, {:.3f}, {:.3f}, {:.3f})", p.x, p.y, p.z, p.w);
+	}
 };
 
 __host__ __device__ point4 operator*(float k, const point4& p) {
@@ -354,5 +360,8 @@ void from_json(const json& j, point4& p) {
 }
 
 __managed__ point4 origin{0.f, 0.f, 0.f, 0.f};
+
+constexpr point4 POINT4_MIN(-MAX_RAY_DIST, -MAX_RAY_DIST, -MAX_RAY_DIST, -MAX_RAY_DIST);
+constexpr point4 POINT4_MAX(MAX_RAY_DIST, MAX_RAY_DIST, MAX_RAY_DIST, MAX_RAY_DIST);
 
 #endif

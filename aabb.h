@@ -2,17 +2,19 @@
 #define AABB_H
 
 #include "vec4.h"
+#include <string>
+#include <format>
 
 struct aabb {
     point4 p_min, p_max;
-
-    __host__ __device__ aabb(): p_min{0.f, 0.f, 0.f, 0.f}, p_max{0.f, 0.f, 0.f, 0.f} {}
+    // empty box
+    __host__ __device__ aabb(): p_min{POINT4_MAX}, p_max{POINT4_MIN} {}
     __host__ __device__ aabb(const point4& p1, const point4& p2): p_min{point4::min(p1, p2)}, p_max{point4::max(p1, p2)} {}
 
     __host__ __device__ bool intersect(const ray& r) const {
         float t0 = 0, t1 = MAX_RAY_DIST;
         
-        for (int i = 0; i < 4; i++) {
+        for (uint i = 0; i < 4; i++) {
             float inv_dir = 1.f / r.dir.get(i);
             float t_near = (p_min.get(i) - r.pos.get(i)) * inv_dir;
             float t_far  = (p_max.get(i) - r.pos.get(i)) * inv_dir;
@@ -44,12 +46,12 @@ struct aabb {
                       lengths.y * lengths.z * lengths.w);
     }
 
-    __host__ __device__ int max_dim() const {
+    __host__ __device__ uint max_dim() const {
         vec4 lengths = p_max - p_min;
-        float dim = 0;
+        uint dim = 0;
         float max_len = lengths.get(0);
 
-        for (int i = 1; i < 4; i++) {
+        for (uint i = 1; i < 4; i++) {
             if (lengths.get(i) > max_len) {
                 dim = i;
                 max_len = lengths.get(i);
@@ -70,7 +72,7 @@ struct aabb {
         return b;
     }
 
-    __host__ __device__ static aabb merge(const aabb& b0, point4& p) {
+    __host__ __device__ static aabb merge(const aabb& b0, const point4& p) {
         aabb b;
         b.p_min = point4::min(b0.p_min, p);
         b.p_max = point4::max(b0.p_max, p);

@@ -6,9 +6,10 @@
 #include "shape.h"
 
 struct nsphere : public shape {
-	float radius;
-
-	__host__ __device__ nsphere() : shape{}, radius{ 0.25f } {}
+	__host__ __device__ nsphere() : shape{}, radius{ 0.25f } {
+		update_bbox_local(); // no transformations yet
+		bbox_world = bbox_local;
+	}
 
 	__host__ __device__ float sdf(const point4& p) const {
 		point4 pp = basis.world_to_local(p);
@@ -73,6 +74,20 @@ struct nsphere : public shape {
 		return true;
 	}
 
+	__host__ __device__ void update_bbox_local() override {
+		bbox_local.p_min = point4(-radius, -radius, -radius, -radius);
+		bbox_local.p_max = point4(radius, radius, radius, radius);
+	}
+
+	__host__ __device__ void set_radius(float r) {
+		radius = r;
+		update_bbox();
+	}
+
+	__host__ __device__ float get_radius() const {
+		return radius;
+	}
+
 	__host__ __device__ size_t size() const override {
 		return sizeof(nsphere);
 	}
@@ -82,6 +97,9 @@ struct nsphere : public shape {
 		printf("[GPU] Hypersphere | Center (%.3f, %.3f, %.3f, %.3f) | Radius %.3f\n",
 		center.x, center.y, center.z, center.w, radius);
 	}
+
+private:
+	float radius;
 };
 
 #endif

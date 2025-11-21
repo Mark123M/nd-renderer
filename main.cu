@@ -28,6 +28,7 @@ using json = nlohmann::json;
 #include "dielectric.h"
 #include "light_material.h"
 #include "util.h"
+#include "bvh.h"
 
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -175,923 +176,57 @@ __global__ void math_test() {
     t2.linear.print();
 }
 
-void tesseract_lines(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-        // Tesseract Scene
-    float L = 0.5f;
+void bvh_test() {
+    std::cout << "==========[BVH TEST (ONE SHAPE)]==========" << std::endl;
+    std::vector<shape*> shapes;
+    auto ns1 = std::make_unique<nsphere>();
+    ns1->set_radius(0.5f);
+    ns1->translate(vec4(-1.f, 0.f, 0.f, 0.f));
+    shapes.push_back(ns1.get());
+
+    uint num_nodes = 0;
+    bvh_node* root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
+    log_bvh(root, 0);
+    delete root;
+
+    std::cout << "==========[BVH TEST (TWO SHAPES)]==========" << std::endl;
+    auto ns2 = std::make_unique<nsphere>();
+    ns2->set_radius(0.5f);
+    ns2->translate(vec4(1.f, 0.f, 0.f, 0.f));
+    shapes.push_back(ns2.get());
+
+    num_nodes = 0;
+    root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
+    log_bvh(root, 0);
+    delete root;
+
+    std::cout << "==========[BVH TEST (FOUR SHAPES)]==========" << std::endl;
+    auto ns4 = std::make_unique<nsphere>();
+    ns4->set_radius(0.5f);
+    ns4->translate(vec4(4.f, 0.f, 0.f, 0.f));
+    shapes.push_back(ns4.get());
+
+    auto ns3 = std::make_unique<nsphere>();
+    ns3->set_radius(0.5f);
+    ns3->translate(vec4(-4.f, 0.f, 0.f, 0.f));
+    shapes.push_back(ns3.get());
+
+    num_nodes = 0;
+    root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
+    log_bvh(root, 0);
+    delete root;
+
+    std::cout << "==========[BVH TEST (MULTI-LEAF)]==========" << std::endl;
+    auto ns5 = std::make_unique<nsphere>();
+    ns5->set_radius(1.f);
+    ns5->translate(vec4(-4.f, 0.f, 0.f, 0.f));
+    shapes.push_back(ns5.get());
+
+    num_nodes = 0;
+    root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
+    log_bvh(root, 0);
+    delete root;
 
-    point4 vertices[16] = {
-        // Vertex Index corresponds to binary (WZYX) -> e.g., 0000 for (0,0,0,0), 1111 for (L,L,L,L)
-
-        // --- Vertices where W = 0.0f ---
-        // Z = 0.0f
-        point4(0.0f, 0.0f, 0.0f, 0.0f), // 0: (0,0,0,0)
-        point4(L,    0.0f, 0.0f, 0.0f), // 1: (L,0,0,0)
-        point4(0.0f, L,    0.0f, 0.0f), // 2: (0,L,0,0)
-        point4(L,    L,    0.0f, 0.0f), // 3: (L,L,0,0)
-        // Z = L
-        point4(0.0f, 0.0f, L,    0.0f), // 4: (0,0,L,0)
-        point4(L,    0.0f, L,    0.0f), // 5: (L,0,L,0)
-        point4(0.0f, L,    L,    0.0f), // 6: (0,L,L,0)
-        point4(L,    L,    L,    0.0f), // 7: (L,L,L,0)
-
-        // --- Vertices where W = L (0.5f) ---
-        // Z = 0.0f
-        point4(0.0f, 0.0f, 0.0f, L),    // 8: (0,0,0,L)
-        point4(L,    0.0f, 0.0f, L),    // 9: (L,0,0,L)
-        point4(0.0f, L,    0.0f, L),    // 10: (0,L,0,L)
-        point4(L,    L,    0.0f, L),    // 11: (L,L,0,L)
-        // Z = L
-        point4(0.0f, 0.0f, L,    L),    // 12: (0,0,L,L)
-        point4(L,    0.0f, L,    L),    // 13: (L,0,L,L)
-        point4(0.0f, L,    L,    L),    // 14: (0,L,L,L)
-        point4(L,    L,    L,    L)     // 15: (L,L,L,L)
-    };
-    
-    //point4 center(L / 2, L / 2, L / 2, L / 2);
-
-    uint edges[32][2] = {
-        // --- Edges within the W=0.0f 'cube' (indices 0-7) ---
-        {0, 1}, // (0,0,0,0) to (L,0,0,0) - X-axis
-        {0, 2}, // (0,0,0,0) to (0,L,0,0) - Y-axis
-        {0, 4}, // (0,0,0,0) to (0,0,L,0) - Z-axis
-
-        {1, 3},
-        {1, 5},
-
-        {2, 3},
-        {2, 6},
-
-        {3, 7},
-
-        {4, 5},
-        {4, 6},
-
-        {5, 7},
-
-        {6, 7},
-
-        // --- Edges within the W=L 'cube' (indices 8-15) ---
-        {8, 9}, // (0,0,0,L) to (L,0,0,L) - X-axis
-        {8, 10}, // (0,0,0,L) to (0,L,0,L) - Y-axis
-        {8, 12}, // (0,0,0,L) to (0,0,L,L) - Z-axis
-
-        {9, 11},
-        {9, 13},
-
-        {10, 11},
-        {10, 14},
-
-        {11, 15},
-
-        {12, 13},
-        {12, 14},
-
-        {13, 15},
-
-        {14, 15},
-
-        // --- Edges connecting the W=0.0f 'cube' to the W=L 'cube' (W-axis edges) ---
-        {0, 8},  // (0,0,0,0) to (0,0,0,L)
-        {1, 9},  // (L,0,0,0) to (L,0,0,L)
-        {2, 10}, // (0,L,0,0) to (0,L,0,L)
-        {3, 11}, // (L,L,0,0) to (L,L,0,L)
-        {4, 12}, // (0,0,L,0) to (0,0,L,L)
-        {5, 13}, // (L,0,L,0) to (L,0,L,L)
-        {6, 14}, // (0,L,L,0) to (0,L,L,L)
-        {7, 15}  // (L,L,L,0) to (L,L,L,L)
-    };
-
-    color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    lambertian edge_mat(edge_color);
-    materials.push_back(edge_mat);
-
-    for (int i = 0; i < 32; ++i) {
-        int idx1 = edges[i][0];
-        int idx2 = edges[i][1];
-
-        vec4 move(L / 2, L / 2, L / 2, L / 2);
-        projected_cylinder pc;
-        pc.start0 = vertices[idx1] - move;
-        pc.end0 = vertices[idx2] - move;
-        pc.mat_idx = 0;
-        scene.push_back(pc);
-    }
-
-    /*std::unique_ptr<ncube> nc = std::make_unique<ncube>();
-    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    nc->corner = cor;
-    nc->albedo = edge_color;
-    scene.push_back(nc.get()); */
-
-    /*std::unique_ptr<nsphere> ball = std::make_unique<nsphere>();
-    ball->radius = 0.5f;
-    ball->albedo = color(1.f, 0.f, 0.f);
-    scene.push_back(ball.get());*/
-    direction_light lig1;
-    lig1.col = color(1.0f, 1.0f, 0.9f);
-    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
-    lights.push_back(lig1);
-}
-
-void tesseract_lines_reflector(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-        // Tesseract Scene
-    float L = 0.5f;
-
-    point4 vertices[16] = {
-        // Vertex Index corresponds to binary (WZYX) -> e.g., 0000 for (0,0,0,0), 1111 for (L,L,L,L)
-
-        // --- Vertices where W = 0.0f ---
-        // Z = 0.0f
-        point4(0.0f, 0.0f, 0.0f, 0.0f), // 0: (0,0,0,0)
-        point4(L,    0.0f, 0.0f, 0.0f), // 1: (L,0,0,0)
-        point4(0.0f, L,    0.0f, 0.0f), // 2: (0,L,0,0)
-        point4(L,    L,    0.0f, 0.0f), // 3: (L,L,0,0)
-        // Z = L
-        point4(0.0f, 0.0f, L,    0.0f), // 4: (0,0,L,0)
-        point4(L,    0.0f, L,    0.0f), // 5: (L,0,L,0)
-        point4(0.0f, L,    L,    0.0f), // 6: (0,L,L,0)
-        point4(L,    L,    L,    0.0f), // 7: (L,L,L,0)
-
-        // --- Vertices where W = L (0.5f) ---
-        // Z = 0.0f
-        point4(0.0f, 0.0f, 0.0f, L),    // 8: (0,0,0,L)
-        point4(L,    0.0f, 0.0f, L),    // 9: (L,0,0,L)
-        point4(0.0f, L,    0.0f, L),    // 10: (0,L,0,L)
-        point4(L,    L,    0.0f, L),    // 11: (L,L,0,L)
-        // Z = L
-        point4(0.0f, 0.0f, L,    L),    // 12: (0,0,L,L)
-        point4(L,    0.0f, L,    L),    // 13: (L,0,L,L)
-        point4(0.0f, L,    L,    L),    // 14: (0,L,L,L)
-        point4(L,    L,    L,    L)     // 15: (L,L,L,L)
-    };
-    
-    //point4 center(L / 2, L / 2, L / 2, L / 2);
-
-    uint edges[32][2] = {
-        // --- Edges within the W=0.0f 'cube' (indices 0-7) ---
-        {0, 1}, // (0,0,0,0) to (L,0,0,0) - X-axis
-        {0, 2}, // (0,0,0,0) to (0,L,0,0) - Y-axis
-        {0, 4}, // (0,0,0,0) to (0,0,L,0) - Z-axis
-
-        {1, 3},
-        {1, 5},
-
-        {2, 3},
-        {2, 6},
-
-        {3, 7},
-
-        {4, 5},
-        {4, 6},
-
-        {5, 7},
-
-        {6, 7},
-
-        // --- Edges within the W=L 'cube' (indices 8-15) ---
-        {8, 9}, // (0,0,0,L) to (L,0,0,L) - X-axis
-        {8, 10}, // (0,0,0,L) to (0,L,0,L) - Y-axis
-        {8, 12}, // (0,0,0,L) to (0,0,L,L) - Z-axis
-
-        {9, 11},
-        {9, 13},
-
-        {10, 11},
-        {10, 14},
-
-        {11, 15},
-
-        {12, 13},
-        {12, 14},
-
-        {13, 15},
-
-        {14, 15},
-
-        // --- Edges connecting the W=0.0f 'cube' to the W=L 'cube' (W-axis edges) ---
-        {0, 8},  // (0,0,0,0) to (0,0,0,L)
-        {1, 9},  // (L,0,0,0) to (L,0,0,L)
-        {2, 10}, // (0,L,0,0) to (0,L,0,L)
-        {3, 11}, // (L,L,0,0) to (L,L,0,L)
-        {4, 12}, // (0,0,L,0) to (0,0,L,L)
-        {5, 13}, // (L,0,L,0) to (L,0,L,L)
-        {6, 14}, // (0,L,L,0) to (0,L,L,L)
-        {7, 15}  // (L,L,L,0) to (L,L,L,L)
-    };
-
-    color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    lambertian edge_mat(edge_color);
-    materials.push_back(edge_mat);
-
-    for (int i = 0; i < 32; ++i) {
-        int idx1 = edges[i][0];
-        int idx2 = edges[i][1];
-
-        vec4 move(L / 2, L / 2, L / 2, L / 2);
-        projected_cylinder pc;
-        pc.start0 = vertices[idx1] - move;
-        pc.end0 = vertices[idx2] - move;
-        pc.mat_idx = 0;
-        scene.push_back(pc);
-    }
-
-    color sphere_color(0.f, 1.f, 0.f);
-    specular sphere_mat(sphere_color);
-    materials.push_back(sphere_mat);
-
-    nsphere ns;
-    ns.radius = 0.25f;
-    ns.mat_idx = 1;
-    //ns->translate(vec4(-1.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns);
-
-    /*std::unique_ptr<ncube> nc = std::make_unique<ncube>();
-    point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    nc->corner = cor;
-    nc->albedo = edge_color;
-    scene.push_back(nc.get()); */
-
-    /*std::unique_ptr<nsphere> ball = std::make_unique<nsphere>();
-    ball->radius = 0.5f;
-    ball->albedo = color(1.f, 0.f, 0.f);
-    scene.push_back(ball.get());*/
-    direction_light lig1;
-    lig1.col = color(1.0f, 1.0f, 0.9f);
-    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
-    lights.push_back(lig1);
-}
-
-void tesseract(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    lambertian edge_mat(edge_color);
-    materials.push_back(edge_mat);
-
-    color sphere_color(0.f, 1.f, 0.f);
-    specular sphere_mat(sphere_color);
-    materials.push_back(sphere_mat);
-
-    color floor_color(0.5f, 0.5f, 0.5f);
-    lambertian floor_mat(floor_color);
-    materials.push_back(floor_mat);
-
-    ncube nc;
-    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    // nc->corner = cor;
-    nc.mat_idx = 0;
-    scene.push_back(nc);
-
-    nsphere ns;
-    ns.radius = 0.5f;
-    ns.mat_idx = 1;
-    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns);
-
-    nsphere floor;
-    floor.radius = 100.f;
-    floor.mat_idx = 2;
-    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
-    scene.push_back(floor);
-
-    direction_light lig1;
-    lig1.col = color(1.0f, 1.0f, 0.9f);
-    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
-    lights.push_back(lig1);
-}
-
-void all_white(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    color edge_color(1.f, 1.f, 1.f); // Orange
-    lambertian edge_mat(edge_color);
-    materials.push_back(edge_mat);
-
-    color sphere_color(1.f, 1.f, 1.f);
-    specular sphere_mat(sphere_color);
-    materials.push_back(sphere_mat);
-
-    color floor_color(1.f, 1.f, 1.f);
-    lambertian floor_mat(floor_color);
-    materials.push_back(floor_mat);
-
-    ncube nc;
-    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    // nc->corner = cor;
-    nc.mat_idx = 0;
-    scene.push_back(nc);
-
-    nsphere ns;
-    ns.radius = 0.5f;
-    ns.mat_idx = 1;
-    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns);
-
-    nsphere floor;
-    floor.radius = 100.f;
-    floor.mat_idx = 2;
-    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
-    scene.push_back(floor);
-
-    direction_light lig1;
-    lig1.col = color(1.0f, 1.0f, 0.9f);
-    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
-    lights.push_back(lig1);
-}
-
-void tesseract_reflector(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    color edge_color(1.0f, 0.647f, 0.0f); // Orange
-    specular edge_mat(edge_color);
-    materials.push_back(edge_mat);
-
-    color sphere_color(0.f, 1.f, 0.f);
-    specular sphere_mat(sphere_color);
-    materials.push_back(sphere_mat);
-
-    color floor_color(0.5f, 0.5f, 0.5f);
-    lambertian floor_mat(floor_color);
-    materials.push_back(floor_mat);
-
-    ncube nc;
-    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    // nc->corner = cor;
-    nc.mat_idx = 0;
-    scene.push_back(nc);
-
-    nsphere ns;
-    ns.radius = 0.5f;
-    ns.mat_idx = 1;
-    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns);
-
-    nsphere floor;
-    floor.radius = 100.f;
-    floor.mat_idx = 2;
-    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
-    scene.push_back(floor);
-
-    direction_light lig1;
-    lig1.col = color(1.0f, 1.0f, 0.9f);
-    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
-    lights.push_back(lig1);
-}
-
-void tesseract_glass(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    smooth_dielectric edge_mat(1.5f);
-    materials.push_back(edge_mat);
-
-    color sphere_color(0.f, 1.f, 0.f);
-    specular sphere_mat(sphere_color);
-    materials.push_back(sphere_mat);
-
-    color floor_color(1.f, 0.8f, 0.5f);
-    lambertian floor_mat(floor_color);
-    materials.push_back(floor_mat);
-
-    ncube nc;
-    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    // nc->corner = cor;
-    nc.mat_idx = 0;
-    scene.push_back(nc);
-
-    nsphere ns;
-    ns.radius = 0.5f;
-    ns.mat_idx = 1;
-    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns);
-
-    nsphere floor;
-    floor.radius = 100.f;
-    floor.mat_idx = 2;
-    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
-    scene.push_back(floor);
-
-    direction_light lig1;
-    lig1.col = color(1.0f, 1.0f, 0.9f);
-    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
-    lights.push_back(lig1);
-}
-
-void spheres(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    color sphere_color(0.9f, 0.5f, 0.9f);
-    specular sphere_mat(sphere_color);
-    materials.push_back(sphere_mat);
-
-    color sphere2_color(0.f, 1.f, 1.f);
-    specular sphere2_mat(sphere2_color);
-    materials.push_back(sphere2_mat);
-
-    smooth_dielectric sphere3_mat(1.5f);
-    materials.push_back(sphere3_mat);
-
-    color floor_color(0.5f, 0.5f, 0.5f);
-    lambertian floor_mat(floor_color);
-    materials.push_back(floor_mat);
-
-    nsphere ns;
-    ns.radius = 0.5f;
-    ns.mat_idx = 0;
-    ns.translate(vec4(-1.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns);
-
-    nsphere ns2;
-    ns2.radius = 0.5f;
-    ns2.mat_idx = 1;
-    ns2.translate(vec4(0.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns2);
-
-    nsphere ns3;
-    ns3.radius = 0.5f;
-    ns3.mat_idx = 2;
-    ns3.translate(vec4(1.f, 0.f, -1.f, 0.f));
-    scene.push_back(ns3);
-
-    nsphere floor;
-    floor.radius = 100.f;
-    floor.mat_idx = 3;
-    floor.translate(vec4(0.f, -100.5f, -1.f, 0.f));
-    scene.push_back(floor);
-
-    direction_light lig1;
-    lig1.col = color(1.0f, 1.0f, 0.9f);
-    lig1.dir = vec4::normalize(vec4(0.8f, 0.8f, 0.5f, 0.1f));
-    lights.push_back(lig1);
-}
-
-// BSDFs are modelled with the unit half 3-sphere (if there is a 4-th spatial dimension it makes sense?)
-void quad_light_test(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    lambertian red(color(1.f, 1.f, 0.05f));
-    materials.push_back(red);
-    light_material white(color(4.f, 4.f, 4.f));
-    materials.push_back(white);
-    lambertian green(color(0.12f, 0.45f, 0.15f));
-    materials.push_back(green);
-
-    quad q1(point4(-3.f, -2.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q1.mat_idx = 0;
-    scene.push_back(q1);
-
-    quad q2(point4(-2.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f), vec4(0.f, 1.f, 0.f, 0.f));
-    q2.mat_idx = 1;
-    scene.push_back(q2);
-}
-
-void cornell_box(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    lambertian red(color(0.65f, 0.05f, 0.05f));
-    lambertian white(color(0.73f, 0.73f, 0.73f));
-    lambertian green(color(0.12f, 0.45f, 0.15f));
-    light_material ceiling(color(15.f, 15.f, 15.f));
-    materials.push_back(red);
-    materials.push_back(white);
-    materials.push_back(green);
-    materials.push_back(ceiling);
-
-    quad q1(point4(555.f, 0.f, 0.f, 0.f), vec4(0.f, 555.f, 0.f, 0.f), vec4(0.f, 0.f, 555.f, 0.f));
-    q1.mat_idx = 2;
-    quad q2(point4(0.f, 0.f, 0.f, 0.f), vec4(0.f, 555.f, 0.f, 0.f), vec4(0.f, 0.f, 555.f, 0.f));
-    q2.mat_idx = 0;
-    quad q3(point4(343.f, 554.f, 332.f, 0.f), vec4(-130.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -105.f, 0.f));
-    q3.mat_idx = 3;
-    quad q4(point4(0.f, 0.f, 0.f, 0.f), vec4(555.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, 555.f, 0.f));
-    q4.mat_idx = 1;
-    quad q5(point4(555.f, 555.f, 555.f, 0.f), vec4(-555.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -555.f, 0.f));
-    q5.mat_idx = 1;
-    quad q6(point4(0.f, 0.f, 555.f, 0.f), vec4(555.f, 0.f, 0.f, 0.f), vec4(0.f, 555.f, 0.f, 0.f));
-    q6.mat_idx = 1;
-    scene.push_back(q1);
-    scene.push_back(q2);
-    scene.push_back(q3);
-    scene.push_back(q4);
-    scene.push_back(q5);
-    scene.push_back(q6);
-}
-
-void my_cornell_box_old(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    lambertian red(color(0.65f, 0.05f, 0.05f));
-    lambertian white(color(0.73f, 0.73f, 0.73f));
-    lambertian green(color(0.12f, 0.45f, 0.15f));
-    light_material ceiling(color(100.f, 100.f, 100.f));
-    materials.push_back(red);
-    materials.push_back(white);
-    materials.push_back(green);
-    materials.push_back(ceiling);
-
-    quad q1(point4(-2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q1.mat_idx = 2;
-    scene.push_back(q1);
-
-    quad q2(point4(2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q2.mat_idx = 0;
-    scene.push_back(q2);
-
-    quad q3(point4(-2.f, -2.f, -2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q3.mat_idx = 1;
-    scene.push_back(q3);
-
-    quad q4(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
-    q4.mat_idx = 1;
-    scene.push_back(q4);
-
-    quad q5(point4(-2.f, 2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
-    q5.mat_idx = 1;
-    scene.push_back(q5);
-
-    quad q6(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q6.mat_idx = 1;
-    scene.push_back(q6);
-
-    /*quad area_light(point4(-1.f, 1.99f, 1.f, 0.f), vec4(1.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f));
-    area_light.mat_idx = 3;
-    scene.push_back(area_light);*/
-
-    nsphere ns_light;
-    ns_light.mat_idx = 3;
-    ns_light.radius = 0.5f;
-    ns_light.translate(vec4(0.f, 2.f, -1.f, 0.f));
-    scene.push_back(ns_light);
-
-    lambertian lamb(color(1.f, 1.f, 1.f));
-    materials.push_back(lamb);
-    specular spec(color(1.f, 1.f, 1.f));
-    materials.push_back(spec);
-    smooth_dielectric glass(1.5f);
-    materials.push_back(glass);
-
-    ncube nc;
-    nc.mat_idx = 6;
-    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    // nc->corner = cor;
-    scene.push_back(nc);
-
-    nsphere ns2;
-    ns2.radius = 0.7f;
-    ns2.mat_idx = 5;
-    ns2.translate(vec4(-1.f, -1.f, -1.f, 0.f));
-    scene.push_back(ns2);
-
-    nsphere ns3;
-    ns3.radius = 0.7f;
-    ns3.mat_idx = 6;
-    ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
-    scene.push_back(ns3);
-
-}
-
-void my_cornell_box(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    lambertian red(color(0.65f, 0.05f, 0.05f));
-    red.in_plane = true;
-    lambertian white(color(0.73f, 0.73f, 0.73f));
-    white.in_plane = true;
-    lambertian green(color(0.12f, 0.45f, 0.15f));
-    green.in_plane = true;
-    light_material ceiling(color(30.f, 30.f, 30.f));
-    materials.push_back(red);
-    materials.push_back(white);
-    materials.push_back(green);
-    materials.push_back(ceiling);
-
-    quad q1(point4(-2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q1.mat_idx = 2;
-    scene.push_back(q1);
-
-    quad q2(point4(2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q2.mat_idx = 0;
-    scene.push_back(q2);
-
-    quad q3(point4(-2.f, -2.f, -2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q3.mat_idx = 1;
-    scene.push_back(q3);
-
-    quad q4(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
-    q4.mat_idx = 1;
-    scene.push_back(q4);
-
-    quad q5(point4(-2.f, 2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
-    q5.mat_idx = 1;
-    scene.push_back(q5);
-
-    quad q6(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q6.mat_idx = 1;
-    scene.push_back(q6);
-
-    quad area_light(point4(-1.f, 1.99f, 1.f, 0.f), vec4(1.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f));
-    area_light.mat_idx = 3;
-    //scene.push_back(area_light);
-
-    lambertian lamb(color(1.f, 1.f, 1.f));
-    materials.push_back(lamb);
-    specular spec(color(1.f, 1.f, 1.f));
-    materials.push_back(spec);
-    smooth_dielectric glass(1.5f);
-    materials.push_back(glass);
-    rough_dielectric stained_glass(1.5f);
-    stained_glass.alpha = 0.8f;
-    // materials.push_back(stained_glass);
-    rough_specular metal(color(0.97, 0.74, 0.62));
-    metal.alpha = 0.1f;
-    // materials.push_back(metal);
-
-    ncube nc;
-    nc.half_len = 0.35f;
-    nc.mat_idx = 6;
-    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    // nc->corner = cor;
-    scene.push_back(nc);
-
-    nsphere ns2;
-    ns2.radius = 0.7f;
-    ns2.mat_idx = 4;
-    ns2.translate(vec4(-1.f, -1.f, -1.f, 0.f));
-    scene.push_back(ns2);
-
-    nsphere ns3;
-    ns3.radius = 0.7f;
-    ns3.mat_idx = 5;
-    ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
-    scene.push_back(ns3);
-
-    ncube nc2;
-    nc2.half_len = 0.35f;
-    nc2.mat_idx = 6;
-    nc2.translate(vec4(1.f, -1.5f, 1.5f, 0.f));
-    //scene.push_back(nc2);
-
-    cube c3;
-    c3.mat_idx = 2;
-    c3.translate(vec4(1.f, 0.f, -1.f, 0.f));
-    scene.push_back(c3);
-    
-    light_material ball(color(4.f, 4.f, 4.f));
-    materials.push_back(ball);
-
-    nsphere ns_light;
-    ns_light.mat_idx = materials.size() - 1;
-    ns_light.radius = 0.5f;
-    ns_light.translate(vec4(-1.f, 0.f, 0.f, 0.f));
-    scene.push_back(ns_light);
-
-    light_material ball2(color(0.f, 4.f, 4.f));
-    materials.push_back(ball2);
-
-    sphere s_light;
-    s_light.mat_idx = materials.size() - 1;
-    s_light.radius = 0.3f;
-    s_light.translate(vec4(1.f, 0.f, 0.f, 0.f));
-    scene.push_back(s_light);
-}
-
-void my_cornell_box2(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    lambertian red(color(0.65f, 0.05f, 0.05f));
-    lambertian white(color(0.73f, 0.73f, 0.73f));
-    lambertian green(color(0.12f, 0.45f, 0.15f));
-    light_material ceiling(color(100.f, 100.f, 100.f));
-    materials.push_back(red);
-    materials.push_back(white);
-    materials.push_back(green);
-    materials.push_back(ceiling);
-
-    quad q1(point4(-2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q1.mat_idx = 2;
-    scene.push_back(q1);
-
-    quad q2(point4(2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q2.mat_idx = 0;
-    scene.push_back(q2);
-
-    quad q3(point4(-2.f, -2.f, -2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q3.mat_idx = 1;
-    scene.push_back(q3);
-
-    quad q4(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
-    q4.mat_idx = 1;
-    scene.push_back(q4);
-
-    quad q5(point4(-2.f, 2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
-    q5.mat_idx = 1;
-    scene.push_back(q5);
-
-    quad q6(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q6.mat_idx = 1;
-    scene.push_back(q6);
-
-    quad area_light(point4(-1.f, 1.99f, 1.f, 0.f), vec4(1.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f));
-    area_light.mat_idx = 3;
-    //scene.push_back(area_light);
-
-    lambertian lamb(color(1.f, 1.f, 1.f));
-    materials.push_back(lamb);
-    specular spec(color(1.f, 1.f, 1.f));
-    materials.push_back(spec);
-    smooth_dielectric glass(1.5f);
-    materials.push_back(glass);
-    rough_dielectric stained_glass(1.5f);
-    stained_glass.alpha = 0.8f;
-    // materials.push_back(stained_glass);
-    rough_specular metal(color(0.97, 0.74, 0.62));
-    metal.alpha = 0.1f;
-    // materials.push_back(metal);
-
-    ncube nc;
-    nc.half_len = 0.35f;
-    nc.mat_idx = 6;
-    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    // nc->corner = cor;
-    scene.push_back(nc);
-
-    nsphere ns2;
-    ns2.radius = 0.7f;
-    ns2.mat_idx = 4;
-    ns2.translate(vec4(-1.f, -1.f, -1.f, 0.f));
-    scene.push_back(ns2);
-
-    nsphere ns3;
-    ns3.radius = 0.7f;
-    ns3.mat_idx = 5;
-    ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
-    scene.push_back(ns3);
-
-    ncube nc2;
-    nc2.half_len = 0.35f;
-    nc2.mat_idx = 6;
-    nc2.translate(vec4(1.f, -1.5f, 1.5f, 0.f));
-    //scene.push_back(nc2);
-    
-    light_material ball(color(4.f, 4.f, 4.f));
-    materials.push_back(ball);
-
-    nsphere ns_light;
-    ns_light.mat_idx = 3;
-    ns_light.radius = 0.5f;
-    ns_light.translate(vec4(0.f, 2.f, -1.f, 0.f));
-    scene.push_back(ns_light);
-
-    cube c3;
-    c3.mat_idx = 2;  //materials.size() - 1; //2;
-    c3.translate(vec4(1.f, 0.f, -1.f, 0.f));
-    scene.push_back(c3);
-
-    light_material ball2(color(0.f, 20.f, 20.f));
-    materials.push_back(ball2);
-
-    sphere s_light;
-    s_light.mat_idx = materials.size() - 1;
-    s_light.radius = 0.3f;
-    s_light.half_w = 0.01f;
-    s_light.translate(vec4(1.f, 0.f, 0.f, 0.f));
-    scene.push_back(s_light);
-}
-
-void my_cornell_box_white(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    lambertian red(color(1.f, 1.f, 1.f));
-    red.in_plane = true;
-    lambertian white(color(1.f, 1.f, 1.f));
-    white.in_plane = true;
-    lambertian green(color(1.f, 1.f, 1.f));
-    green.in_plane = true;
-    light_material ceiling(color(1.f, 1.f, 1.f));
-    materials.push_back(red);
-    materials.push_back(white);
-    materials.push_back(green);
-    materials.push_back(ceiling);
-
-    quad q1(point4(-2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q1.mat_idx = 2;
-    scene.push_back(q1);
-
-    quad q2(point4(2.f, -2.f, 2.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q2.mat_idx = 0;
-    scene.push_back(q2);
-
-    quad q3(point4(-2.f, -2.f, -2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q3.mat_idx = 1;
-    scene.push_back(q3);
-
-    quad q4(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
-    q4.mat_idx = 1;
-    scene.push_back(q4);
-
-    quad q5(point4(-2.f, 2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -4.f, 0.f));
-    q5.mat_idx = 1;
-    scene.push_back(q5);
-
-    quad q6(point4(-2.f, -2.f, 2.f, 0.f), vec4(4.f, 0.f, 0.f, 0.f), vec4(0.f, 4.f, 0.f, 0.f));
-    q6.mat_idx = 1;
-    scene.push_back(q6);
-
-    quad area_light(point4(-1.f, 1.99f, 1.f, 0.f), vec4(1.f, 0.f, 0.f, 0.f), vec4(0.f, 0.f, -1.f, 0.f));
-    area_light.mat_idx = 3;
-    scene.push_back(area_light);
-
-    lambertian lamb(color(1.f, 1.f, 1.f));
-    materials.push_back(lamb);
-    specular spec(color(1.f, 1.f, 1.f));
-    materials.push_back(spec);
-    smooth_dielectric glass(1.5f);
-    materials.push_back(glass);
-    rough_dielectric stained_glass(1.5f);
-    stained_glass.alpha = 0.8f;
-    // materials.push_back(stained_glass);
-    rough_specular metal(color(0.97, 0.74, 0.62));
-    metal.alpha = 0.1f;
-    // materials.push_back(metal);
-
-    ncube nc;
-    nc.half_len = 0.35f;
-    nc.mat_idx = 6;
-    // point4 cor(0.25f, 0.25f, 0.25f, 0.25f);
-    // nc->corner = cor;
-    scene.push_back(nc);
-
-    nsphere ns2;
-    ns2.radius = 0.7f;
-    ns2.mat_idx = 4;
-    ns2.translate(vec4(-1.f, -1.f, -1.f, 0.f));
-    scene.push_back(ns2);
-
-    nsphere ns3;
-    ns3.radius = 0.7f;
-    ns3.mat_idx = 5;
-    ns3.translate(vec4(1.f, -1.f, -1.f, 0.f));
-    scene.push_back(ns3);
-
-    ncube nc2;
-    nc2.half_len = 0.35f;
-    nc2.mat_idx = 6;
-    nc2.translate(vec4(1.f, -1.5f, 1.5f, 0.f));
-    scene.push_back(nc2);
-
-    cube c3;
-    c3.mat_idx = 2;
-    c3.translate(vec4(1.f, 0.f, -1.f, 0.f));
-    scene.push_back(c3);
-}
-
-void DI_test(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    lambertian lamb(color(1.f, 1.f, 1.f));
-    materials.push_back(lamb);
-    light_material lig(color(0.7f, 0.7f, 0.7f));
-    materials.push_back(lig);
-
-    nsphere ns1;
-    ns1.mat_idx = 0;
-    ns1.radius = 0.5f;
-    // ns1.translate(vec4(-0.5f, 0.f, 0.f, 0.f));
-    scene.push_back(ns1);
-
-    nsphere env; // constant environment map
-    env.mat_idx = 1;
-    env.radius = 2.f;
-    scene.push_back(env);
-}
-
-void GI_test(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    lambertian lamb(color(1.f, 1.f, 1.f));
-    materials.push_back(lamb);
-    light_material lig(color(0.7f, 0.7f, 0.7f));
-    materials.push_back(lig);
-
-    nsphere ns1;
-    ns1.mat_idx = 0;
-    ns1.radius = 0.5f;
-    ns1.translate(vec4(-0.5f, 0.f, 0.f, 0.f));
-    scene.push_back(ns1);
-
-    smooth_dielectric glass(1.5f);
-    materials.push_back(glass);
-
-    nsphere ns2;
-    ns2.mat_idx = 0;
-    ns2.radius = 0.5f;
-    ns2.translate(vec4(0.5f, 0.f, 0.f, 0.f));
-    scene.push_back(ns2);
-
-    nsphere ns3;
-    ns3.mat_idx = 0;
-    ns3.radius = 0.5f;
-    ns3.translate(vec4(1.f, 0.f, 0.f, 0.f));
-    //scene.push_back(ns3);
-
-    nsphere env; // constant environment map
-    env.mat_idx = 1;
-    env.radius = 2.f;
-    scene.push_back(env);
-}
-
-void touch_test(device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
-    lambertian lamb;
-    lamb.albedo = color(1.f, 1.f, 1.f);
-    materials.push_back(lamb);
-    light_material lig;
-    lig.col = color(0.7f, 0.7f, 0.7f);
-    materials.push_back(lig);
-
-    nsphere ns1;
-    ns1.mat_idx = 0;
-    ns1.radius = 0.5f;
-    ns1.translate(vec4(-1.f, 0.f, 0.f, 0.f));
-    scene.push_back(ns1);
-
-    nsphere ns2;
-    ns2.mat_idx = 1;
-    ns2.radius = 0.5f;
-    // ns2.translate(vec4(0.f, 0.f, 0.f, 0.f));
-    scene.push_back(ns2);
 }
 
 void build_base_shape(shape* s, size_t mat_idx, const vec4& t, float rxy, float rxz, float rxw, float ryz, float ryw, float rzw) {
@@ -1148,10 +283,10 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             nsphere ns;
 
             if (shape_data.find("radius") != shape_data.end()) {
-                ns.radius = shape_data["radius"].template get<float>();
+                ns.set_radius(shape_data["radius"].template get<float>());
             }
 
-            std::cout << "constructing nsphere radius " << ns.radius << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
+            std::cout << "constructing nsphere radius " << ns.get_radius() << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
             build_base_shape(&ns, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
             scene.push_back<nsphere>(ns);
         } else if (shape_class == "ncube") {
@@ -1341,18 +476,6 @@ int main() {
     ImGui_ImplOpenGL3_Init(glsl_version);
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    device_list<shape> scene;
-    device_list<light> lights;
-    device_list<material> materials;
-
-    std::filesystem::path init_scene_path("scenes/cornell2.json");
-    std::filesystem::directory_entry cur_scene_entry(init_scene_path);
-    std::filesystem::file_time_type cur_scene_last_write_time = cur_scene_entry.last_write_time();
-    std::ifstream f(init_scene_path);
-    json data = json::parse(f);
-    build_scene(data, scene, materials, lights);
-    //std::cout << data["shapes"][0]["class"] << std::endl;
-
     //spheres();
     //quad_light_test();
     //my_cornell_box_old();
@@ -1372,6 +495,20 @@ int main() {
     // can try space distortion too
     // tesseract lines with a sphere in the middle?
     // tesseract solid reflectors?
+    bvh_test();
+    return 0;
+
+    device_list<shape> scene;
+    device_list<light> lights;
+    device_list<material> materials;
+
+    std::filesystem::path init_scene_path("scenes/cornell2.json");
+    std::filesystem::directory_entry cur_scene_entry(init_scene_path);
+    std::filesystem::file_time_type cur_scene_last_write_time = cur_scene_entry.last_write_time();
+    std::ifstream f(init_scene_path);
+    json data = json::parse(f);
+    build_scene(data, scene, materials, lights);
+    //std::cout << data["shapes"][0]["class"] << std::endl;
 
     camera::aspect_ratio = 16.f / 9.f;
     camera::image_width = 1280;

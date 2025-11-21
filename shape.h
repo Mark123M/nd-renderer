@@ -36,7 +36,7 @@ struct shape {
 	__host__ __device__ shape() : basis{identity_affine, identity_affine} {}
 
 	__host__ __device__ virtual float sdf(const point4& p) const {
-		return 0.f;
+		return MAX_RAY_DIST;
 	}
 
 	__host__ __device__ virtual bool intersect(const ray& r, hit_result& res) const {
@@ -44,7 +44,7 @@ struct shape {
 	}
 
 	__host__ __device__ virtual float surface_volume() const {
-		return 0.f; // 0 means not implemented
+		return 0.f; // not implemented
 	}
 
 	__host__ __device__ virtual bool sample(shape_sample& ss, const hit_result& res, uint64_t& pcg_state) const {
@@ -53,39 +53,12 @@ struct shape {
 
 	__host__ __device__ virtual void rotate(float angle, uint a, uint b) {
 		basis.rotate(angle, a, b);
-		
-		point4& p_min_local = bbox_local.p_min;
-		point4& p_max_local = bbox_local.p_max;
-		point4 p_min_world(MAX_RAY_DIST, MAX_RAY_DIST, MAX_RAY_DIST, MAX_RAY_DIST);
-		point4 p_max_world(-MAX_RAY_DIST, -MAX_RAY_DIST, -MAX_RAY_DIST, -MAX_RAY_DIST);
-		
-		for (int x = 0; x < 2; x++) {
-			for (int y = 0; y < 2; y++) {
-				for (int z = 0; z < 2; z++) {
-					for (int w = 0; w < 2; w++) {
-						point4 corner(
-							x == 0 ? p_min_local.x : p_max_local.x,
-							y == 0 ? p_min_local.y : p_max_local.y,
-							z == 0 ? p_min_local.z : p_max_local.z,
-							w == 0 ? p_min_local.w : p_max_local.w
-						);
-						point4 p = basis.local_to_world(corner);
-						p_min_world = point4::min(p_min_world, p);
-						p_max_world = point4::max(p_max_world, p);
-					}
-				}
-			}
-		}
-
-		bbox_world.p_min = p_min_world;
-		bbox_world.p_max = p_max_world;
+		update_bbox_world();
 	}
 	
 	__host__ __device__ virtual void translate(const vec4& t) {
 		basis.translate(t);
-		// skip applying transform to corners
-		bbox_world.p_min += t;
-		bbox_world.p_max += t;
+		update_bbox_world(); // too inefficient?
 	}
 
 	__host__ __device__ void rotate_xy(float angle) {
@@ -110,6 +83,43 @@ struct shape {
 
 	__host__ __device__ void rotate_zw(float angle) {
 		rotate(angle, 2, 3);
+	}
+
+	__host__ __device__ void update_bbox_world() {
+		point4& p_min_local = bbox_local.p_min;
+		point4& p_max_local = bbox_local.p_max;
+		point4 p_min_world = POINT4_MAX;
+		point4 p_max_world = POINT4_MIN;
+		
+		for (uint x = 0; x < 2; x++) {
+			for (uint y = 0; y < 2; y++) {
+				for (uint z = 0; z < 2; z++) {
+					for (uint w = 0; w < 2; w++) {
+						point4 corner(
+							x == 0 ? p_min_local.x : p_max_local.x,
+							y == 0 ? p_min_local.y : p_max_local.y,
+							z == 0 ? p_min_local.z : p_max_local.z,
+							w == 0 ? p_min_local.w : p_max_local.w
+						);
+						point4 p = basis.local_to_world(corner);
+						p_min_world = point4::min(p_min_world, p);
+						p_max_world = point4::max(p_max_world, p);
+					}
+				}
+			}
+		}
+
+		bbox_world.p_min = p_min_world;
+		bbox_world.p_max = p_max_world;
+	}
+
+	__host__ __device__ virtual void update_bbox_local() {}
+
+	__host__ __device__ void update_bbox() {
+		update_bbox_local();
+		//printf("UPDATING BBOX LOCAL: %s %s\n", point4::to_string(bbox_local.p_min).c_str(), point4::to_string(bbox_local.p_max).c_str());
+		update_bbox_world();
+		//printf("UPDATING BBOX WORLD: %s %s\n", point4::to_string(bbox_world.p_min).c_str(), point4::to_string(bbox_world.p_max).c_str());
 	}
 
 	__host__ __device__ virtual size_t size() const = 0;
