@@ -270,6 +270,8 @@ struct point4 {
 	
 	__host__ __device__ point4 operator+(const vec4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
 
+	__host__ __device__ point4 operator+(const point4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
+
 	__host__ __device__ point4 operator-(const vec4& v) const { return { x - v.x, y - v.y, z - v.z, w - v.w }; }
 
 	__host__ __device__ vec4 operator-(const point4& p) const { return { x - p.x, y - p.y, z - p.z, w - p.w }; }
@@ -330,7 +332,19 @@ struct point4 {
 	__host__ __device__ static bool approx_points_equals(const point4& p1, const point4& p2) {
 		return approx_equals(p1.x, p2.x) && approx_equals(p1.y, p2.y) && approx_equals(p1.z, p2.z) && approx_equals(p1.w, p2.w);
 	}
+
+	__host__ __device__ static point4 min(const point4& p1, const point4& p2) {
+		return point4(fminf(p1.x, p2.x), fminf(p1.y, p2.y), fminf(p1.z, p2.z), fminf(p1.w, p2.w));
+	}
+
+	__host__ __device__ static point4 max(const point4& p1, const point4& p2) {
+		return point4(fmaxf(p1.x, p2.x), fmaxf(p1.y, p2.y), fmaxf(p1.z, p2.z), fmaxf(p1.w, p2.w));
+	}
 };
+
+__host__ __device__ point4 operator*(float k, const point4& p) {
+	return { p.x * k, p.y * k, p.z * k, p.w * k};
+}
 
 void from_json(const json& j, point4& p) {
 	j[0].get_to(p.x);

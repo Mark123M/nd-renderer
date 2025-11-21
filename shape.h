@@ -5,6 +5,7 @@
 #include "color.h"
 #include "transform.h"
 #include "material.h"
+#include "aabb.h"
 
 enum shape_type {
     CYLINDER, PROJECTED_CYLINDER, HYPERSPHERE, HYPERCUBE
@@ -28,6 +29,8 @@ struct shape_sample {
 
 struct shape {
 	transform basis;
+	aabb bbox_local;
+	aabb bbox_world;
 	size_t mat_idx;
 
 	__host__ __device__ shape() : basis{identity_affine, identity_affine} {}
@@ -50,10 +53,39 @@ struct shape {
 
 	__host__ __device__ virtual void rotate(float angle, uint a, uint b) {
 		basis.rotate(angle, a, b);
+		
+		point4& p_min_local = bbox_local.p_min;
+		point4& p_max_local = bbox_local.p_max;
+		point4 p_min_world(MAX_RAY_DIST, MAX_RAY_DIST, MAX_RAY_DIST, MAX_RAY_DIST);
+		point4 p_max_world(-MAX_RAY_DIST, -MAX_RAY_DIST, -MAX_RAY_DIST, -MAX_RAY_DIST);
+		
+		for (int x = 0; x < 2; x++) {
+			for (int y = 0; y < 2; y++) {
+				for (int z = 0; z < 2; z++) {
+					for (int w = 0; w < 2; w++) {
+						point4 corner(
+							x == 0 ? p_min_local.x : p_max_local.x,
+							y == 0 ? p_min_local.y : p_max_local.y,
+							z == 0 ? p_min_local.z : p_max_local.z,
+							w == 0 ? p_min_local.w : p_max_local.w
+						);
+						point4 p = basis.local_to_world(corner);
+						p_min_world = point4::min(p_min_world, p);
+						p_max_world = point4::max(p_max_world, p);
+					}
+				}
+			}
+		}
+
+		bbox_world.p_min = p_min_world;
+		bbox_world.p_max = p_max_world;
 	}
 	
 	__host__ __device__ virtual void translate(const vec4& t) {
 		basis.translate(t);
+		// skip applying transform to corners
+		bbox_world.p_min += t;
+		bbox_world.p_max += t;
 	}
 
 	__host__ __device__ void rotate_xy(float angle) {
