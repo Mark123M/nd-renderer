@@ -1094,6 +1094,17 @@ void touch_test(device_list<shape>& scene, device_list<material>& materials, dev
     scene.push_back(ns2);
 }
 
+void build_base_shape(shape* s, size_t mat_idx, const vec4& t, float rxy, float rxz, float rxw, float ryz, float ryw, float rzw) {
+    s->mat_idx = mat_idx;
+    s->translate(t);
+    s->rotate_xy(rxy);
+    s->rotate_xz(rxz);
+    s->rotate_xw(rxw);
+    s->rotate_yz(ryz);
+    s->rotate_yw(ryw);
+    s->rotate_zw(rzw);
+}
+
 void build_scene(json& data, device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     scene.clear();
     materials.clear();
@@ -1103,12 +1114,34 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
         std::string shape_class = shape_data["class"].template get<std::string>();
         size_t mat_idx = shape_data["mat_idx"].template get<size_t>();
         vec4 t(0.f, 0.f, 0.f, 0.f);
+        float rxy = 0.f;
+        float rxz = 0.f;
+        float rxw = 0.f;
+        float ryz = 0.f;
+        float ryw = 0.f; 
+        float rzw = 0.f;
         // vec4 r(0.f, 0.f, 0.f, 0.f);
         if (shape_data.find("translate") != shape_data.end()) {
-            t.x = shape_data["translate"][0].template get<float>();
-            t.y = shape_data["translate"][1].template get<float>();
-            t.z = shape_data["translate"][2].template get<float>();
-            t.w = shape_data["translate"][3].template get<float>();
+            t = shape_data["translate"].template get<vec4>();
+        }
+
+        if (shape_data.find("rotate_xy") != shape_data.end()) {
+            rxy = shape_data["rotate_xy"].template get<float>();
+        }
+        if (shape_data.find("rotate_xz") != shape_data.end()) {
+            rxz = shape_data["rotate_xz"].template get<float>();
+        }
+        if (shape_data.find("rotate_xw") != shape_data.end()) {
+            rxw = shape_data["rotate_xw"].template get<float>();
+        }
+        if (shape_data.find("rotate_yz") != shape_data.end()) {
+            ryz = shape_data["rotate_yz"].template get<float>();
+        }
+        if (shape_data.find("rotate_yw") != shape_data.end()) {
+            ryw = shape_data["rotate_yw"].template get<float>();
+        }
+        if (shape_data.find("rotate_zw") != shape_data.end()) {
+            rzw = shape_data["rotate_zw"].template get<float>();
         }
 
         if (shape_class == "nsphere") {
@@ -1119,9 +1152,55 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             }
 
             std::cout << "constructing nsphere radius " << ns.radius << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
-            ns.mat_idx = mat_idx;
-            ns.translate(t);
-            scene.push_back(ns);
+            build_base_shape(&ns, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
+            scene.push_back<nsphere>(ns);
+        } else if (shape_class == "ncube") {
+            ncube nc;
+
+            if (shape_data.find("half_len") != shape_data.end()) {
+                nc.half_len = shape_data["half_len"].template get<float>();
+            }
+
+            std::cout << "constructing ncube half_len " << nc.half_len << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
+            build_base_shape(&nc, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
+            scene.push_back<ncube>(nc);
+        } else if (shape_class == "sphere") {
+            sphere s;
+
+            if (shape_data.find("radius") != shape_data.end()) {
+                s.radius = shape_data["radius"].template get<float>();
+            }
+
+            if (shape_data.find("half_w") != shape_data.end()) {
+                s.half_w = shape_data["half_w"].template get<float>();
+            }
+
+            std::cout << "constructing sphere radius " << s.radius << " half_w " << s.half_w << std::endl;
+            build_base_shape(&s, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
+            scene.push_back<sphere>(s);
+        } else if (shape_class == "cube") {
+            cube c;
+
+            if (shape_data.find("half_len") != shape_data.end()) {
+                c.half_len = shape_data["half_len"].template get<float>();
+            }
+
+            if (shape_data.find("half_w") != shape_data.end()) {
+                c.half_w = shape_data["half_w"].template get<float>();
+            }
+
+            std::cout << "constructing cube half_len " << c.half_len << " half_w" << c.half_w << std::endl;
+            build_base_shape(&c, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
+            scene.push_back<cube>(c);
+        } else if (shape_class == "quad") {
+            point4 o = shape_data["origin"].template get<point4>();
+            vec4 u = shape_data["u"].template get<vec4>();
+            vec4 v = shape_data["v"].template get<vec4>();
+            quad q(o, u, v);
+
+            std::cout << "constructing quad" << std::endl;
+            build_base_shape(&q, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
+            scene.push_back<quad>(q);
         }
     }
 
@@ -1132,28 +1211,43 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             lambertian l;
             
             if (mat_data.find("albedo") != mat_data.end()) {
-                color c;
-                c.r = mat_data["albedo"][0].template get<float>();
-                c.g = mat_data["albedo"][1].template get<float>();
-                c.b = mat_data["albedo"][2].template get<float>();
+                color c = mat_data["albedo"].template get<color>();
                 l.albedo = c;
             }
 
             std::cout << "constructing lambertian albedo " << l.albedo.r << " " << l.albedo.g << " " << l.albedo.b << std::endl;
-            materials.push_back(l);
+            materials.push_back<lambertian>(l);
         } else if (mat_class == "light_material") {
             light_material lig;
             
             if (mat_data.find("color") != mat_data.end()) {
-                color c;
-                c.r = mat_data["color"][0].template get<float>();
-                c.g = mat_data["color"][1].template get<float>();
-                c.b = mat_data["color"][2].template get<float>();
+                color c = mat_data["color"].template get<color>();
                 lig.col = c;
             }
 
-            std::cout << "constructing light color " << lig.col.r << " " << lig.col.g << " " << lig.col.b << std::endl;
-            materials.push_back(lig);
+            if (mat_data.find("albedo") != mat_data.end()) {
+                color c = mat_data["albedo"].template get<color>();
+                lig.albedo = c;
+            }
+
+            std::cout << "constructing light color " << lig.col.r << " " << lig.col.g << " " << lig.col.b << " albedo " << lig.albedo.r << " " << lig.albedo.g << " " << lig.albedo.b << std::endl;
+            materials.push_back<light_material>(lig);
+        } else if (mat_class == "dielectric") {
+            smooth_dielectric sd;
+
+            if (mat_data.find("eta") != mat_data.end()) {
+                sd.eta = mat_data["eta"].template get<float>();
+            }
+
+            materials.push_back<smooth_dielectric>(sd);
+        } else if (mat_class == "specular") {
+            specular sp;
+
+            if (mat_data.find("albedo") != mat_data.end()) {
+                sp.albedo = mat_data["albedo"].template get<color>();
+            }
+
+            materials.push_back<specular>(sp);
         }
     }
 
@@ -1251,7 +1345,7 @@ int main() {
     device_list<light> lights;
     device_list<material> materials;
 
-    std::filesystem::path init_scene_path("scenes/di_test.json");
+    std::filesystem::path init_scene_path("scenes/cornell2.json");
     std::filesystem::directory_entry cur_scene_entry(init_scene_path);
     std::filesystem::file_time_type cur_scene_last_write_time = cur_scene_entry.last_write_time();
     std::ifstream f(init_scene_path);
@@ -1263,7 +1357,7 @@ int main() {
     //quad_light_test();
     //my_cornell_box_old();
     //my_cornell_box();
-    //my_cornell_box2();
+    //my_cornell_box2(scene, materials, lights);
     // DI_test();
     //GI_test();
     //touch_test();
@@ -1310,14 +1404,14 @@ int main() {
     uint row_range = std::ceil((float)camera::image_height / NUM_CPU_THREADS); // range: ceil(height / N)
 
     uint num_pixels = camera::image_width * camera::image_height;
-    color* d_color_buffer;
-    gpuErrchk(cudaMalloc(&d_color_buffer, num_pixels * sizeof(color)));
+    double3* d_color_buffer;
+    gpuErrchk(cudaMalloc(&d_color_buffer, num_pixels * sizeof(double3)));
 
     uchar4* d_image_data;
     gpuErrchk(cudaMalloc(&d_image_data, num_pixels * sizeof(uchar4)));
 
     //nvtxRangePush("Processing Inputs");
-    dim3 threads_per_block(16, 16);
+    dim3 threads_per_block(32, 32);
     dim3 num_blocks((camera::image_height + threads_per_block.x - 1) / threads_per_block.x, 
     (camera::image_width + threads_per_block.y - 1) / threads_per_block.y);
 
@@ -1328,9 +1422,12 @@ int main() {
     int num_samples = 0;
     auto clear_buffer = [&num_samples, num_pixels, d_color_buffer, d_image_data]() -> void {
         num_samples = 0;
-        gpuErrchk(cudaMemset(d_color_buffer, 0, num_pixels * sizeof(color)));
+        gpuErrchk(cudaMemset(d_color_buffer, 0, num_pixels * sizeof(double3)));
         gpuErrchk(cudaMemset(d_image_data, 0, num_pixels * sizeof(uchar4)));
     };
+
+    int sample_mode = 0;
+    bool sample_lights = true; // NEE;
 
     while (!glfwWindowShouldClose(window)) {
         current_frame = glfwGetTime();
@@ -1394,31 +1491,35 @@ int main() {
             clear_buffer();
         }
 
-        if (true) {
-            camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-            (num_samples, true, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
-            num_samples++;
-
-            //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
-
-            cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
-            gpuErrchk(cudaGraphicsMapResources(1, &render_texture_CUDA, 0)); // Map on stream 0
-            gpuErrchk(cudaGraphicsSubResourceGetMappedArray(&d_texture_array, render_texture_CUDA, 0, 0));
-
-            gpuErrchk(cudaMemcpy2DToArray(d_texture_array, // Destination: CUDA array
-                    0, 0,             // Destination X, Y offsets (start at top-left)
-                    d_image_data,      // Source: Device pointer to your linear pixel data
-                    camera::image_width * sizeof(uchar4), // Source pitch (bytes per row)
-                    camera::image_width * sizeof(uchar4), // Width of the copy (bytes)
-                    camera::image_height, // Height of the copy (rows)
-                    cudaMemcpyDeviceToDevice)); // Type of copy (Device to Array)
-            gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
-            //nvtxRangePop();
+        if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+            clear_buffer();
+            world::reset_camera_kernel<<<1,1>>>();
+            gpuErrchk(cudaDeviceSynchronize());
         }
+
+        camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
+        (num_samples, sample_mode, sample_lights, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
+        num_samples++;
+
+        //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
+
+        cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
+        gpuErrchk(cudaGraphicsMapResources(1, &render_texture_CUDA, 0)); // Map on stream 0
+        gpuErrchk(cudaGraphicsSubResourceGetMappedArray(&d_texture_array, render_texture_CUDA, 0, 0));
+
+        gpuErrchk(cudaMemcpy2DToArray(d_texture_array, // Destination: CUDA array
+                0, 0,             // Destination X, Y offsets (start at top-left)
+                d_image_data,      // Source: Device pointer to your linear pixel data
+                camera::image_width * sizeof(uchar4), // Source pitch (bytes per row)
+                camera::image_width * sizeof(uchar4), // Width of the copy (bytes)
+                camera::image_height, // Height of the copy (rows)
+                cudaMemcpyDeviceToDevice)); // Type of copy (Device to Array)
+        gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
+        //nvtxRangePop();
 
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(camera::image_width, camera::image_height));
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        ImGui::Text("%.3f ms/frame (%.1f FPS), %d samples per pixel", 1000.0f / io.Framerate, io.Framerate, num_samples);
         
         for (const auto& entry : std::filesystem::directory_iterator(PATH_TO_SCENES)) {
             const char* stem = entry.path().stem().c_str();
@@ -1449,6 +1550,20 @@ int main() {
         }
 
         ImGui::NewLine();
+        
+        if (ImGui::RadioButton("Sample solid angles", &sample_mode, 0)) {
+            clear_buffer();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::RadioButton("Sample surface area", &sample_mode, 1)) {
+            clear_buffer();
+        }
+
+        if (ImGui::Checkbox("Sample lights", &sample_lights)) {
+            clear_buffer();
+        }
 
         if (ImGui::Button("EXPORT IMAGE")) {
             camera::export_image(d_image_data, num_pixels);

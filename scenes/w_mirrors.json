@@ -1,0 +1,60 @@
+{
+    "materials": [
+        {
+            "class": "specular",
+            "albedo": [0.65, 0.65, 0.65]
+        },
+        {
+            "class": "lambertian",
+            "albedo": [0.73, 0.73, 0.73]
+        },
+        {
+            "class": "lambertian",
+            "albedo": [0.12, 0.45, 0.15]
+        },
+        {
+            "class": "lambertian",
+            "albedo": [0.12, 1.0, 0.15]
+        },
+        {
+            "class": "light_material",
+            "color": [50.0, 50.0, 50.0]
+        },
+        {
+            "class": "specular",
+            "albedo": [0.12, 0.45, 0.15]
+        }
+    ],
+    "shapes": [
+        {
+            "class": "nsphere",
+            "mat_idx": 5,
+            "radius": 1.0,
+            "translate": [-2.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "nsphere",
+            "mat_idx": 5,
+            "radius": 1.0,
+            "translate": [-2.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "cube",
+            "mat_idx": 0,
+            "half_len": 2.0,
+            "translate": [3.0, 1.0, 0.0, 0.0]
+        },
+        {
+            "class": "ncube",
+            "mat_idx": 1,
+            "half_len": 0.50,
+            "translate": [0.0, 0.0, 0.0, 0.0]
+        },
+        {
+            "class": "nsphere",
+            "mat_idx": 4,
+            "radius": 1.0,
+            "translate": [0.0, 2.0, 0.0, 0.0]
+        }
+    ]
+}

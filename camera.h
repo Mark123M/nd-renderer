@@ -162,16 +162,70 @@ __device__ color sample_ld(const hit_result& res, uint num_area_lights, shape** 
     }
 
     material* bsdf = shared_materials[res.target->mat_idx];
-    color f = bsdf->f(wo, wi) * fabsf(vec4::dot(wi, res.normal));
+    color f = bsdf->f(wo, wi, res.m) * fabsf(vec4::dot(wi, res.normal));
     float p_l = p_light * ls.pdf;
 
     return ls.L * f / p_l; // TODO: multiple importance sampling?
 }
 
-__device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
+struct area_sample {
+    float G; // geometry term
+    color f; // bsdf reflectance
+    hit_result res_next;
+};
+
+// computes f and G for a 
+__device__ bool sample_area(area_sample& as, const shape* s, const material* mat_hit, const hit_result& res, shape** shared_scene, uint64_t& pcg_state) {
+    shape_sample ss;
+    s->sample(ss, res, pcg_state);
+
+    vec4 oriented_normal = vec4::dot(res.wo, res.normal) < 0.f ? -res.normal : res.normal;
+    point4 p_offset = res.p + EPSILON * oriented_normal;
+    vec4 v = ss.p - p_offset; // vector to shape
+    
+    float dist = vec4::length(v);
+    vec4 wi = v / dist;
+    color f = mat_hit->f(res.wo, wi, res.m);
+    ray r_next = ray(p_offset, wi);
+
+    // visibility term
+    hit_result res_next;
+    if (!intersect_world(r_next, res_next, shared_scene) || !point4::approx_points_equals(res_next.p, ss.p)) {
+        return false;
+    }
+
+    float cos_wi = vec4::dot(wi, res.normal); 
+    float cos_wo_next = vec4::dot(-wi, res_next.normal);
+    float G = (fabsf(cos_wi) * fabsf(cos_wo_next)) / (dist * dist * dist);
+
+    as.G = G;
+    as.f = f;
+    as.res_next = res_next;
+    return true;
+}
+
+__device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, bool sample_lights, uint64_t& pcg_state) {
     color L(0.f, 0.f, 0.f);
     //color col(1.f, 1.f, 1.f);
     color beta(1.f, 1.f, 1.f);
+    bool specular_bounce = true;
+
+    float total_surface_volume = 0.f;
+    float total_emitter_surface_volume = 0.f;
+
+    for (size_t i = 0; i < d_scene_len; i++) {
+        float sv = shared_scene[i]->surface_volume();
+        material* mat = shared_materials[shared_scene[i]->mat_idx];
+        total_surface_volume += sv;
+
+        if (mat->is_emissive()) {
+            if (approx_equals(sv, 0.f)) { // can't sample emitters when sv function hasn't been implemented
+                return color(0.f, 0.f, 0.f);
+            }
+            total_emitter_surface_volume += sv;
+        }
+    }
+
 
     for (uint k = 0; k < MAX_RAY_BOUNCES; k++) {
         hit_result res; // res is initialized with MAX_RAY_DIST
@@ -179,29 +233,63 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
         if (!intersect_world(r, res, shared_scene)) {
             // float a = 0.5f * (r.dir.y + 1.f);
             // return color(0.5f, 0.5f, 0.5f); // constant environment map
-            break; //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+            // return color(0.f, 0.f, 0.f); //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
+            break;
         }
 
-        const vec4& normal = res.normal;
+        material* mat = shared_materials[res.target->mat_idx];
 
-        if (d_render_normals) {
-            return 0.5f * color(normal.x + 1.f, normal.y + 1.f, normal.z + 1.f);
+        if (mat->is_emissive()) {
+            if (!sample_lights || specular_bounce) {
+                L += beta * mat->L();
+            }
+        }
+
+        if (sample_lights && !mat->is_specular()) {
+            shape* e = nullptr;
+            material* light_mat = nullptr;
+            float u = randf_pcg32(0.f, 1.f, pcg_state);
+
+            for (size_t i = 0; i < d_scene_len; i++) {
+                material* mat = shared_materials[shared_scene[i]->mat_idx];
+
+                if (mat->is_emissive()) {
+                    u -= shared_scene[i]->surface_volume() / total_emitter_surface_volume;
+
+                    if (u <= 0) {
+                        e = shared_scene[i];
+                        light_mat = mat;
+                        break;
+                    }
+                }
+            }
+
+            area_sample as_emitter;
+
+            if (e != nullptr && sample_area(as_emitter, e, mat, res, shared_scene, pcg_state)) {
+                // color L_throughput = ((as_emitter.G * as_emitter.f) / (1.f / total_emitter_surface_volume)) * beta;
+               // vec4 li_wi = -as_emitter.res_next.wo;
+               // color li_f = as_emitter.f * fabsf(vec4::dot(li_wi, res.normal));
+                //L += (li_f * beta * light_mat->L()) / (1.f / total_emitter_surface_volume);
+                //L += light_mat->L() * L_throughput;
+
+                float pdf_A = 1.f / total_emitter_surface_volume;
+                L += (as_emitter.f * beta * light_mat->L() * as_emitter.G) / pdf_A;
+            }
         }
         
         bsdf_sample bs;
-        material* mat = shared_materials[res.target->mat_idx];
 
-        if (!mat->sample_f(-r.dir, res.m, bs, pcg_state)) { // hit an area light, bs.f represents the light color
-            L = beta * bs.f;
+        if (!mat->sample_f(-r.dir, res.m, bs, pcg_state)) {
             break;
-        } else {
-            beta *= (bs.f * fabsf(vec4::dot(bs.wi, res.normal))) / bs.pdf;
         }
 
+        beta *= (bs.f * fabsf(vec4::dot(bs.wi, res.normal))) / bs.pdf;
+        specular_bounce = mat->is_specular();
         r = ray(res.p + EPSILON * bs.wi, bs.wi);
         
         float beta_max = fmaxf(beta.r, fmaxf(beta.g, beta.b));
-        if (beta_max <= 1.f && k >= 1.f) {
+        if (beta_max <= 1.f && k >= 3) {
             float q = fmaxf(0.f, 1.f - beta_max);
             if (randf_pcg32(0.f, 1.f, pcg_state) < q) {
                 break;
@@ -213,12 +301,18 @@ __device__ color ray_color_cuda(ray& r, shape** shared_scene, light** shared_lig
     return L;
 }
 
-__device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, uint64_t& pcg_state) {
+__device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** shared_lights, material** shared_materials, bool sample_lights, uint64_t& pcg_state) {
     float total_surface_volume = 0.f;
+    float total_emitter_surface_volume = 0.f;
 
     for (size_t i = 0; i < d_scene_len; i++) {
         float sv = shared_scene[i]->surface_volume();
+        material* mat = shared_materials[shared_scene[i]->mat_idx];
         total_surface_volume += sv;
+
+        if (mat->is_emissive()) {
+            total_emitter_surface_volume += sv;
+        }
 
         if (approx_equals(sv, 0.f)) { // can't area sample when sv function hasn't been implemented
             return color(0.f, 0.f, 0.f);
@@ -234,13 +328,51 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
     }
 
     uint k = 0;
+    bool specular_bounce = true;
+    material* mat_hit = shared_materials[res.target->mat_idx];
 
-    while (true) {
-        material* mat = shared_materials[res.target->mat_idx];
+    if (sample_lights && mat_hit->is_emissive()) {
+        L = mat_hit->L();
+        // return mat_hit->L();
+    }
 
-        if (mat->is_emissive()) {
-            L = beta * mat->L();
-            break;
+    for (uint k = 0; k < MAX_RAY_BOUNCES; k++) {
+        mat_hit = shared_materials[res.target->mat_idx];
+        specular_bounce = mat_hit->is_specular();
+
+        if (mat_hit->is_emissive()) {
+            if (!sample_lights || specular_bounce) { // avoid NEE double count
+                L += beta * mat_hit->L();
+            }
+
+            // break;
+        }
+
+        if (sample_lights) {
+            shape* e = nullptr;
+            material* light_mat = nullptr;
+            float u = randf_pcg32(0.f, 1.f, pcg_state);
+
+            for (size_t i = 0; i < d_scene_len; i++) {
+                material* mat = shared_materials[shared_scene[i]->mat_idx];
+
+                if (mat->is_emissive()) {
+                    u -= shared_scene[i]->surface_volume() / total_emitter_surface_volume;
+
+                    if (u <= 0) {
+                        e = shared_scene[i];
+                        light_mat = mat;
+                        break;
+                    }
+                }
+            }
+
+            area_sample as_emitter;
+
+            if (e != nullptr && sample_area(as_emitter, e, mat_hit, res, shared_scene, pcg_state)) {
+                color L_throughput = ((as_emitter.G * as_emitter.f) / (1.f / total_emitter_surface_volume)) * beta;
+                L += light_mat->L() * L_throughput;
+            }
         }
 
         // sample point in scene
@@ -250,50 +382,20 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
         for (size_t i = 0; i < d_scene_len; i++) {
             u -= shared_scene[i]->surface_volume() / total_surface_volume;
 
-            if (u < 0) {
+            if (u <= 0) {
                 s = shared_scene[i];
+                break;
             }
         }
 
-        if (s == nullptr) {
+        area_sample as;
+
+        if (s == nullptr || !sample_area(as, s, mat_hit, res, shared_scene, pcg_state)) {
             break;
         }
 
-        shape_sample ss;
-        s->sample(ss, res, pcg_state);
-
-        vec4 v = ss.p - res.p; // vector to shape
-        float dist = vec4::length(v);
-        vec4 wi = v / dist;
-        color f = mat->f(res.wo, wi);
-        ray next_r = ray(res.p, wi);
-
-        // visibility term
-        hit_result res_next;
-        if (!intersect_world(next_r, res_next, shared_scene) || !point4::approx_points_equals(res_next.p, ss.p)) {
-            break;
-        }
-
-        /*if (!point4::approx_points_equals(res_next.p, ss.p)) {
-            if (isnan(res_next.p.x) || isnan(res_next.p.y) || isnan(res_next.p.z) || isnan(res_next.p.w)) {
-                printf("Intersect point NaN");
-            }
-            if (isnan(ss.p.x) || isnan(ss.p.y) || isnan(ss.p.z) || isnan(ss.p.w)) {
-                printf("Sampled point NaN");
-            }
-            if (s != res.target) {
-                //printf("Intersected point (%.3f, %.3f, %.3f, %.3f), Sampled point (%.3f, %.3f, %.3f, %.3f)\n", res_next.p.x, res_next.p.y, res_next.p.z, res_next.p.w, ss.p.x, ss.p.y, ss.p.z, ss.p.w); 
-            }
-            break;
-        } else if (!color::approx_colors_equals(shared_materials[s->mat_idx]->L(), color(0.f, 0.f, 0.f))) {
-            printf("Light sampled\n");
-        }*/
-
-        float cos_wi = vec4::dot(wi, res.normal); 
-        float cos_wo_next = vec4::dot(-wi, res_next.normal);
-        float G = (fabsf(cos_wi) * fabsf(cos_wo_next)) / (dist * dist * dist);
-        beta *= (G * f) / (1.f / total_surface_volume);
-        res = res_next;
+        beta *= (as.G * as.f) / (1.f / total_surface_volume);
+        res = as.res_next;
 
         float beta_max = fmaxf(beta.r, fmaxf(beta.g, beta.b));
         if (beta_max <= 1.f && k >= 2) {
@@ -303,14 +405,12 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
             }
             beta /= 1.f - q;
         }
-
-        k++;
     }
 
     return L;
 }
 
-__global__ void render_kernel(int num_samples, bool sample_solid_angles, color* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
+__global__ void render_kernel(int num_samples, int sample_mode, bool sample_lights, double3* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
     extern __shared__ char buffer[];
 
     // buffer layout for shared memory
@@ -359,13 +459,30 @@ __global__ void render_kernel(int num_samples, bool sample_solid_angles, color* 
         vec4 direction = vec4::normalize(sample - camera_pos);
         ray r(camera_pos, direction);
         
-        color c_sample = sample_solid_angles ? ray_color_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx])
-            : ray_color_area_cuda(r, shared_scene, shared_lights, shared_materials, d_pcg_states[idx]);
-        d_color_buffer[idx] = (1.f / (num_samples + 1.f)) * ((float)num_samples * d_color_buffer[idx] + c_sample);
-        
-        d_image_data[idx].x = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].r) * 255.999f);
-        d_image_data[idx].y = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].g) * 255.999f);
-        d_image_data[idx].z = static_cast<unsigned char>(fminf(1.f, d_color_buffer[idx].b) * 255.999f);
+        color c_sample = sample_mode == 0 ? ray_color_cuda(r, shared_scene, shared_lights, shared_materials, sample_lights, d_pcg_states[idx])
+            : ray_color_area_cuda(r, shared_scene, shared_lights, shared_materials, sample_lights, d_pcg_states[idx]);
+
+        float max_rgb = fmaxf(c_sample.r, fmaxf(c_sample.g, c_sample.b));
+        if (max_rgb > MAX_SAMPLE_L) {
+            float k = MAX_SAMPLE_L / max_rgb;
+            c_sample.r *= k;
+            c_sample.g *= k;
+            c_sample.b *= k;
+        }
+
+        double3 c_sample_double;
+        c_sample_double.x = fminf(c_sample.r, MAX_SAMPLE_L);
+        c_sample_double.y = fminf(c_sample.g, MAX_SAMPLE_L);
+        c_sample_double.z = fminf(c_sample.b, MAX_SAMPLE_L);
+
+        d_color_buffer[idx].x = (1.0 / (num_samples + 1.0)) * (num_samples * d_color_buffer[idx].x + c_sample_double.x);
+        d_color_buffer[idx].y = (1.0 / (num_samples + 1.0)) * (num_samples * d_color_buffer[idx].y + c_sample_double.y);
+        d_color_buffer[idx].z = (1.0 / (num_samples + 1.0)) * (num_samples * d_color_buffer[idx].z + c_sample_double.z);
+        // d_color_buffer[idx] = (1.f / (num_samples + 1.f)) * ((float)num_samples * d_color_buffer[idx] + c_sample_double);
+
+        d_image_data[idx].x = static_cast<unsigned char>(fmin(1.0, d_color_buffer[idx].x) * 255.999);
+        d_image_data[idx].y = static_cast<unsigned char>(fmin(1.0, d_color_buffer[idx].y) * 255.999);
+        d_image_data[idx].z = static_cast<unsigned char>(fmin(1.0, d_color_buffer[idx].z) * 255.999);
         d_image_data[idx].w = 255;
     }
 }

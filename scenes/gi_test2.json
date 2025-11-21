@@ -2,15 +2,13 @@
     "shapes": [
         {
             "class": "nsphere",
-            "mat_idx": 0,
-            "translate": [-0.51, 0.0, 0.0, 0.0],
-            "radius": 0.5
+            "mat_idx": 1,
+            "radius": 1.0
         },
         {
             "class": "nsphere",
-            "mat_idx": 1,
-            "translate": [0.51, 0.0, 0.0, 0.0],
-            "radius": 0.5
+            "mat_idx": 0,
+            "radius": 2.0
         }
     ],
     "materials": [
@@ -20,7 +18,7 @@
         },
         {
             "class": "light_material",
-            "color": [0.5, 0.5, 0.5]
+            "color": [0.2, 0.2, 0.2]
         }
     ]
 }

@@ -43,6 +43,13 @@ struct color {
         return *this;
     }
 
+    __host__ __device__ color& operator*=(float k) {
+        r *= k;
+        g *= k;
+        b *= k;
+        return *this;
+    }
+
     __host__ __device__ color operator*(float k) const {
         return {r * k, g * k, b * k};
     }
@@ -83,6 +90,12 @@ __host__ __device__ void write_color(std::ofstream& file, const color& col) {
     int ib = (int)(fminf(1.f, apply_gamma(col.b)) * 255.999f);
 
     //file << ir << " " << ig << " " << ib << " ";
+}
+
+void from_json(const json& j, color& c) {
+	j[0].get_to(c.r);
+	j[1].get_to(c.g);
+	j[2].get_to(c.b);
 }
 
 #endif

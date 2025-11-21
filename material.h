@@ -25,10 +25,12 @@ struct shape;
 struct hit_result;
 
 struct material {
-    bool in_plane = false;
-
+private:
     __host__ __device__ virtual color f(const vec4& wo, const vec4& wi) const = 0;
     __host__ __device__ virtual bool sample_f(const vec4& wo, bsdf_sample& bs, uint64_t& pcg_state) const = 0;
+
+public:
+    bool in_plane = false;
     __host__ __device__ virtual size_t size() const = 0;
     __device__ virtual void print_gpu() const = 0;
 

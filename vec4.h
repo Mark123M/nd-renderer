@@ -120,7 +120,7 @@ struct vec4 {
 
 	// Cross product of the first three elements (w must be equal)
 	__host__ __device__ static vec4 cross(const vec4& a, const vec4& b) {
-		assert(approx_equals(a.w, b.w));
+		// assert(approx_equals(a.w, b.w));
 		//if (!approx_equals(a.w, b.w)) {
 		//	printf("[GPU] Invalid cross product %.3f, %.3f", a.w, b.w);
 		//}
@@ -241,6 +241,13 @@ struct vec4 {
 	}
 };
 
+void from_json(const json& j, vec4& v) {
+	j[0].get_to(v.x);
+	j[1].get_to(v.y);
+	j[2].get_to(v.z);
+	j[3].get_to(v.w);
+}
+
 __host__ __device__ vec4 operator*(float k, const vec4& v) { return v * k; }
 
 // host constants
@@ -324,6 +331,13 @@ struct point4 {
 		return approx_equals(p1.x, p2.x) && approx_equals(p1.y, p2.y) && approx_equals(p1.z, p2.z) && approx_equals(p1.w, p2.w);
 	}
 };
+
+void from_json(const json& j, point4& p) {
+	j[0].get_to(p.x);
+	j[1].get_to(p.y);
+	j[2].get_to(p.z);
+	j[3].get_to(p.w);
+}
 
 __managed__ point4 origin{0.f, 0.f, 0.f, 0.f};
 
