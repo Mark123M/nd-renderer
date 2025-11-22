@@ -7,6 +7,7 @@
 #include "material.h"
 #include "aabb.h"
 #include <string>
+#include <memory>
 
 struct shape;
 
@@ -82,6 +83,8 @@ struct shape {
 		return aabb();
 	}
 
+	__host__ __device__ virtual std::unique_ptr<shape> clone() const = 0;
+
 	__host__ __device__ virtual size_t size() const = 0;
 
 	__device__ virtual void print_gpu() const = 0;
@@ -89,10 +92,10 @@ struct shape {
 
 struct shape_wrapper {
 	std::string type;
-	const shape* s;
+	std::unique_ptr<shape> s;
 	aabb bbox_world;
 
-	shape_wrapper(const std::string& type, const shape* s) : type{type}, s{s}, bbox_world {} {
+	shape_wrapper(const std::string& type, const shape& sh) : type{type}, s{sh.clone()}, bbox_world {} {
 		update_bbox_world();
 	}
 

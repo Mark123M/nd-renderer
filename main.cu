@@ -179,10 +179,10 @@ __global__ void math_test() {
 void bvh_test() {
     std::cout << "==========[BVH TEST (ONE SHAPE)]==========" << std::endl;
     std::vector<shape_wrapper> shapes;
-    auto ns1 = std::make_unique<nsphere>();
-    ns1->radius = 0.5f;
-    ns1->translate(vec4(-1.f, 0.f, 0.f, 0.f));
-    shapes.emplace_back(std::string("nsphere"), ns1.get());
+    nsphere ns1;
+    ns1.radius = 0.5f;
+    ns1.translate(vec4(-1.f, 0.f, 0.f, 0.f));
+    shapes.emplace_back(std::string("nsphere"), ns1);
 
     uint num_nodes = 0;
     bvh_node* root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
@@ -190,10 +190,10 @@ void bvh_test() {
     delete root;
 
     std::cout << "==========[BVH TEST (TWO SHAPES)]==========" << std::endl;
-    auto ns2 = std::make_unique<nsphere>();
-    ns2->radius = 0.5f;
-    ns2->translate(vec4(1.f, 0.f, 0.f, 0.f));
-    shapes.emplace_back(std::string("nsphere"), ns2.get());
+    nsphere ns2;
+    ns2.radius = 0.5f;
+    ns2.translate(vec4(1.f, 0.f, 0.f, 0.f));
+    shapes.emplace_back(std::string("nsphere"), ns2);
 
     num_nodes = 0;
     root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
@@ -201,15 +201,15 @@ void bvh_test() {
     delete root;
 
     std::cout << "==========[BVH TEST (FOUR SHAPES)]==========" << std::endl;
-    auto ns4 = std::make_unique<nsphere>();
-    ns4->radius = 0.5f;
-    ns4->translate(vec4(4.f, 0.f, 0.f, 0.f));
-    shapes.emplace_back(std::string("nsphere"), ns4.get());
+    nsphere ns4;
+    ns4.radius = 0.5f;
+    ns4.translate(vec4(4.f, 0.f, 0.f, 0.f));
+    shapes.emplace_back(std::string("nsphere"), ns4);
 
-    auto ns3 = std::make_unique<nsphere>();
-    ns3->radius = 0.5f;
-    ns3->translate(vec4(-4.f, 0.f, 0.f, 0.f));
-    shapes.emplace_back(std::string("nsphere"), ns3.get());
+    nsphere ns3;
+    ns3.radius = 0.5f;
+    ns3.translate(vec4(-4.f, 0.f, 0.f, 0.f));
+    shapes.emplace_back(std::string("nsphere"), ns3);
 
     num_nodes = 0;
     root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
@@ -217,10 +217,10 @@ void bvh_test() {
     delete root;
 
     std::cout << "==========[BVH TEST (MULTI-LEAF)]==========" << std::endl;
-    auto ns5 = std::make_unique<nsphere>();
-    ns5->radius = 1.f;
-    ns5->translate(vec4(-4.f, 0.f, 0.f, 0.f));
-    shapes.emplace_back(std::string("nsphere"), ns5.get());
+    nsphere ns5;
+    ns5.radius = 1.f;
+    ns5.translate(vec4(-4.f, 0.f, 0.f, 0.f));
+    shapes.emplace_back(std::string("nsphere"), ns5);
 
     /*num_nodes = 0;
     root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
@@ -244,10 +244,13 @@ void build_base_shape(shape* s, size_t mat_idx, const vec4& t, float rxy, float 
     s->rotate_zw(rzw);
 }
 
-void build_scene(json& data, device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
+void build_scene(json& data, std::vector<linear_bvh_node>& linear_nodes, device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
     scene.clear();
     materials.clear();
     lights.clear();
+    linear_nodes.clear();
+
+    std::vector<shape_wrapper> shapes;
 
     for (auto& shape_data : data["shapes"]) {
         std::string shape_class = shape_data["class"].template get<std::string>();
@@ -292,7 +295,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
 
             std::cout << "constructing nsphere radius " << ns.get_radius() << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
             build_base_shape(&ns, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
-            scene.push_back<nsphere>(ns);
+            shapes.emplace_back(shape_class, ns);
         } else if (shape_class == "ncube") {
             ncube nc;
 
@@ -302,7 +305,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
 
             std::cout << "constructing ncube half_len " << nc.half_len << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
             build_base_shape(&nc, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
-            scene.push_back<ncube>(nc);
+            shapes.emplace_back(shape_class, nc);
         } else if (shape_class == "sphere") {
             sphere s;
 
@@ -316,7 +319,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
 
             std::cout << "constructing sphere radius " << s.radius << " half_w " << s.half_w << std::endl;
             build_base_shape(&s, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
-            scene.push_back<sphere>(s);
+            shapes.emplace_back(shape_class, s);
         } else if (shape_class == "cube") {
             cube c;
 
@@ -330,7 +333,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
 
             std::cout << "constructing cube half_len " << c.half_len << " half_w" << c.half_w << std::endl;
             build_base_shape(&c, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
-            scene.push_back<cube>(c);
+            shapes.emplace_back(shape_class, c);
         } else if (shape_class == "quad") {
             point4 o = shape_data["origin"].template get<point4>();
             vec4 u = shape_data["u"].template get<vec4>();
@@ -339,7 +342,26 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
 
             std::cout << "constructing quad" << std::endl;
             build_base_shape(&q, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
-            scene.push_back<quad>(q);
+            shapes.emplace_back(shape_class, q);
+        }
+    }
+    
+    build_bvh(shapes, linear_nodes);
+    for (const auto& l : linear_nodes) {
+        std::cout << linear_bvh_node::to_string(l) << std::endl;
+    }
+
+    for (const shape_wrapper& sw : shapes) {
+        if (sw.type == "nsphere") {
+            scene.push_back<nsphere>(sw.s.get());
+        } else if (sw.type == "ncube") {
+            scene.push_back<ncube>(sw.s.get());
+        } else if (sw.type == "sphere") {
+            scene.push_back<sphere>(sw.s.get());
+        } else if (sw.type == "cube") {
+            scene.push_back<cube>(sw.s.get());
+        } else if (sw.type == "quad") {
+            scene.push_back<quad>(sw.s.get());
         }
     }
 
@@ -505,13 +527,14 @@ int main() {
     device_list<shape> scene;
     device_list<light> lights;
     device_list<material> materials;
+    std::vector<linear_bvh_node> linear_nodes;
 
     std::filesystem::path init_scene_path("scenes/cornell2.json");
     std::filesystem::directory_entry cur_scene_entry(init_scene_path);
     std::filesystem::file_time_type cur_scene_last_write_time = cur_scene_entry.last_write_time();
     std::ifstream f(init_scene_path);
     json data = json::parse(f);
-    build_scene(data, scene, materials, lights);
+    build_scene(data, linear_nodes, scene, materials, lights);
     //std::cout << data["shapes"][0]["class"] << std::endl;
 
     camera::aspect_ratio = 16.f / 9.f;
@@ -628,7 +651,7 @@ int main() {
             cur_scene_last_write_time = cur_scene_entry.last_write_time();
             std::ifstream f(cur_scene_entry.path());
             json data = json::parse(f);
-            build_scene(data, scene, materials, lights);
+            build_scene(data, linear_nodes, scene, materials, lights);
             clear_buffer();
         }
 
@@ -670,7 +693,7 @@ int main() {
                 cur_scene_last_write_time = cur_scene_entry.last_write_time();
                 std::ifstream f(entry.path());
                 json data = json::parse(f);
-                build_scene(data, scene, materials, lights);
+                build_scene(data, linear_nodes, scene, materials, lights);
                 clear_buffer();
             }
 

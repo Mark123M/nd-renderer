@@ -106,7 +106,7 @@ struct device_list {
    device_list(): d_list{nullptr}, d_data{nullptr}, len{0}, data_size{0} {}
 
    template <typename U>
-   void push_back(U object) {
+   void push_back(const U& object) {
       T** d_new_list;
       gpuErrchk(cudaMalloc(&d_new_list, (len + 1) * sizeof(T*)));
       gpuErrchk(cudaFree(d_list));
@@ -122,6 +122,12 @@ struct device_list {
       gpuErrchk(cudaDeviceSynchronize());
       len++;
       data_size += sizeof(U);
+   }
+
+   template <typename U>
+   void push_back(const T* object) {
+      const U* object_ptr = (const U*)object;
+      push_back(*object_ptr);
    }
 
    __host__ __device__ T* operator[](int i) const {

@@ -127,6 +127,10 @@ struct ncube : public shape {
 		return aabb(p_min, p_max);
 	}
 
+    __host__ __device__ std::unique_ptr<shape> clone() const override {
+        return std::make_unique<ncube>(*this);
+    }
+
 	__host__ __device__ size_t size() const override {
 		return sizeof(ncube);
 	}
