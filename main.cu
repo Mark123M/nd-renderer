@@ -76,8 +76,13 @@ __global__ void hello() {
     printf("Hello from block: %u, thread: %u\n", blockIdx.x, threadIdx.x);
 }
 
-static bool handle_inputs_cuda(device_list<shape>& scene) {
-    bool did_input = false;
+struct input_result {
+    bool should_clear_buffer = false;
+    bool should_rebuild_bvh = false;
+};
+
+static input_result handle_inputs_cuda(std::vector<shape_wrapper>& shapes, device_list<shape>& scene) {
+    input_result res;
     uint threads_per_block = 64;
     uint num_blocks = (scene.size() + threads_per_block - 1) / threads_per_block;
 
@@ -92,7 +97,7 @@ static bool handle_inputs_cuda(device_list<shape>& scene) {
             world::rotate_camera_vertical_kernel<<<1, 1>>>(mouse_delta.y * CAMERA_ROTATE_RATE * fixed_delta_time);
         }
 
-        did_input = true;
+        res.should_clear_buffer = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_Z)) {
@@ -100,7 +105,7 @@ static bool handle_inputs_cuda(device_list<shape>& scene) {
             world::rotate_camera_yw_kernel<<<1, 1>>>(mouse_delta.x * CAMERA_ROTATE_RATE * fixed_delta_time);
         }
 
-        did_input = true;
+        res.should_clear_buffer = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_C)) {
@@ -108,60 +113,76 @@ static bool handle_inputs_cuda(device_list<shape>& scene) {
             world::rotate_camera_xw_kernel<<<1, 1>>>(mouse_delta.x * CAMERA_ROTATE_RATE * fixed_delta_time);
         }
 
-        did_input = true;
+        res.should_clear_buffer = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_A)) {
         //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(-MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
         world::move_camera_x_kernel<<<1, 1>>>(-CAMERA_MOVE_RATE * fixed_delta_time);
-        did_input = true;
+        res.should_clear_buffer = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_D)) {
         //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(MOVE_RATE * fixed_delta_time, 0.f, 0.f, 0.f));
         world::move_camera_x_kernel<<<1, 1>>>(CAMERA_MOVE_RATE * fixed_delta_time);
-        did_input = true;
+        res.should_clear_buffer = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_W)) {
         //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         world::move_camera_z_kernel<<<1, 1>>>(-CAMERA_MOVE_RATE * fixed_delta_time);
-        did_input = true;
+        res.should_clear_buffer = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_S)) {
         //world::translate_kernel<<<num_blocks, threads_per_block>>>(vec4(0.f, -MOVE_RATE * fixed_delta_time, 0.f, 0.f));
         world::move_camera_z_kernel<<<1, 1>>>(CAMERA_MOVE_RATE * fixed_delta_time);
-        did_input = true;
+        res.should_clear_buffer = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_Q)) {
         world::move_camera_w_kernel<<<1, 1>>>(CAMERA_MOVE_RATE * fixed_delta_time);
-        did_input = true;
+        res.should_clear_buffer = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_E)) {
         world::move_camera_w_kernel<<<1, 1>>>(-CAMERA_MOVE_RATE * fixed_delta_time);
-        did_input = true;
+        res.should_clear_buffer = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_UpArrow)) {
+        for (shape_wrapper& sw : shapes) {
+            sw.s->rotate_xz(ROTATE_RATE * fixed_delta_time);
+            sw.s->rotate_yw(ROTATE_RATE * fixed_delta_time);
+        }
+
         world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
         world::rotate_yw_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
-        did_input = true;
+        res.should_clear_buffer = true;
+        res.should_rebuild_bvh = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_DownArrow)) {
+        for (shape_wrapper& sw : shapes) {
+            sw.s->rotate_yz(ROTATE_RATE * fixed_delta_time);
+        }
+
         world::rotate_yz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
-        did_input = true;
+        res.should_clear_buffer = true;
+        res.should_rebuild_bvh = true;
     }
 
     if (ImGui::IsKeyDown(ImGuiKey_LeftArrow)) {
+        for (shape_wrapper& sw : shapes) {
+            sw.s->rotate_xz(ROTATE_RATE * fixed_delta_time);
+        }
+
         world::rotate_xz_kernel<<<num_blocks, threads_per_block>>>(ROTATE_RATE * fixed_delta_time, scene.d_list);
-        did_input = true;
+        res.should_clear_buffer = true;
+        res.should_rebuild_bvh = true;
     }
 
-    return did_input;
+    return res;
 }
 
 __global__ void math_test() {
@@ -233,6 +254,22 @@ void bvh_test() {
     }
 }
 
+void build_bvh_cuda(std::vector<linear_bvh_node>& linear_nodes, linear_bvh_node*& d_linear_nodes, std::vector<shape_wrapper>& shapes) {
+    linear_nodes.clear();
+    build_bvh(shapes, linear_nodes);
+    for (const auto& l : linear_nodes) {
+        std::cout << linear_bvh_node::to_string(l) << std::endl;
+    }
+
+    uint linear_nodes_bytes = linear_nodes.size() * sizeof(linear_bvh_node);
+    if (d_linear_nodes != nullptr) {
+        gpuErrchk(cudaFree(d_linear_nodes));
+    }
+    gpuErrchk(cudaMalloc(&d_linear_nodes, linear_nodes_bytes));
+    linear_bvh_node* h_linear_nodes = linear_nodes.data();
+    gpuErrchk(cudaMemcpy(d_linear_nodes, h_linear_nodes, linear_nodes_bytes, cudaMemcpyHostToDevice));
+}
+
 void build_base_shape(shape* s, size_t mat_idx, const vec4& t, float rxy, float rxz, float rxw, float ryz, float ryw, float rzw) {
     s->mat_idx = mat_idx;
     s->translate(t);
@@ -244,13 +281,19 @@ void build_base_shape(shape* s, size_t mat_idx, const vec4& t, float rxy, float 
     s->rotate_zw(rzw);
 }
 
-void build_scene(json& data, std::vector<linear_bvh_node>& linear_nodes, device_list<shape>& scene, device_list<material>& materials, device_list<light>& lights) {
+void build_scene(
+    json& data,
+    std::vector<linear_bvh_node>& linear_nodes,
+    linear_bvh_node*& d_linear_nodes,
+    std::vector<shape_wrapper>& shapes,
+    device_list<shape>& scene,
+    device_list<material>& materials,
+    device_list<light>& lights
+) {
+    shapes.clear();
     scene.clear();
     materials.clear();
     lights.clear();
-    linear_nodes.clear();
-
-    std::vector<shape_wrapper> shapes;
 
     for (auto& shape_data : data["shapes"]) {
         std::string shape_class = shape_data["class"].template get<std::string>();
@@ -346,10 +389,7 @@ void build_scene(json& data, std::vector<linear_bvh_node>& linear_nodes, device_
         }
     }
     
-    build_bvh(shapes, linear_nodes);
-    for (const auto& l : linear_nodes) {
-        std::cout << linear_bvh_node::to_string(l) << std::endl;
-    }
+    build_bvh_cuda(linear_nodes, d_linear_nodes, shapes);
 
     for (const shape_wrapper& sw : shapes) {
         if (sw.type == "nsphere") {
@@ -524,17 +564,19 @@ int main() {
     bvh_test();
     return 0;
 
+    std::vector<linear_bvh_node> linear_nodes;
+    linear_bvh_node* d_linear_nodes = nullptr;
+    std::vector<shape_wrapper> shapes;
     device_list<shape> scene;
     device_list<light> lights;
     device_list<material> materials;
-    std::vector<linear_bvh_node> linear_nodes;
 
     std::filesystem::path init_scene_path("scenes/cornell2.json");
     std::filesystem::directory_entry cur_scene_entry(init_scene_path);
     std::filesystem::file_time_type cur_scene_last_write_time = cur_scene_entry.last_write_time();
     std::ifstream f(init_scene_path);
     json data = json::parse(f);
-    build_scene(data, linear_nodes, scene, materials, lights);
+    build_scene(data, linear_nodes, d_linear_nodes, shapes, scene, materials, lights);
     //std::cout << data["shapes"][0]["class"] << std::endl;
 
     camera::aspect_ratio = 16.f / 9.f;
@@ -642,16 +684,19 @@ int main() {
         // --- Render Target Window ---
         ImGui::Begin("Render Output");
         //bool input_changed = handle_inputs();
-        bool input_changed_cuda = handle_inputs_cuda(scene);
-        if (input_changed_cuda) {
+        input_result res = handle_inputs_cuda(shapes, scene);
+        if (res.should_clear_buffer) {
             clear_buffer();
+        }
+        if (res.should_rebuild_bvh) {
+            build_bvh_cuda(linear_nodes, d_linear_nodes, shapes);
         }
 
         if (cur_scene_entry.last_write_time() > cur_scene_last_write_time) {
             cur_scene_last_write_time = cur_scene_entry.last_write_time();
             std::ifstream f(cur_scene_entry.path());
             json data = json::parse(f);
-            build_scene(data, linear_nodes, scene, materials, lights);
+            build_scene(data, linear_nodes, d_linear_nodes, shapes, scene, materials, lights);
             clear_buffer();
         }
 
@@ -661,10 +706,28 @@ int main() {
             gpuErrchk(cudaDeviceSynchronize());
         }
 
-        camera::render_kernel<<<num_blocks, threads_per_block, scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*)>>>
-        (num_samples, sample_mode, sample_lights, d_color_buffer, d_image_data, d_pcg_states, camera::image_width, camera::image_height, scene.d_data, scene.data_size, lights.d_data, lights.data_size, materials.d_data, materials.data_size);
-        num_samples++;
+        uint shared_memory_bytes = scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*);
+        camera::render_kernel<<<num_blocks, threads_per_block, shared_memory_bytes>>>(
+            num_samples,
+            sample_mode,
+            sample_lights,
+            camera::image_width,
+            camera::image_height,
+            d_linear_nodes,
+            linear_nodes.size(),
+            scene.d_data,
+            scene.data_size,
+            lights.d_data,
+            lights.data_size,
+            materials.d_data,
+            materials.data_size,
+            d_color_buffer,
+            d_image_data,
+            d_pcg_states
+        );
 
+        num_samples++;
+        
         //camera::render_stride_kernel<<<stride_num_blocks, stride_threads_per_block>>>(d_image_data, camera::image_width, camera::image_height * camera::image_width);
 
         cudaArray* d_texture_array = nullptr; // Pointer to the CUDA array representing the texture
@@ -693,7 +756,7 @@ int main() {
                 cur_scene_last_write_time = cur_scene_entry.last_write_time();
                 std::ifstream f(entry.path());
                 json data = json::parse(f);
-                build_scene(data, linear_nodes, scene, materials, lights);
+                build_scene(data, linear_nodes, d_linear_nodes, shapes, scene, materials, lights);
                 clear_buffer();
             }
 
@@ -748,6 +811,7 @@ int main() {
 
     gpuErrchk(cudaGraphicsUnregisterResource(render_texture_CUDA));
     gpuErrchk(cudaDeviceSynchronize());
+    gpuErrchk(cudaFree(d_linear_nodes));
     gpuErrchk(cudaFree(d_color_buffer));
     gpuErrchk(cudaFree(d_image_data));
     gpuErrchk(cudaFree(d_pcg_states));

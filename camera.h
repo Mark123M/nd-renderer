@@ -12,6 +12,7 @@
 #include "util.h"
 #include "light.h"
 #include "transform.h"
+#include "bvh.h"
 
 static inline std::tm localtime_xp(std::time_t timer) {
     std::tm bt{};
@@ -410,7 +411,24 @@ __device__ color ray_color_area_cuda(ray& r, shape** shared_scene, light** share
     return L;
 }
 
-__global__ void render_kernel(int num_samples, int sample_mode, bool sample_lights, double3* d_color_buffer, uchar4* d_image_data, uint64_t* d_pcg_states, uint width, uint height, char* d_scene_data, size_t h_total_scene_bytes, char* d_lights_data, size_t h_total_lights_bytes, char* d_materials_data, size_t h_total_materials_bytes) {
+__global__ void render_kernel(
+    int num_samples,
+    int sample_mode,
+    bool sample_lights,
+    uint width,
+    uint height,
+    linear_bvh_node* d_linear_nodes,
+    size_t h_num_nodes,
+    char* d_scene_data,
+    size_t h_total_scene_bytes,
+    char* d_lights_data,
+    size_t h_total_lights_bytes,
+    char* d_materials_data,
+    size_t h_total_materials_bytes,
+    double3* d_color_buffer,
+    uchar4* d_image_data,
+    uint64_t* d_pcg_states
+) {
     extern __shared__ char buffer[];
 
     // buffer layout for shared memory
