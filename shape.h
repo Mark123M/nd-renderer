@@ -6,10 +6,7 @@
 #include "transform.h"
 #include "material.h"
 #include "aabb.h"
-
-enum shape_type {
-    CYLINDER, PROJECTED_CYLINDER, HYPERSPHERE, HYPERCUBE
-};
+#include <string>
 
 struct shape;
 
@@ -29,8 +26,6 @@ struct shape_sample {
 
 struct shape {
 	transform basis;
-	aabb bbox_local;
-	aabb bbox_world;
 	size_t mat_idx;
 
 	__host__ __device__ shape() : basis{identity_affine, identity_affine} {}
@@ -53,12 +48,10 @@ struct shape {
 
 	__host__ __device__ virtual void rotate(float angle, uint a, uint b) {
 		basis.rotate(angle, a, b);
-		update_bbox_world();
 	}
 	
 	__host__ __device__ virtual void translate(const vec4& t) {
 		basis.translate(t);
-		update_bbox_world(); // too inefficient?
 	}
 
 	__host__ __device__ void rotate_xy(float angle) {
@@ -85,7 +78,26 @@ struct shape {
 		rotate(angle, 2, 3);
 	}
 
+	__host__ __device__ virtual aabb get_bbox_local() const {
+		return aabb();
+	}
+
+	__host__ __device__ virtual size_t size() const = 0;
+
+	__device__ virtual void print_gpu() const = 0;
+};
+
+struct shape_wrapper {
+	std::string type;
+	const shape* s;
+	aabb bbox_world;
+
+	shape_wrapper(const std::string& type, const shape* s) : type{type}, s{s}, bbox_world {} {
+		update_bbox_world();
+	}
+
 	__host__ __device__ void update_bbox_world() {
+		aabb bbox_local = s->get_bbox_local();
 		point4& p_min_local = bbox_local.p_min;
 		point4& p_max_local = bbox_local.p_max;
 		point4 p_min_world = POINT4_MAX;
@@ -101,7 +113,7 @@ struct shape {
 							z == 0 ? p_min_local.z : p_max_local.z,
 							w == 0 ? p_min_local.w : p_max_local.w
 						);
-						point4 p = basis.local_to_world(corner);
+						point4 p = s->basis.local_to_world(corner);
 						p_min_world = point4::min(p_min_world, p);
 						p_max_world = point4::max(p_max_world, p);
 					}
@@ -112,19 +124,6 @@ struct shape {
 		bbox_world.p_min = p_min_world;
 		bbox_world.p_max = p_max_world;
 	}
-
-	__host__ __device__ virtual void update_bbox_local() {}
-
-	__host__ __device__ void update_bbox() {
-		update_bbox_local();
-		//printf("UPDATING BBOX LOCAL: %s %s\n", point4::to_string(bbox_local.p_min).c_str(), point4::to_string(bbox_local.p_max).c_str());
-		update_bbox_world();
-		//printf("UPDATING BBOX WORLD: %s %s\n", point4::to_string(bbox_world.p_min).c_str(), point4::to_string(bbox_world.p_max).c_str());
-	}
-
-	__host__ __device__ virtual size_t size() const = 0;
-
-	__device__ virtual void print_gpu() const = 0;
 };
 
 #endif

@@ -121,6 +121,12 @@ struct ncube : public shape {
 		return 8 * len * len * len;
 	}
 
+    __host__ __device__ aabb get_bbox_local() const override {
+		point4 p_min = point4(-half_len, -half_len, -half_len, -half_len);
+		point4 p_max = point4(half_len, half_len, half_len, half_len);
+		return aabb(p_min, p_max);
+	}
+
 	__host__ __device__ size_t size() const override {
 		return sizeof(ncube);
 	}

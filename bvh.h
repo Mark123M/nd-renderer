@@ -44,14 +44,14 @@ struct bvh_bucket {
     aabb bbox; 
 };
 
-bvh_node* build_recursive(uint L, uint R, uint& num_nodes, std::vector<shape*>& shapes) {
+bvh_node* build_recursive(uint L, uint R, uint& num_nodes, std::vector<shape_wrapper>& shapes) {
     bvh_node* node = new bvh_node;
     num_nodes++;
     uint num_shapes = R - L + 1;
 
     aabb bbox;
     for (uint i = L; i <= R; i++) {
-        bbox = aabb::merge(bbox, shapes[i]->bbox_world);
+        bbox = aabb::merge(bbox, shapes[i].bbox_world);
     }
 
     if (bbox.surface_volume() == 0.f || num_shapes == 1) {
@@ -61,7 +61,7 @@ bvh_node* build_recursive(uint L, uint R, uint& num_nodes, std::vector<shape*>& 
 
     aabb bbox_centroid;
     for (uint i = L; i <= R; i++) {
-        bbox_centroid = aabb::merge(bbox_centroid, shapes[i]->bbox_world.centroid());
+        bbox_centroid = aabb::merge(bbox_centroid, shapes[i].bbox_world.centroid());
     }
 
     uint dim = bbox_centroid.max_dim();
@@ -73,20 +73,20 @@ bvh_node* build_recursive(uint L, uint R, uint& num_nodes, std::vector<shape*>& 
     uint mid;
     if (num_shapes == 2) {
         mid = L;
-        if (shapes[L]->bbox_world.centroid().get(dim) > shapes[R]->bbox_world.centroid().get(dim)) {
+        if (shapes[L].bbox_world.centroid().get(dim) > shapes[R].bbox_world.centroid().get(dim)) {
             std::swap(shapes[L], shapes[R]);
         }
     } else {
         std::vector<bvh_bucket> buckets(NUM_BVH_BUCKETS);
 
         for (uint i = L; i <= R; i++) {
-            float offset = shapes[i]->bbox_world.centroid().get(dim) - bbox_centroid.p_min.get(dim);
+            float offset = shapes[i].bbox_world.centroid().get(dim) - bbox_centroid.p_min.get(dim);
             float extent = bbox_centroid.p_max.get(dim) - bbox_centroid.p_min.get(dim);
             uint b = NUM_BVH_BUCKETS * (offset / extent);
             b = min(b, NUM_BVH_BUCKETS - 1);
 
             buckets[b].count++;
-            buckets[b].bbox = aabb::merge(buckets[b].bbox, shapes[i]->bbox_world);
+            buckets[b].bbox = aabb::merge(buckets[b].bbox, shapes[i].bbox_world);
         }
 
         std::vector<float> costs(NUM_BVH_BUCKETS - 1);
@@ -121,8 +121,8 @@ bvh_node* build_recursive(uint L, uint R, uint& num_nodes, std::vector<shape*>& 
         if (min_cost < leaf_cost) {
             auto mid_iter = std::partition(
                 shapes.begin() + L, shapes.begin() + R + 1,
-                [=](const shape* bp) {
-                    float offset = bp->bbox_world.centroid().get(dim) - bbox_centroid.p_min.get(dim);
+                [=](const shape_wrapper& bp) {
+                    float offset = bp.bbox_world.centroid().get(dim) - bbox_centroid.p_min.get(dim);
                     float extent = bbox_centroid.p_max.get(dim) - bbox_centroid.p_min.get(dim);
                     int b = NUM_BVH_BUCKETS * (offset / extent);
                     b = min(b, NUM_BVH_BUCKETS - 1);
@@ -202,7 +202,7 @@ uint flatten_bvh(bvh_node* node, uint& offset, std::vector<linear_bvh_node>& lin
     return node_offset;
 }
 
-void build_bvh(std::vector<shape*>& shapes, std::vector<linear_bvh_node>& linear_nodes) {
+void build_bvh(std::vector<shape_wrapper>& shapes, std::vector<linear_bvh_node>& linear_nodes) {
     uint num_nodes = 0;
     bvh_node* node = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
     log_bvh(node, 0);

@@ -178,11 +178,11 @@ __global__ void math_test() {
 
 void bvh_test() {
     std::cout << "==========[BVH TEST (ONE SHAPE)]==========" << std::endl;
-    std::vector<shape*> shapes;
+    std::vector<shape_wrapper> shapes;
     auto ns1 = std::make_unique<nsphere>();
-    ns1->set_radius(0.5f);
+    ns1->radius = 0.5f;
     ns1->translate(vec4(-1.f, 0.f, 0.f, 0.f));
-    shapes.push_back(ns1.get());
+    shapes.emplace_back(std::string("nsphere"), ns1.get());
 
     uint num_nodes = 0;
     bvh_node* root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
@@ -191,9 +191,9 @@ void bvh_test() {
 
     std::cout << "==========[BVH TEST (TWO SHAPES)]==========" << std::endl;
     auto ns2 = std::make_unique<nsphere>();
-    ns2->set_radius(0.5f);
+    ns2->radius = 0.5f;
     ns2->translate(vec4(1.f, 0.f, 0.f, 0.f));
-    shapes.push_back(ns2.get());
+    shapes.emplace_back(std::string("nsphere"), ns2.get());
 
     num_nodes = 0;
     root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
@@ -202,14 +202,14 @@ void bvh_test() {
 
     std::cout << "==========[BVH TEST (FOUR SHAPES)]==========" << std::endl;
     auto ns4 = std::make_unique<nsphere>();
-    ns4->set_radius(0.5f);
+    ns4->radius = 0.5f;
     ns4->translate(vec4(4.f, 0.f, 0.f, 0.f));
-    shapes.push_back(ns4.get());
+    shapes.emplace_back(std::string("nsphere"), ns4.get());
 
     auto ns3 = std::make_unique<nsphere>();
-    ns3->set_radius(0.5f);
+    ns3->radius = 0.5f;
     ns3->translate(vec4(-4.f, 0.f, 0.f, 0.f));
-    shapes.push_back(ns3.get());
+    shapes.emplace_back(std::string("nsphere"), ns3.get());
 
     num_nodes = 0;
     root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
@@ -218,9 +218,9 @@ void bvh_test() {
 
     std::cout << "==========[BVH TEST (MULTI-LEAF)]==========" << std::endl;
     auto ns5 = std::make_unique<nsphere>();
-    ns5->set_radius(1.f);
+    ns5->radius = 1.f;
     ns5->translate(vec4(-4.f, 0.f, 0.f, 0.f));
-    shapes.push_back(ns5.get());
+    shapes.emplace_back(std::string("nsphere"), ns5.get());
 
     /*num_nodes = 0;
     root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
@@ -287,7 +287,7 @@ void build_scene(json& data, device_list<shape>& scene, device_list<material>& m
             nsphere ns;
 
             if (shape_data.find("radius") != shape_data.end()) {
-                ns.set_radius(shape_data["radius"].template get<float>());
+                ns.radius = shape_data["radius"].template get<float>();
             }
 
             std::cout << "constructing nsphere radius " << ns.get_radius() << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
