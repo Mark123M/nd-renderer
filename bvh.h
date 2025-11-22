@@ -44,13 +44,6 @@ struct bvh_bucket {
     aabb bbox; 
 };
 
-struct linear_bvh_node {
-    aabb bbox;
-    uint second_child_idx;
-    uint split_axis;
-    uint L, R;
-};
-
 bvh_node* build_recursive(uint L, uint R, uint& num_nodes, std::vector<shape*>& shapes) {
     bvh_node* node = new bvh_node;
     num_nodes++;
@@ -153,8 +146,8 @@ bvh_node* build_recursive(uint L, uint R, uint& num_nodes, std::vector<shape*>& 
     return node;
 }
 
-void log_bvh(const bvh_node* root, uint depth) {
-    if (root == nullptr) {
+void log_bvh(const bvh_node* node, uint depth) {
+    if (node == nullptr) {
         return;
     }
 
@@ -162,19 +155,104 @@ void log_bvh(const bvh_node* root, uint depth) {
     for (int i = 0; i < depth; i++) {
         spaces += "     ";
     }
-    std::string str = bvh_node::to_string(*root);
+    std::string str = bvh_node::to_string(*node);
     std::cout << spaces << str << std::endl;
     
-    log_bvh(root->children[0], depth + 1);
-    log_bvh(root->children[1], depth + 1);
+    log_bvh(node->children[0], depth + 1);
+    log_bvh(node->children[1], depth + 1);
 }
 
-void build_bvh(std::vector<shape*>& shapes, std::vector<linear_bvh_node>& nodes) {
-    uint num_nodes = 0;
-    bvh_node* root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
+struct linear_bvh_node {
+    aabb bbox;
+    uint split_axis;
+    uint L, R;
+    uint second_child_idx;
 
+    bool is_leaf() const {
+        return second_child_idx == 0;
+    }
+
+    static std::string to_string(const linear_bvh_node& linear_node) {
+        if (linear_node.is_leaf()) {
+            return std::format("[LINEAR LEAF] pmin {} | pmax {} | L {:d} | R {:d}",
+                point4::to_string(linear_node.bbox.p_min), point4::to_string(linear_node.bbox.p_max), linear_node.L, linear_node.R);
+        } else {
+            return std::format("[LINEAR INTERIOR] pmin {} | pmax {} | split_axis {:d} | second_child_idx {:d}",
+                point4::to_string(linear_node.bbox.p_min), point4::to_string(linear_node.bbox.p_max), linear_node.split_axis, linear_node.second_child_idx);
+        }
+	}
+};
+
+uint flatten_bvh(bvh_node* node, uint& offset, std::vector<linear_bvh_node>& linear_nodes) {
+    linear_bvh_node& linear_node = linear_nodes[offset];
+    linear_node.bbox = node->bbox;
+    uint node_offset = offset++;
+
+    if (node->children[0] == nullptr && node->children[1] == nullptr) { // leaf
+        linear_node.L = node->L;
+        linear_node.R = node->R;
+        linear_node.second_child_idx = 0; // mark as leaf
+    } else { // interior
+        linear_node.split_axis = node->split_axis;
+        linear_node.L = linear_node.R = 0;
+        flatten_bvh(node->children[0], offset, linear_nodes);
+        linear_node.second_child_idx = flatten_bvh(node->children[1], offset, linear_nodes);
+    }
+
+    return node_offset;
+}
+
+void build_bvh(std::vector<shape*>& shapes, std::vector<linear_bvh_node>& linear_nodes) {
+    uint num_nodes = 0;
+    bvh_node* node = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
+    log_bvh(node, 0);
+
+    linear_nodes = std::vector<linear_bvh_node>(num_nodes);
     uint offset = 0;
-    //flatten_bvh(root, &offset, nodes);
+    flatten_bvh(node, offset, linear_nodes);
+    delete node;
+}
+
+__host__ __device__ bool intersect_bvh(const ray& r, hit_result& res, linear_bvh_node* nodes, shape** shared_scene) {
+    int to_visit_offset = 0;
+    int nodes_to_visit[BVH_STACK_LEN];
+    int cur_node_idx = 0;
+    int nodes_visited = 0;
+    bool hit = false;
+
+    while(true) {
+        ++nodes_visited;
+        const linear_bvh_node* node = &nodes[cur_node_idx];
+
+        if (node->bbox.intersect(r, res.t)) {
+            if (node->is_leaf()) {
+                for (uint i = node->L; i <= node->R; i++) {
+                    hit = shared_scene[i]->intersect(r, res) || hit;
+                }
+
+                if (to_visit_offset == 0) {
+                    break;
+                }
+
+                cur_node_idx = nodes_to_visit[--to_visit_offset];
+            } else {
+                if (r.dir.get(node->split_axis) < 0.f) {
+                    nodes_to_visit[to_visit_offset++] = cur_node_idx + 1;
+                    cur_node_idx = node->second_child_idx;
+                } else {
+                    nodes_to_visit[to_visit_offset++] = node->second_child_idx;
+                    cur_node_idx = cur_node_idx + 1;
+                }
+            }
+        } else {
+            if (to_visit_offset == 0) {
+                break;
+            }
+            cur_node_idx = nodes_to_visit[--to_visit_offset];
+        }
+    }
+
+    return hit;
 }
 
 #endif

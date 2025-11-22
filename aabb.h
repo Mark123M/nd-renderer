@@ -11,8 +11,8 @@ struct aabb {
     __host__ __device__ aabb(): p_min{POINT4_MAX}, p_max{POINT4_MIN} {}
     __host__ __device__ aabb(const point4& p1, const point4& p2): p_min{point4::min(p1, p2)}, p_max{point4::max(p1, p2)} {}
 
-    __host__ __device__ bool intersect(const ray& r) const {
-        float t0 = 0, t1 = MAX_RAY_DIST;
+    __host__ __device__ bool intersect(const ray& r, float t_max) const {
+        float t0 = 0, t1 = t_max;
         
         for (uint i = 0; i < 4; i++) {
             float inv_dir = 1.f / r.dir.get(i);

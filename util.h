@@ -159,6 +159,7 @@ constexpr uint SAMPLES_PER_PIXEL = 20;
 constexpr uint MAX_RAY_BOUNCES = 100;
 constexpr float MAX_SAMPLE_L = 100.f;
 constexpr uint NUM_BVH_BUCKETS = 12;
+constexpr uint BVH_STACK_LEN = 16;
 
 // scene
 constexpr float AMBIENT = 0.3f;

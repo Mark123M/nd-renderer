@@ -222,11 +222,15 @@ void bvh_test() {
     ns5->translate(vec4(-4.f, 0.f, 0.f, 0.f));
     shapes.push_back(ns5.get());
 
-    num_nodes = 0;
+    /*num_nodes = 0;
     root = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
     log_bvh(root, 0);
-    delete root;
-
+    delete root; */
+    std::vector<linear_bvh_node> linear_nodes;
+    build_bvh(shapes, linear_nodes);
+    for (const auto& l : linear_nodes) {
+        std::cout << linear_bvh_node::to_string(l) << std::endl;
+    }
 }
 
 void build_base_shape(shape* s, size_t mat_idx, const vec4& t, float rxy, float rxz, float rxw, float ryz, float ryw, float rzw) {
