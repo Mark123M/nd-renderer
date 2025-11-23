@@ -83,7 +83,7 @@ struct nsphere : public shape {
 		return radius;
 	}
 
-	__host__ __device__ std::unique_ptr<shape> clone() const override {
+	std::unique_ptr<shape> clone() const override {
         return std::make_unique<nsphere>(*this);
     }
 

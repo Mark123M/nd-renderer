@@ -561,8 +561,8 @@ int main() {
     // can try space distortion too
     // tesseract lines with a sphere in the middle?
     // tesseract solid reflectors?
-    bvh_test();
-    return 0;
+    //bvh_test();
+    //return 0;
 
     std::vector<linear_bvh_node> linear_nodes;
     linear_bvh_node* d_linear_nodes = nullptr;
@@ -706,7 +706,8 @@ int main() {
             gpuErrchk(cudaDeviceSynchronize());
         }
 
-        uint shared_memory_bytes = scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*);
+        uint linear_nodes_bytes = linear_nodes.size() * sizeof(linear_bvh_node);
+        uint shared_memory_bytes = linear_nodes_bytes + scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*);
         camera::render_kernel<<<num_blocks, threads_per_block, shared_memory_bytes>>>(
             num_samples,
             sample_mode,
@@ -714,7 +715,7 @@ int main() {
             camera::image_width,
             camera::image_height,
             d_linear_nodes,
-            linear_nodes.size(),
+            linear_nodes_bytes,
             scene.d_data,
             scene.data_size,
             lights.d_data,

@@ -94,7 +94,7 @@ struct cube : public shape {
         return true;
     }
 
-    __host__ __device__ std::unique_ptr<shape> clone() const override {
+    std::unique_ptr<shape> clone() const override {
         return std::make_unique<cube>(*this);
     }
 

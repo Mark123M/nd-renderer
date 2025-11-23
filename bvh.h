@@ -168,7 +168,7 @@ struct linear_bvh_node {
     uint L, R;
     uint second_child_idx;
 
-    bool is_leaf() const {
+    __host__ __device__ bool is_leaf() const {
         return second_child_idx == 0;
     }
 

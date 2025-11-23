@@ -83,7 +83,7 @@ struct shape {
 		return aabb();
 	}
 
-	__host__ __device__ virtual std::unique_ptr<shape> clone() const = 0;
+	virtual std::unique_ptr<shape> clone() const = 0;
 
 	__host__ __device__ virtual size_t size() const = 0;
 
