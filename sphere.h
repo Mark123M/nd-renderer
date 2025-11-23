@@ -124,6 +124,12 @@ struct sphere : public shape {
 		return true;
 	}
 
+	__host__ __device__ aabb get_bbox_local() const override {
+		point4 p_min = point4(-radius, -radius, -radius, -half_w);
+		point4 p_max = point4(radius, radius, radius, half_w);
+		return aabb(p_min, p_max);
+	}
+
 	std::unique_ptr<shape> clone() const override {
         return std::make_unique<sphere>(*this);
     }

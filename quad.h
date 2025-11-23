@@ -90,6 +90,14 @@ struct quad : public shape {
 		return true;
 	}
 
+	__host__ __device__ aabb get_bbox_local() const override {
+		aabb bbox(o, o);
+		bbox = aabb::merge(bbox, o + u);
+		bbox = aabb::merge(bbox, o + v);
+		bbox = aabb::merge(bbox, o + u + v);
+		return bbox;
+	}
+
 	std::unique_ptr<shape> clone() const override {
         return std::make_unique<quad>(*this);
     }

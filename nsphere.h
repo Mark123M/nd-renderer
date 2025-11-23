@@ -79,10 +79,6 @@ struct nsphere : public shape {
 		return aabb(p_min, p_max);
 	}
 
-	__host__ __device__ float get_radius() const {
-		return radius;
-	}
-
 	std::unique_ptr<shape> clone() const override {
         return std::make_unique<nsphere>(*this);
     }

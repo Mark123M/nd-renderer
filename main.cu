@@ -336,7 +336,7 @@ void build_scene(
                 ns.radius = shape_data["radius"].template get<float>();
             }
 
-            std::cout << "constructing nsphere radius " << ns.get_radius() << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
+            //std::cout << "constructing nsphere radius " << ns.get_radius() << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
             build_base_shape(&ns, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
             shapes.emplace_back(shape_class, ns);
         } else if (shape_class == "ncube") {
@@ -346,7 +346,7 @@ void build_scene(
                 nc.half_len = shape_data["half_len"].template get<float>();
             }
 
-            std::cout << "constructing ncube half_len " << nc.half_len << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
+            //std::cout << "constructing ncube half_len " << nc.half_len << " translation " << t.x << " " << t.y << " " << t.z << " " << t.w << std::endl;
             build_base_shape(&nc, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
             shapes.emplace_back(shape_class, nc);
         } else if (shape_class == "sphere") {
@@ -360,7 +360,7 @@ void build_scene(
                 s.half_w = shape_data["half_w"].template get<float>();
             }
 
-            std::cout << "constructing sphere radius " << s.radius << " half_w " << s.half_w << std::endl;
+            //std::cout << "constructing sphere radius " << s.radius << " half_w " << s.half_w << std::endl;
             build_base_shape(&s, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
             shapes.emplace_back(shape_class, s);
         } else if (shape_class == "cube") {
@@ -374,7 +374,7 @@ void build_scene(
                 c.half_w = shape_data["half_w"].template get<float>();
             }
 
-            std::cout << "constructing cube half_len " << c.half_len << " half_w" << c.half_w << std::endl;
+            //std::cout << "constructing cube half_len " << c.half_len << " half_w" << c.half_w << std::endl;
             build_base_shape(&c, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
             shapes.emplace_back(shape_class, c);
         } else if (shape_class == "quad") {
@@ -383,7 +383,7 @@ void build_scene(
             vec4 v = shape_data["v"].template get<vec4>();
             quad q(o, u, v);
 
-            std::cout << "constructing quad" << std::endl;
+            //std::cout << "constructing quad" << std::endl;
             build_base_shape(&q, mat_idx, t, rxy, rxz, rxw, ryz, ryw, rzw);
             shapes.emplace_back(shape_class, q);
         }
@@ -416,7 +416,7 @@ void build_scene(
                 l.albedo = c;
             }
 
-            std::cout << "constructing lambertian albedo " << l.albedo.r << " " << l.albedo.g << " " << l.albedo.b << std::endl;
+            //std::cout << "constructing lambertian albedo " << l.albedo.r << " " << l.albedo.g << " " << l.albedo.b << std::endl;
             materials.push_back<lambertian>(l);
         } else if (mat_class == "light_material") {
             light_material lig;
@@ -431,7 +431,7 @@ void build_scene(
                 lig.albedo = c;
             }
 
-            std::cout << "constructing light color " << lig.col.r << " " << lig.col.g << " " << lig.col.b << " albedo " << lig.albedo.r << " " << lig.albedo.g << " " << lig.albedo.b << std::endl;
+            //std::cout << "constructing light color " << lig.col.r << " " << lig.col.g << " " << lig.col.b << " albedo " << lig.albedo.r << " " << lig.albedo.g << " " << lig.albedo.b << std::endl;
             materials.push_back<light_material>(lig);
         } else if (mat_class == "dielectric") {
             smooth_dielectric sd;

@@ -118,7 +118,7 @@ bvh_node* build_recursive(uint L, uint R, uint& num_nodes, std::vector<shape_wra
         float leaf_cost = num_shapes;
         min_cost = 1.f / 2.f + min_cost / bbox.surface_volume();
 
-        if (min_cost < leaf_cost) {
+        if (num_shapes > MAX_BVH_LEAF_SHAPES || min_cost < leaf_cost) {
             auto mid_iter = std::partition(
                 shapes.begin() + L, shapes.begin() + R + 1,
                 [=](const shape_wrapper& bp) {
@@ -215,7 +215,7 @@ void build_bvh(std::vector<shape_wrapper>& shapes, std::vector<linear_bvh_node>&
 
 __host__ __device__ bool intersect_bvh(const ray& r, hit_result& res, linear_bvh_node* nodes, shape** shared_scene) {
     int to_visit_offset = 0;
-    int nodes_to_visit[BVH_STACK_LEN];
+    int nodes_to_visit[MAX_BVH_STACK_LEN];
     int cur_node_idx = 0;
     int nodes_visited = 0;
     bool hit = false;
