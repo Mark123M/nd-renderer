@@ -173,6 +173,7 @@ __device__ bool sample_area(
     // visibility term
     hit_result res_next;
     if (!intersect_bvh(r_next, res_next, shared_linear_nodes, shared_scene, num_bvh_intersections, num_shape_intersections) || !point4::approx_points_equals(res_next.p, ss.p)) {
+    //if (!intersect_world(r_next, res_next, shared_scene, num_shape_intersections) || !point4::approx_points_equals(res_next.p, ss.p)) {
         return false;
     }
 
@@ -224,6 +225,7 @@ __device__ color ray_color_cuda(
         hit_result res; // res is initialized with MAX_RAY_DIST
 
         if (!intersect_bvh(r, res, shared_linear_nodes, shared_scene, num_bvh_intersections, num_shape_intersections)) {
+        //if (!intersect_world(r, res, shared_scene, num_shape_intersections)) {
             // float a = 0.5f * (r.dir.y + 1.f);
             // return color(0.5f, 0.5f, 0.5f); // constant environment map
             // return color(0.f, 0.f, 0.f); //* (1.f - a) * color(1.f, 1.f, 1.f) + a * color(0.5f, 0.7f, 1.f);
@@ -329,6 +331,7 @@ __device__ color ray_color_area_cuda(
     hit_result res;
 
     if (!intersect_bvh(r, res, shared_linear_nodes, shared_scene, num_bvh_intersections, num_shape_intersections)) { // can't area sample when the world is unbounded
+    //if (!intersect_world(r, res, shared_scene, num_shape_intersections)) { // can't area sample when the world is unbounded
         return color(0.f, 0.f, 0.f);
     }
 
