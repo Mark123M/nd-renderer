@@ -94,6 +94,16 @@ struct cube : public shape {
         return true;
     }
 
+    __host__ __device__ aabb get_bbox_local() const override {
+        point4 p_min = point4(-half_len, -half_len, -half_len, -half_w);
+		point4 p_max = point4(half_len, half_len, half_len, half_w);
+		return aabb(p_min, p_max);
+	}
+
+    std::unique_ptr<shape> clone() const override {
+        return std::make_unique<cube>(*this);
+    }
+
     // Returns the size of the object in memory.
 	__host__ __device__ size_t size() const override {
 		return sizeof(cube);

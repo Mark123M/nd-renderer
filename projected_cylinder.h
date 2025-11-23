@@ -45,6 +45,10 @@ struct projected_cylinder : public shape {
 		end = basis.local_to_world(end0);
 	}
 
+    std::unique_ptr<shape> clone() const override {
+        return std::make_unique<projected_cylinder>(*this);
+    }
+
 	__host__ __device__ size_t size() const override {
 		return sizeof(projected_cylinder);
 	}

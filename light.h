@@ -5,10 +5,6 @@
 #include "shape.h"
 #include <cuda_runtime.h>
 
-enum light_type {
-    DIRECTION, POINT, AREA
-};
-
 struct light {
 	color col;
 

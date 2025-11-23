@@ -15,7 +15,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
 // program
 constexpr uint NUM_CPU_THREADS = 20;
-constexpr float SIMULATION_RATE = 100.f;
+constexpr float SIMULATION_RATE = 1000.f;
 constexpr float MIN_DELTA_TIME = 1.f / SIMULATION_RATE;
 const char* PATH_TO_SCENES = "./scenes";
 
@@ -106,7 +106,7 @@ struct device_list {
    device_list(): d_list{nullptr}, d_data{nullptr}, len{0}, data_size{0} {}
 
    template <typename U>
-   void push_back(U object) {
+   void push_back(const U& object) {
       T** d_new_list;
       gpuErrchk(cudaMalloc(&d_new_list, (len + 1) * sizeof(T*)));
       gpuErrchk(cudaFree(d_list));
@@ -122,6 +122,12 @@ struct device_list {
       gpuErrchk(cudaDeviceSynchronize());
       len++;
       data_size += sizeof(U);
+   }
+
+   template <typename U>
+   void push_back(const T* object) {
+      const U* object_ptr = (const U*)object;
+      push_back(*object_ptr);
    }
 
    __host__ __device__ T* operator[](int i) const {
@@ -158,6 +164,10 @@ constexpr uint MAX_MARCH_STEPS = 50;
 constexpr uint SAMPLES_PER_PIXEL = 20;
 constexpr uint MAX_RAY_BOUNCES = 100;
 constexpr float MAX_SAMPLE_L = 100.f;
+
+constexpr uint NUM_BVH_BUCKETS = 12;
+constexpr uint MAX_BVH_STACK_LEN = 16;
+constexpr uint MAX_BVH_LEAF_SHAPES = 4;
 
 // scene
 constexpr float AMBIENT = 0.3f;

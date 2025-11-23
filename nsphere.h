@@ -73,6 +73,16 @@ struct nsphere : public shape {
 		return true;
 	}
 
+	__host__ __device__ aabb get_bbox_local() const override {
+		point4 p_min = point4(-radius, -radius, -radius, -radius);
+		point4 p_max = point4(radius, radius, radius, radius);
+		return aabb(p_min, p_max);
+	}
+
+	std::unique_ptr<shape> clone() const override {
+        return std::make_unique<nsphere>(*this);
+    }
+
 	__host__ __device__ size_t size() const override {
 		return sizeof(nsphere);
 	}

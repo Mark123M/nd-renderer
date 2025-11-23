@@ -17,10 +17,6 @@ struct light_sample {
     float pdf = 1.f;
 };
 
-enum material_type {
-    LAMBERTIAN, SPECULAR, DIELECTRIC
-};
-
 struct shape;
 struct hit_result;
 
