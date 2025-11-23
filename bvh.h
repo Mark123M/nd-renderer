@@ -203,6 +203,10 @@ uint flatten_bvh(bvh_node* node, uint& offset, std::vector<linear_bvh_node>& lin
 }
 
 void build_bvh(std::vector<shape_wrapper>& shapes, std::vector<linear_bvh_node>& linear_nodes) {
+    if (shapes.empty()) {
+        return;
+    }
+
     uint num_nodes = 0;
     bvh_node* node = build_recursive(0, shapes.size() - 1, num_nodes, shapes);
     log_bvh(node, 0);

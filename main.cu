@@ -197,6 +197,22 @@ __global__ void math_test() {
     t2.linear.print();
 }
 
+void build_bvh_cuda(std::vector<linear_bvh_node>& linear_nodes, linear_bvh_node*& d_linear_nodes, std::vector<shape_wrapper>& shapes) {
+    linear_nodes.clear();
+    build_bvh(shapes, linear_nodes);
+    for (const auto& l : linear_nodes) {
+        std::cout << linear_bvh_node::to_string(l) << std::endl;
+    }
+
+    uint linear_nodes_bytes = linear_nodes.size() * sizeof(linear_bvh_node);
+    if (d_linear_nodes != nullptr) {
+        gpuErrchk(cudaFree(d_linear_nodes));
+    }
+    gpuErrchk(cudaMalloc(&d_linear_nodes, linear_nodes_bytes));
+    linear_bvh_node* h_linear_nodes = linear_nodes.data();
+    gpuErrchk(cudaMemcpy(d_linear_nodes, h_linear_nodes, linear_nodes_bytes, cudaMemcpyHostToDevice));
+}
+
 void bvh_test() {
     std::cout << "==========[BVH TEST (ONE SHAPE)]==========" << std::endl;
     std::vector<shape_wrapper> shapes;
@@ -254,20 +270,59 @@ void bvh_test() {
     }
 }
 
-void build_bvh_cuda(std::vector<linear_bvh_node>& linear_nodes, linear_bvh_node*& d_linear_nodes, std::vector<shape_wrapper>& shapes) {
-    linear_nodes.clear();
-    build_bvh(shapes, linear_nodes);
-    for (const auto& l : linear_nodes) {
-        std::cout << linear_bvh_node::to_string(l) << std::endl;
+void bvh_test_scene(
+    std::vector<linear_bvh_node>& linear_nodes,
+    linear_bvh_node*& d_linear_nodes,
+    std::vector<shape_wrapper>& shapes,
+    device_list<shape>& scene,
+    device_list<material>& materials,
+    device_list<light>& lights,
+    uint64_t& h_pcg_state
+) {
+    shapes.clear();
+    scene.clear();
+    materials.clear();
+    lights.clear();
+
+    for (uint i = 0; i < 500; i++) {
+        vec4 t(randf_pcg32(-5.f, 5.f, h_pcg_state), randf_pcg32(-5.f, 5.f, h_pcg_state), randf_pcg32(-10.f, -20.f, h_pcg_state), 0.f);
+        nsphere ns;
+        ns.radius =  randf_pcg32(0.5f, 2.0f, h_pcg_state);
+        ns.translate(t);
+        ns.mat_idx = i % 2;
+        shapes.emplace_back("nsphere", ns);
     }
 
-    uint linear_nodes_bytes = linear_nodes.size() * sizeof(linear_bvh_node);
-    if (d_linear_nodes != nullptr) {
-        gpuErrchk(cudaFree(d_linear_nodes));
+    build_bvh_cuda(linear_nodes, d_linear_nodes, shapes);
+
+    for (const shape_wrapper& sw : shapes) {
+        if (sw.type == "nsphere") {
+            scene.push_back<nsphere>(sw.s.get());
+        } else if (sw.type == "ncube") {
+            scene.push_back<ncube>(sw.s.get());
+        } else if (sw.type == "sphere") {
+            scene.push_back<sphere>(sw.s.get());
+        } else if (sw.type == "cube") {
+            scene.push_back<cube>(sw.s.get());
+        } else if (sw.type == "quad") {
+            scene.push_back<quad>(sw.s.get());
+        }
     }
-    gpuErrchk(cudaMalloc(&d_linear_nodes, linear_nodes_bytes));
-    linear_bvh_node* h_linear_nodes = linear_nodes.data();
-    gpuErrchk(cudaMemcpy(d_linear_nodes, h_linear_nodes, linear_nodes_bytes, cudaMemcpyHostToDevice));
+
+    // add materials directly
+    lambertian lamb;
+    lamb.albedo = color(0.9f, 0.5f, 0.8f);
+    materials.push_back(lamb);
+    light_material lig;
+    lig.col = color(10.f, 10.f, 10.f);
+    materials.push_back(lig);
+
+    size_t scene_len = scene.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_scene_len, &scene_len, sizeof(size_t)));
+    size_t lights_len = lights.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_lights_len, &lights_len, sizeof(size_t)));    
+    size_t materials_len = materials.size();
+    gpuErrchk(cudaMemcpyToSymbol(d_materials_len, &materials_len, sizeof(size_t)));
 }
 
 void build_base_shape(shape* s, size_t mat_idx, const vec4& t, float rxy, float rxz, float rxw, float ryz, float ryw, float rzw) {
@@ -571,7 +626,7 @@ int main() {
     device_list<light> lights;
     device_list<material> materials;
 
-    std::filesystem::path init_scene_path("scenes/cornell2.json");
+    std::filesystem::path init_scene_path("scenes/empty.json");
     std::filesystem::directory_entry cur_scene_entry(init_scene_path);
     std::filesystem::file_time_type cur_scene_last_write_time = cur_scene_entry.last_write_time();
     std::ifstream f(init_scene_path);
@@ -624,6 +679,10 @@ int main() {
     uint64_t* d_pcg_states;
     gpuErrchk(cudaMalloc(&d_pcg_states, num_pixels * sizeof(uint64_t)));
     camera::init_pcg_states_kernel<<<num_blocks, threads_per_block>>>(d_pcg_states, camera::image_width, camera::image_height);
+    uint64_t h_pcg_state = 0x4d595df4d0f33173;
+    pcg32_init(2121, h_pcg_state);
+
+    bvh_test_scene(linear_nodes, d_linear_nodes, shapes, scene, materials, lights, h_pcg_state);
 
     int num_samples = 0;
     auto clear_buffer = [&num_samples, num_pixels, d_color_buffer, d_image_data]() -> void {
