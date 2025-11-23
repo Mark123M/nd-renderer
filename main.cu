@@ -35,8 +35,6 @@ using json = nlohmann::json;
 #include <cuda_gl_interop.h>
 #include <nvtx3/nvToolsExt.h>
 
-uint g_sm_count;
-uint g_sm_max_threads;
 float fixed_delta_time = 0.f;
 
 struct cudaGraphicsResource* render_texture_CUDA = nullptr;
@@ -284,10 +282,10 @@ void bvh_test_scene(
     materials.clear();
     lights.clear();
 
-    for (uint i = 0; i < 500; i++) {
-        vec4 t(randf_pcg32(-5.f, 5.f, h_pcg_state), randf_pcg32(-5.f, 5.f, h_pcg_state), randf_pcg32(-10.f, -20.f, h_pcg_state), 0.f);
+    for (uint i = 0; i < 5000; i++) {
+        vec4 t(randf_pcg32(-20.f, 20.f, h_pcg_state), randf_pcg32(-20.f, 20.f, h_pcg_state), randf_pcg32(-10.f, -20.f, h_pcg_state), 0.f);
         nsphere ns;
-        ns.radius =  randf_pcg32(0.5f, 2.0f, h_pcg_state);
+        ns.radius = randf_pcg32(0.5f, 2.0f, h_pcg_state);
         ns.translate(t);
         ns.mat_idx = i % 2;
         shapes.emplace_back("nsphere", ns);
@@ -552,11 +550,17 @@ void shape_axes(device_list<shape>& scene, device_list<material>& materials, dev
 int main() {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
-    g_sm_count = deviceProp.multiProcessorCount;
-    g_sm_max_threads = deviceProp.maxThreadsPerMultiProcessor;
+    uint sm_count;
+    uint sm_max_threads;
+    uint max_smem_per_block;
+
+    sm_count = deviceProp.multiProcessorCount;
+    sm_max_threads = deviceProp.maxThreadsPerMultiProcessor;
+    max_smem_per_block = deviceProp.sharedMemPerBlock;
+
     uint stride_threads_per_block = 256;
-    uint stride_num_blocks = (g_sm_max_threads / stride_threads_per_block) * g_sm_count;
-    printf("SM count %d | Max threads per SM %d | Stride block count %d\n", g_sm_count, g_sm_max_threads, stride_num_blocks);
+    uint stride_num_blocks = (sm_max_threads / stride_threads_per_block) * sm_count;
+    printf("Max SMEM/block %d | SM count %d | Max threads per SM %d", max_smem_per_block, sm_count, sm_max_threads);
 
     glfwSetErrorCallback(glfw_error_callback);
 
@@ -680,7 +684,7 @@ int main() {
     gpuErrchk(cudaMalloc(&d_pcg_states, num_pixels * sizeof(uint64_t)));
     camera::init_pcg_states_kernel<<<num_blocks, threads_per_block>>>(d_pcg_states, camera::image_width, camera::image_height);
     uint64_t h_pcg_state = 0x4d595df4d0f33173;
-    pcg32_init(2121, h_pcg_state);
+    pcg32_init(4221, h_pcg_state);
 
     bvh_test_scene(linear_nodes, d_linear_nodes, shapes, scene, materials, lights, h_pcg_state);
 
@@ -767,24 +771,42 @@ int main() {
 
         uint linear_nodes_bytes = linear_nodes.size() * sizeof(linear_bvh_node);
         uint shared_memory_bytes = linear_nodes_bytes + scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*);
-        camera::render_kernel<<<num_blocks, threads_per_block, shared_memory_bytes>>>(
-            num_samples,
-            sample_mode,
-            sample_lights,
-            camera::image_width,
-            camera::image_height,
-            d_linear_nodes,
-            linear_nodes_bytes,
-            scene.d_data,
-            scene.data_size,
-            lights.d_data,
-            lights.data_size,
-            materials.d_data,
-            materials.data_size,
-            d_color_buffer,
-            d_image_data,
-            d_pcg_states
-        );
+        
+        if (shared_memory_bytes <= max_smem_per_block) {
+            camera::render_kernel<<<num_blocks, threads_per_block, shared_memory_bytes>>>(
+                num_samples,
+                sample_mode,
+                sample_lights,
+                camera::image_width,
+                camera::image_height,
+                d_linear_nodes,
+                linear_nodes_bytes,
+                scene.d_data,
+                scene.data_size,
+                lights.d_data,
+                lights.data_size,
+                materials.d_data,
+                materials.data_size,
+                d_color_buffer,
+                d_image_data,
+                d_pcg_states
+            );
+        } else {
+            camera::render_kernel_global<<<num_blocks, threads_per_block>>>(
+                num_samples,
+                sample_mode,
+                sample_lights,
+                camera::image_width,
+                camera::image_height,
+                d_linear_nodes,
+                scene.d_list,
+                lights.d_list,
+                materials.d_list,
+                d_color_buffer,
+                d_image_data,
+                d_pcg_states
+            );
+        }
 
         num_samples++;
         

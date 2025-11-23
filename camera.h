@@ -392,6 +392,61 @@ __device__ color ray_color_area_cuda(
     return L;
 }
 
+__global__ void render_kernel_global(
+    int num_samples,
+    int sample_mode,
+    bool sample_lights,
+    uint width,
+    uint height,
+    linear_bvh_node* d_linear_nodes,
+    shape** d_scene,
+    light** d_lights,
+    material** d_materials,
+    double3* d_color_buffer,
+    uchar4* d_image_data,
+    uint64_t* d_pcg_states
+) {
+    uint row = blockDim.x * blockIdx.x + threadIdx.x;
+    uint col = blockDim.y * blockIdx.y + threadIdx.y;
+    uint idx = row * width + col;
+
+    if (row < height && col < width) {
+        point4 camera_pos = d_camera_transform.get_pos();
+        float row_offset = randf_pcg32(-0.5f, 0.5f, d_pcg_states[idx]);
+        float col_offset = randf_pcg32(-0.5f, 0.5f, d_pcg_states[idx]);
+        
+        point4 sample = d_pixel00_center + ((col + col_offset) * d_pixel_x) + ((row + row_offset) * d_pixel_y);
+        vec4 direction = vec4::normalize(sample - camera_pos);
+        ray r(camera_pos, direction);
+        
+        color c_sample = sample_mode == 0 ? ray_color_cuda(r, d_linear_nodes, d_scene, d_lights, d_materials, sample_lights, d_pcg_states[idx])
+            : ray_color_area_cuda(r, d_linear_nodes, d_scene, d_lights, d_materials, sample_lights, d_pcg_states[idx]);
+
+        float max_rgb = fmaxf(c_sample.r, fmaxf(c_sample.g, c_sample.b));
+        if (max_rgb > MAX_SAMPLE_L) {
+            float k = MAX_SAMPLE_L / max_rgb;
+            c_sample.r *= k;
+            c_sample.g *= k;
+            c_sample.b *= k;
+        }
+
+        double3 c_sample_double;
+        c_sample_double.x = fminf(c_sample.r, MAX_SAMPLE_L);
+        c_sample_double.y = fminf(c_sample.g, MAX_SAMPLE_L);
+        c_sample_double.z = fminf(c_sample.b, MAX_SAMPLE_L);
+
+        d_color_buffer[idx].x = (1.0 / (num_samples + 1.0)) * (num_samples * d_color_buffer[idx].x + c_sample_double.x);
+        d_color_buffer[idx].y = (1.0 / (num_samples + 1.0)) * (num_samples * d_color_buffer[idx].y + c_sample_double.y);
+        d_color_buffer[idx].z = (1.0 / (num_samples + 1.0)) * (num_samples * d_color_buffer[idx].z + c_sample_double.z);
+        // d_color_buffer[idx] = (1.f / (num_samples + 1.f)) * ((float)num_samples * d_color_buffer[idx] + c_sample_double);
+
+        d_image_data[idx].x = static_cast<unsigned char>(fmin(1.0, d_color_buffer[idx].x) * 255.999);
+        d_image_data[idx].y = static_cast<unsigned char>(fmin(1.0, d_color_buffer[idx].y) * 255.999);
+        d_image_data[idx].z = static_cast<unsigned char>(fmin(1.0, d_color_buffer[idx].z) * 255.999);
+        d_image_data[idx].w = 255;
+    }
+}
+
 __global__ void render_kernel(
     int num_samples,
     int sample_mode,
