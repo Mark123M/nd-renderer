@@ -283,7 +283,7 @@ void bvh_test_scene(
     lights.clear();
 
     for (uint i = 0; i < 5000; i++) {
-        vec4 t(randf_pcg32(-20.f, 20.f, h_pcg_state), randf_pcg32(-20.f, 20.f, h_pcg_state), randf_pcg32(-10.f, -20.f, h_pcg_state), 0.f);
+        vec4 t(randf_pcg32(-200.f, 200.f, h_pcg_state), randf_pcg32(-200.f, 200.f, h_pcg_state), randf_pcg32(-10.f, -20.f, h_pcg_state), 0.f);
         nsphere ns;
         ns.radius = randf_pcg32(0.5f, 2.0f, h_pcg_state);
         ns.translate(t);
@@ -771,7 +771,8 @@ int main() {
 
         uint linear_nodes_bytes = linear_nodes.size() * sizeof(linear_bvh_node);
         uint shared_memory_bytes = linear_nodes_bytes + scene.data_size + lights.data_size + materials.data_size + scene.size() * sizeof(shape*) + lights.size() * sizeof(light*) + materials.size() * sizeof(material*);
-        
+        camera::d_metrics.reset_metrics();
+
         if (shared_memory_bytes <= max_smem_per_block) {
             camera::render_kernel<<<num_blocks, threads_per_block, shared_memory_bytes>>>(
                 num_samples,
@@ -826,10 +827,13 @@ int main() {
         gpuErrchk(cudaGraphicsUnmapResources(1, &render_texture_CUDA, 0));
         //nvtxRangePop();
 
+        gpuErrchk(cudaDeviceSynchronize());
         // Display the texture in an ImGui::Image widget
         ImGui::Image((void*)(intptr_t)render_texture, ImVec2(camera::image_width, camera::image_height));
-        ImGui::Text("%.3f ms/frame (%.1f FPS), %d samples per pixel", 1000.0f / io.Framerate, io.Framerate, num_samples);
-        
+        ImGui::Text("latency: %.3f ms/frame (%.1f FPS) | samples per pixel: %d", 1000.0f / io.Framerate, io.Framerate, num_samples);
+        ImGui::Text("avg bvh intersections: %.3f | avg shape intersections: %.3f | avg bounces %.3f",
+            (float)camera::d_metrics.total_num_bvh_intersections / num_pixels, (float)camera::d_metrics.total_num_shape_intersections / num_pixels, (float)camera::d_metrics.total_num_bounces / num_pixels);
+
         for (const auto& entry : std::filesystem::directory_iterator(PATH_TO_SCENES)) {
             const char* stem = entry.path().stem().c_str();
             

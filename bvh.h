@@ -217,21 +217,28 @@ void build_bvh(std::vector<shape_wrapper>& shapes, std::vector<linear_bvh_node>&
     delete node;
 }
 
-__host__ __device__ bool intersect_bvh(const ray& r, hit_result& res, linear_bvh_node* nodes, shape** shared_scene) {
+__host__ __device__ bool intersect_bvh(
+    const ray& r,
+    hit_result& res,
+    linear_bvh_node* nodes,
+    shape** shared_scene,
+    uint& num_bvh_intersections,
+    uint& num_shape_intersections
+) {
     int to_visit_offset = 0;
     int nodes_to_visit[MAX_BVH_STACK_LEN];
     int cur_node_idx = 0;
-    int nodes_visited = 0;
     bool hit = false;
 
     while(true) {
-        ++nodes_visited;
+        num_bvh_intersections++;
         const linear_bvh_node* node = &nodes[cur_node_idx];
 
         if (node->bbox.intersect(r, res.t)) {
             if (node->is_leaf()) {
                 for (uint i = node->L; i <= node->R; i++) {
                     hit = shared_scene[i]->intersect(r, res) || hit;
+                    num_shape_intersections++;
                 }
 
                 if (to_visit_offset == 0) {
