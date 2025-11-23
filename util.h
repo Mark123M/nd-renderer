@@ -15,7 +15,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
 // program
 constexpr uint NUM_CPU_THREADS = 20;
-constexpr float SIMULATION_RATE = 100.f;
+constexpr float SIMULATION_RATE = 1000.f;
 constexpr float MIN_DELTA_TIME = 1.f / SIMULATION_RATE;
 const char* PATH_TO_SCENES = "./scenes";
 
